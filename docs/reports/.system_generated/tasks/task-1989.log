@@ -1,0 +1,17 @@
+Precomputing inferences...
+
+Evaluating Scenario A (30s @ 120s on S-S1)...
+Scenario A with Clean Heading & NHC EKF:
+  Final Position Error: 175.06 m (Old was 119.08 m)
+  Drift Percentage:     40.21 % (Old was 23.34 %)
+  Pre-Blackout bg_z:    -0.0523 deg/s
+  NHC dtheta (mean):    0.0106 deg/step
+  NHC dtheta (max):     0.1319 deg/step
+
+Evaluating Scenario B (60s @ 300s on S-S1)...
+Scenario B with Clean Heading & NHC EKF:
+  Final Position Error: 466.76 m (Old was 254.07 m)
+  Drift Percentage:     55.54 % (Old was 31.21 %)
+  Pre-Blackout bg_z:    -0.3680 deg/s
+  NHC dtheta (mean):    0.0098 deg/step
+  NHC dtheta (max):     0.0539 deg/step

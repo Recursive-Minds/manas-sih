@@ -1,0 +1,20 @@
+=== HIGH R_NHC SWEEP ON PHYSICAL 3D ES-EKF ===
+R_NHC =  0.20 -> Combined Med:  79.23%, Long Med:  51.69%, Worst: 193.41%
+R_NHC =  2.00 -> Combined Med: 120.27%, Long Med: 112.72%, Worst: 357.07%
+R_NHC =  5.00 -> Combined Med: 144.51%, Long Med: 141.12%, Worst: 785.94%
+R_NHC = 10.00 -> Combined Med: 181.91%, Long Med: 174.35%, Worst: 1592.12%
+R_NHC = 20.00 -> Combined Med: 207.43%, Long Med: 214.57%, Worst: 1435.97%
+
+==========================================================================
+                 HIGH R_NHC SWEEP COMPARISON TABLE                        
+==========================================================================
+Config / R_NHC       | Median Drift % | Long (>500m) Med % | Worst Case % | Status
+------------------------------------------------------------------------------
+Pre-Fix Baseline     | 72.51%         | 48.57%             | 189.20%      | Reference
+R_NHC = 0.20          |         79.23% |             51.69% |      193.41% | Better than R=0.20
+R_NHC = 2.00          |        120.27% |            112.72% |      357.07% | Regressed
+R_NHC = 5.00          |        144.51% |            141.12% |      785.94% | Regressed
+R_NHC = 10.00         |        181.91% |            174.35% |     1592.12% | Regressed
+R_NHC = 20.00         |        207.43% |            214.57% |     1435.97% | Regressed
+==========================================================================
+Optimal R_NHC among active physical 3D tests: 0.2 (Median: 79.23%)

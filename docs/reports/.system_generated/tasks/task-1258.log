@@ -1,0 +1,13 @@
+Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 490/51746 [00:00<00:30, 1655.75it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 656/51746 [00:00<01:04, 789.66it/s] Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 747/51746 [00:00<01:18, 648.13it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 814/51746 [00:01<01:27, 579.34it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 870/51746 [00:01<01:29, 571.44it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 1019/51746 [00:01<01:07, 754.99it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1106/51746 [00:01<01:22, 613.65it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1177/51746 [00:01<01:32, 543.97it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1238/51746 [00:01<01:41, 496.34it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1292/51746 [00:02<01:48, 466.55it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1341/51746 [00:02<01:53, 445.78it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1387/51746 [00:02<01:56, 431.54it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1431/51746 [00:02<02:00, 416.35it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1473/51746 [00:02<02:02, 409.91it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1514/51746 [00:02<02:04, 402.94it/s]                                                                                             Columns in history_df: ['time_s', 'timestamp_ns', 'est_lat', 'est_lon', 'est_e', 'est_n', 'est_u', 'gt_e', 'gt_n', 'gt_u', 'error_m', 'heading_deg', 'speed_mps', 'in_blackout', 'mode']
+GT Total Distance Travelled:  510.3 m
+Est Total Distance Travelled: 424.1 m (Diff: -86.1 m)
+Final Position Error:         100.32 m
+Drift Percentage:             19.66%
+
+Step-by-step during blackout:
+  t=120.1s | Err=0.3m | EstPos=(-337.5, 132.5) | GTPos=(-337.2, 132.5) | EstSpeed=11.0 m/s | EstHdg=272.2�
+  t=125.1s | Err=29.7m | EstPos=(-398.6, 146.3) | GTPos=(-426.3, 135.6) | EstSpeed=16.1 m/s | EstHdg=286.0�
+  t=130.1s | Err=52.1m | EstPos=(-466.9, 161.0) | GTPos=(-515.4, 142.0) | EstSpeed=15.6 m/s | EstHdg=281.3�
+  t=135.1s | Err=58.1m | EstPos=(-552.1, 185.1) | GTPos=(-604.6, 160.1) | EstSpeed=18.6 m/s | EstHdg=294.4�
+  t=140.1s | Err=75.2m | EstPos=(-615.5, 235.1) | GTPos=(-679.6, 195.8) | EstSpeed=14.9 m/s | EstHdg=322.1�
+  t=145.1s | Err=89.0m | EstPos=(-652.3, 282.7) | GTPos=(-736.4, 253.7) | EstSpeed=11.3 m/s | EstHdg=323.2�

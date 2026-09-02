@@ -1,0 +1,17 @@
+exp_id,param_changed,turn_th,max_bg,cool,spd_mode,r_nhc,median_pct,worst_pct
+Ref (Current Best),Baseline Reference,1.5,0.5,0.5,dynamic,0.2,72.5064452692622,189.20471171067393
+Exp A: bg=0.3°/s,max_gyro_bias=0.3°/s,1.5,0.3,0.5,dynamic,0.2,72.63971959473099,189.20471171067393
+Exp A: bg=0.4°/s,max_gyro_bias=0.4°/s,1.5,0.4,0.5,dynamic,0.2,73.44616175082669,189.20471171067393
+Exp A: bg=0.5°/s,max_gyro_bias=0.5°/s,1.5,0.5,0.5,dynamic,0.2,72.5064452692622,189.20471171067393
+Exp A: bg=0.6°/s,max_gyro_bias=0.6°/s,1.5,0.6,0.5,dynamic,0.2,72.7878670551147,189.20471171067393
+Exp A: bg=0.75°/s,max_gyro_bias=0.75°/s,1.5,0.75,0.5,dynamic,0.2,72.7878670551147,189.20471171067393
+Exp A: bg=1.0°/s,max_gyro_bias=1.0°/s,1.5,1.0,0.5,dynamic,0.2,72.7878670551147,189.20471171067393
+Exp B: spd=off,speed_scale_mode=off,1.5,0.5,0.5,off,0.2,71.14917540140269,196.3914652904274
+Exp B: spd=static_1.0,speed_scale_mode=static_1.0,1.5,0.5,0.5,static_1.0,0.2,71.14917540140269,196.3914652904274
+Exp B: spd=static_3.4,speed_scale_mode=static_3.4,1.5,0.5,0.5,static_3.4,0.2,329.441026688111,612.2381450672495
+Exp B: spd=dynamic,speed_scale_mode=dynamic,1.5,0.5,0.5,dynamic,0.2,72.5064452692622,189.20471171067393
+Exp C: r_nhc=0.05,r_nhc=0.05,1.5,0.5,0.5,dynamic,0.05,72.50644526926351,189.20471171067393
+Exp C: r_nhc=0.1,r_nhc=0.1,1.5,0.5,0.5,dynamic,0.1,72.50644526926219,189.20471171067393
+Exp C: r_nhc=0.2,r_nhc=0.2,1.5,0.5,0.5,dynamic,0.2,72.5064452692622,189.20471171067393
+Exp C: r_nhc=0.5,r_nhc=0.5,1.5,0.5,0.5,dynamic,0.5,72.50644526926307,189.20471171067393
+Exp C: r_nhc=1.0,r_nhc=1.0,1.5,0.5,0.5,dynamic,1.0,72.50644526926322,189.20471171067393

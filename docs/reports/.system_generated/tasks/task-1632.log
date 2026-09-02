@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\check_filter_states.py", line 57, in <module>
+    scales.append(runner.pipeline.filter._speed_scale)
+                  ^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'IDRPipeline' object has no attribute 'filter'

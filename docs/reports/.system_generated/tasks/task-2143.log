@@ -1,0 +1,96 @@
+Loading datasets...
+Precomputing inferences...
+
+Evaluating 50 scenarios with production fixed EKF...
+  [ 1/50] rand_bo_01_75s_at_1956s             old= 289.60m  new= 509.04m (++219.45m)
+  [ 2/50] rand_bo_02_34s_at_4810s             old=  46.17m  new=  46.72m (++0.55m)
+  [ 3/50] rand_bo_03_56s_at_3727s             old=  38.99m  new= 120.07m (++81.08m)
+  [ 4/50] rand_bo_04_61s_at_3066s             old= 443.03m  new= 465.28m (++22.26m)
+  [ 5/50] rand_bo_05_23s_at_873s              old=  69.40m  new= 109.35m (++39.95m)
+  [ 6/50] rand_bo_06_63s_at_873s              old= 177.67m  new= 298.51m (++120.84m)
+  [ 7/50] rand_bo_07_32s_at_388s              old=  63.08m  new=  87.86m (++24.78m)
+  [ 8/50] rand_bo_08_25s_at_4391s             old=  88.28m  new= 125.77m (++37.49m)
+  [ 9/50] rand_bo_09_86s_at_3078s             old= 530.88m  new= 540.31m (++9.43m)
+  [10/50] rand_bo_10_88s_at_3608s             old= 285.26m  new= 354.89m (++69.63m)
+  [11/50] rand_bo_11_77s_at_202s              old= 465.75m  new= 657.28m (++191.53m)
+  [12/50] rand_bo_12_41s_at_4905s             old=  50.05m  new= 159.53m (++109.49m)
+  [13/50] rand_bo_13_27s_at_4224s             old= 108.61m  new= 125.54m (++16.93m)
+  [14/50] rand_bo_14_68s_at_1152s             old= 253.04m  new= 149.38m (-103.66m)
+  [15/50] rand_bo_15_51s_at_1001s             old= 435.82m  new=  68.84m (-366.98m)
+  [16/50] rand_bo_16_29s_at_1009s             old=  58.50m  new= 272.58m (++214.08m)
+  [17/50] rand_bo_17_55s_at_1607s             old= 356.65m  new= 460.95m (++104.30m)
+  [18/50] rand_bo_18_22s_at_2700s             old=  21.36m  new=  49.60m (++28.24m)
+  [19/50] rand_bo_19_84s_at_2240s             old= 319.40m  new= 178.85m (-140.55m)
+  [20/50] rand_bo_20_38s_at_1543s             old= 100.31m  new= 223.13m (++122.83m)
+  [21/50] rand_bo_21_66s_at_3131s             old= 386.39m  new= 279.48m (-106.91m)
+  [22/50] rand_bo_22_42s_at_791s              old= 495.93m  new= 513.85m (++17.92m)
+  [23/50] rand_bo_23_56s_at_1547s             old= 188.55m  new= 212.70m (++24.15m)
+  [24/50] rand_bo_24_58s_at_1915s             old=  94.26m  new= 218.41m (++124.15m)
+  [25/50] rand_bo_25_33s_at_2360s             old= 222.59m  new= 342.62m (++120.03m)
+  [26/50] rand_bo_01_71s_at_8989s             old= 924.72m  new=1746.30m (++821.58m)
+  [27/50] rand_bo_02_74s_at_7206s             old= 471.85m  new= 318.24m (-153.60m)
+  [28/50] rand_bo_03_25s_at_8713s             old=  93.45m  new= 299.35m (++205.90m)
+  [29/50] rand_bo_04_45s_at_8303s             old= 131.34m  new= 332.29m (++200.96m)
+  [30/50] rand_bo_05_28s_at_5581s             old= 227.06m  new= 152.58m (-74.48m)
+  [31/50] rand_bo_06_80s_at_8551s             old=  68.67m  new= 896.21m (++827.54m)
+  [32/50] rand_bo_07_64s_at_911s              old= 157.58m  new= 565.62m (++408.05m)
+  [33/50] rand_bo_08_43s_at_1897s             old= 114.47m  new= 258.27m (++143.80m)
+  [34/50] rand_bo_09_24s_at_515s              old= 237.50m  new= 288.03m (++50.53m)
+  [35/50] rand_bo_10_42s_at_3082s             old= 118.69m  new=  83.57m (-35.13m)
+  [36/50] rand_bo_11_43s_at_3663s             old= 106.97m  new= 118.67m (++11.70m)
+  [37/50] rand_bo_12_71s_at_2588s             old=1047.83m  new= 801.89m (-245.94m)
+  [38/50] rand_bo_13_65s_at_7697s             old= 771.64m  new=1025.72m (++254.08m)
+  [39/50] rand_bo_14_82s_at_3371s             old= 563.77m  new= 353.96m (-209.82m)
+  [40/50] rand_bo_15_53s_at_2675s             old= 269.31m  new= 169.22m (-100.08m)
+  [41/50] rand_bo_16_28s_at_5075s             old= 134.96m  new= 432.21m (++297.25m)
+  [42/50] rand_bo_17_70s_at_1392s             old= 455.47m  new= 211.90m (-243.57m)
+  [43/50] rand_bo_18_73s_at_7454s             old=1030.23m  new= 414.72m (-615.50m)
+  [44/50] rand_bo_19_59s_at_783s              old= 671.44m  new= 210.01m (-461.43m)
+  [45/50] rand_bo_20_74s_at_9147s             old= 579.66m  new=1337.36m (++757.70m)
+  [46/50] rand_bo_21_55s_at_7180s             old= 280.97m  new= 567.53m (++286.56m)
+  [47/50] rand_bo_22_57s_at_1922s             old= 292.71m  new= 211.86m (-80.85m)
+  [48/50] rand_bo_23_50s_at_151s              old= 318.64m  new= 171.33m (-147.30m)
+  [49/50] rand_bo_24_22s_at_7576s             old=  98.99m  new= 192.38m (++93.39m)
+  [50/50] rand_bo_25_28s_at_6580s             old= 125.63m  new= 182.41m (++56.77m)
+
+Results saved to C:\Users\carpe\SIH\artifacts\fixed_sweep_results.csv
+
+================================================================================
+50-SAMPLE RANDOMIZED SWEEP COMPARISON TABLE (Baseline vs Fixed EKF)
+================================================================================
+
+S-S1 Sub-Dataset (N=25):
+  Metric                    |   Baseline (Old) |  Fixed EKF (New) |      Delta
+  --------------------------|------------------|------------------|-----------
+  Drift % (Mean)            |           102.96% |           277.27% |    +174.31%
+  Drift % (Median)          |            58.02% |            95.16% |     +37.15%
+  Drift % (90th %)          |           166.55% |           177.47% |     +10.93%
+  Drift % (Worst)           |           806.03% |          4671.89% |   +3865.86%
+  Abs Error m (Mean)        |           223.58m |           262.82m |     +39.24m
+  Abs Error m (Median)      |           188.55m |           218.41m |     +29.86m
+  Abs Error m (90th %)      |           456.66m |           511.93m |     +55.27m
+  Abs Error m (Worst)       |           530.88m |           657.28m |    +126.40m
+
+S-S2 Sub-Dataset (N=25):
+  Metric                    |   Baseline (Old) |  Fixed EKF (New) |      Delta
+  --------------------------|------------------|------------------|-----------
+  Drift % (Mean)            |           105.86% |           114.35% |      +8.50%
+  Drift % (Median)          |           108.91% |           103.35% |      -5.56%
+  Drift % (90th %)          |           208.38% |           130.53% |     -77.85%
+  Drift % (Worst)           |           256.91% |           436.91% |    +179.99%
+  Abs Error m (Mean)        |           371.74m |           453.67m |     +81.92m
+  Abs Error m (Median)      |           269.31m |           299.35m |     +30.05m
+  Abs Error m (90th %)      |           863.49m |           973.92m |    +110.43m
+  Abs Error m (Worst)       |          1047.83m |          1746.30m |    +698.46m
+
+COMBINED ALL TRIPS (N=50):
+  Metric                    |   Baseline (Old) |  Fixed EKF (New) |      Delta
+  --------------------------|------------------|------------------|-----------
+  Drift % (Mean)            |           104.41% |           195.81% |     +91.41%
+  Drift % (Median)          |            73.54% |           101.05% |     +27.50%
+  Drift % (90th %)          |           183.90% |           162.12% |     -21.78%
+  Drift % (Worst)           |           806.03% |          4671.89% |   +3865.86%
+Saved plot: C:\Users\carpe\SIH\artifacts\fixed_gyro_bias_convergence.png
+Saved plot: C:\Users\carpe\SIH\artifacts\fixed_heading_error_vs_turn_severity.png
+
+Sweep Complete!

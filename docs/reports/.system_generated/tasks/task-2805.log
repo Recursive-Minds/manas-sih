@@ -1,0 +1,27 @@
+=== PyTorch GPU Vectorized EKF Sweep (Device: cuda) ===
+Sweeping 216 configurations on GPU...
+[ 10/216] turn=1.0�/s, bg=0.5�/s, cool=1.0s, scale=1.08 -> Median= 86.31%, Worst=175.13% [FAILED]
+[ 20/216] turn=1.0�/s, bg=1.0�/s, cool=0.5s, scale=1.12 -> Median= 85.89%, Worst=174.40% [FAILED]
+[ 30/216] turn=1.0�/s, bg=1.0�/s, cool=1.0s, scale=1.15 -> Median= 85.57%, Worst=173.85% [FAILED]
+[ 40/216] turn=1.0�/s, bg=1.5�/s, cool=0.5s, scale=1.18 -> Median= 85.25%, Worst=173.30% [FAILED]
+[ 50/216] turn=1.0�/s, bg=1.5�/s, cool=1.0s, scale=1.20 -> Median= 85.04%, Worst=172.94% [FAILED]
+[ 60/216] turn=1.5�/s, bg=0.5�/s, cool=0.5s, scale=1.22 -> Median= 84.83%, Worst=172.57% [FAILED]
+[ 70/216] turn=1.5�/s, bg=0.5�/s, cool=1.0s, scale=1.25 -> Median= 84.52%, Worst=172.02% [FAILED]
+[ 80/216] turn=1.5�/s, bg=1.0�/s, cool=0.5s, scale=1.28 -> Median= 84.20%, Worst=171.47% [FAILED]
+[ 90/216] turn=1.5�/s, bg=1.0�/s, cool=1.0s, scale=1.30 -> Median= 83.99%, Worst=171.11% [FAILED]
+[100/216] turn=1.5�/s, bg=1.5�/s, cool=1.0s, scale=1.08 -> Median= 86.31%, Worst=175.13% [FAILED]
+[110/216] turn=2.0�/s, bg=0.5�/s, cool=0.5s, scale=1.12 -> Median= 85.89%, Worst=174.40% [FAILED]
+[120/216] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=1.15 -> Median= 85.57%, Worst=173.85% [FAILED]
+[130/216] turn=2.0�/s, bg=1.0�/s, cool=0.5s, scale=1.18 -> Median= 85.25%, Worst=173.30% [FAILED]
+[140/216] turn=2.0�/s, bg=1.0�/s, cool=1.0s, scale=1.20 -> Median= 85.04%, Worst=172.94% [FAILED]
+[150/216] turn=2.0�/s, bg=1.5�/s, cool=0.5s, scale=1.22 -> Median= 84.83%, Worst=172.57% [FAILED]
+[160/216] turn=2.0�/s, bg=1.5�/s, cool=1.0s, scale=1.25 -> Median= 84.52%, Worst=172.02% [FAILED]
+[170/216] turn=2.5�/s, bg=0.5�/s, cool=0.5s, scale=1.28 -> Median= 84.20%, Worst=171.47% [FAILED]
+[180/216] turn=2.5�/s, bg=0.5�/s, cool=1.0s, scale=1.30 -> Median= 83.99%, Worst=171.11% [FAILED]
+[190/216] turn=2.5�/s, bg=1.0�/s, cool=1.0s, scale=1.08 -> Median= 86.31%, Worst=175.13% [FAILED]
+[200/216] turn=2.5�/s, bg=1.5�/s, cool=0.5s, scale=1.12 -> Median= 85.89%, Worst=174.40% [FAILED]
+[210/216] turn=2.5�/s, bg=1.5�/s, cool=1.0s, scale=1.15 -> Median= 85.57%, Worst=173.85% [FAILED]
+
+GPU Vectorized Sweep Completed across 216 configs in 9.84 seconds!
+
+Sweep finished.

@@ -1,0 +1,12 @@
+Pre-blackout GNSS Fix at t=120.0s:
+  Pos: (-335.4, 132.4)
+  True COG Heading: 272.0�
+Estimated Gyro Z Bias: -0.000100 rad/s (-0.006�/s)
+
+================ WITH TRUE COG & CALIBRATED GYRO ================
+  Distance Travelled:   510.3 m
+  Final Position Error: 202.63 m
+  Max Position Error:   202.63 m
+  RMSE Position Error:  86.55 m
+  Drift Percentage:     39.71%
+  Passed (<10%):        False

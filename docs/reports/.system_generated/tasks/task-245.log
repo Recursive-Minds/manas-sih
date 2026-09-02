@@ -1,0 +1,9 @@
+Estimated Gravity unit vector: [ 8.26617366e-05 -2.14745264e-02  9.99769392e-01]
+Estimated Yaw Gyro Bias: 0.001217 rad/s
+
+================ 3D GRAVITY-PROJECTED YAW RESULTS ================
+  Distance Travelled:   510.3 m
+  Final Position Error: 198.23 m
+  Max Position Error:   198.23 m
+  RMSE Position Error:  84.64 m
+  Drift Percentage:     38.85%

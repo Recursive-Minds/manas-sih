@@ -1,0 +1,16 @@
+Loading datasets...
+Neural model device: cuda
+Precomputing velocity inferences...
+
+Starting 50-Scenario Evaluation with Real-Time Progress...
+  [ 1/50] (  2%) rand_bo_01_75s_at_1956s          old=  30.09% ( 289.6m) -> new=  35.42% ( 328.6m)
+  [ 2/50] (  4%) rand_bo_02_34s_at_4810s          old= 806.03% (  46.2m) -> new=2887.78% (  28.9m)
+  [ 3/50] (  6%) rand_bo_03_56s_at_3727s          old=   7.10% (  39.0m) -> new= 205.88% (1118.7m)
+  [ 4/50] (  8%) rand_bo_04_61s_at_3066s          old= 145.05% ( 443.0m) -> new=  83.36% ( 251.0m)
+  [ 5/50] ( 10%) rand_bo_05_23s_at_873s           old=  37.55% (  69.4m) -> new=  55.08% ( 110.5m)
+  [ 6/50] ( 12%) rand_bo_06_63s_at_873s           old=  53.39% ( 177.7m) -> new=  65.32% ( 204.9m)
+  [ 7/50] ( 14%) rand_bo_07_32s_at_388s           old=  16.69% (  63.1m) -> new=  14.81% (  48.1m)
+  [ 8/50] ( 16%) rand_bo_08_25s_at_4391s          old= 104.64% (  88.3m) -> new= 159.93% ( 193.5m)
+  [ 9/50] ( 18%) rand_bo_09_86s_at_3078s          old= 134.95% ( 530.9m) -> new= 106.96% ( 393.7m)
+  [10/50] ( 20%) rand_bo_10_88s_at_3608s          old=  58.02% ( 285.3m) -> new=  88.40% ( 352.0m)
+  [11/50] ( 22%) rand_bo_11_77s_at_202s           old=  51.70% ( 465.8m) -> new=  49.42% ( 493.9m)

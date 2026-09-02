@@ -1,0 +1,26 @@
+=== CHECKS 2 & 3: DISTANCE BUCKET BREAKDOWN (METERS VS DRIFT %) ===
+
+==========================================================================
+         DISTANCE BUCKET BREAKDOWN RESULTS (CHECKS 2 & 3)                 
+==========================================================================
+
+1. Short Outages (< 200m) [Count: 11]:
+   - Median Drift %:                 76.99%
+   - Median Absolute Error (Meters): 97.17 m
+   - Mean Absolute Error (Meters):   99.12 m
+
+2. Medium Outages (200m - 500m) [Count: 27]:
+   - Median Drift %:                 76.90%
+   - Median Absolute Error (Meters): 258.17 m
+   - Mean Absolute Error (Meters):   295.39 m
+
+3. Long Outages (> 500m) [Count: 12]:
+   - Median Drift %:                 48.57%
+   - Median Absolute Error (Meters): 403.69 m
+   - Mean Absolute Error (Meters):   488.42 m
+
+4. Overall All 50 Scenarios [Count: 50]:
+   - Combined Median Drift %:        72.51%
+   - Combined Median Absolute Error: 214.77 m
+   - Combined Max (Worst) Error:     961.53 m
+==========================================================================

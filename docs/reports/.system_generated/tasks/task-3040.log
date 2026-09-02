@@ -1,0 +1,26 @@
+================================================================================
+            SMARTPHONE INTELLIGENT DEAD RECKONING (SIH)            
+               PRODUCTION 15-STATE ES-EKF BENCHMARK SWEEP              
+================================================================================
+Hardware Acceleration: cuda (NVIDIA GeForce RTX 4060 Laptop GPU)
+
+Precomputing Neural Velocity Inferences on GPU...
+
+Executing Production 15-State ES-EKF Benchmark Evaluation...
+  [ 1/50] (  2%) rand_bo_01_75s_at_1956s          old=  30.09% ( 289.6m) -> new= 193.70% (1864.3m)
+  [ 2/50] (  4%) rand_bo_02_34s_at_4810s          old= 806.03% (  46.2m) -> new=1449.70% (  83.0m)
+  [ 3/50] (  6%) rand_bo_03_56s_at_3727s          old=   7.10% (  39.0m) -> new= 169.71% ( 932.5m)
+  [ 4/50] (  8%) rand_bo_04_61s_at_3066s          old= 145.05% ( 443.0m) -> new=  99.79% ( 304.8m)
+  [ 5/50] ( 10%) rand_bo_05_23s_at_873s           old=  37.55% (  69.4m) -> new= 161.24% ( 298.0m)
+  [ 6/50] ( 12%) rand_bo_06_63s_at_873s           old=  53.39% ( 177.7m) -> new= 112.63% ( 374.8m)
+  [ 7/50] ( 14%) rand_bo_07_32s_at_388s           old=  16.69% (  63.1m) -> new= 177.34% ( 670.3m)
+  [ 8/50] ( 16%) rand_bo_08_25s_at_4391s          old= 104.64% (  88.3m) -> new=  71.53% (  60.3m)
+  [ 9/50] ( 18%) rand_bo_09_86s_at_3078s          old= 134.95% ( 530.9m) -> new= 119.61% ( 470.5m)
+  [10/50] ( 20%) rand_bo_10_88s_at_3608s          old=  58.02% ( 285.3m) -> new=  34.32% ( 168.7m)
+  [11/50] ( 22%) rand_bo_11_77s_at_202s           old=  51.70% ( 465.8m) -> new= 106.86% ( 962.7m)
+  [12/50] ( 24%) rand_bo_12_41s_at_4905s          old=  18.89% (  50.0m) -> new= 280.78% ( 743.7m)
+  [13/50] ( 26%) rand_bo_13_27s_at_4224s          old=  87.21% ( 108.6m) -> new= 223.89% ( 278.8m)
+  [14/50] ( 28%) rand_bo_14_68s_at_1152s          old=  58.11% ( 253.0m) -> new= 150.83% ( 656.8m)
+  [15/50] ( 30%) rand_bo_15_51s_at_1001s          old= 123.44% ( 435.8m) -> new=  43.55% ( 153.8m)
+  [16/50] ( 32%) rand_bo_16_29s_at_1009s          old=  26.50% (  58.5m) -> new=  26.95% (  59.5m)
+  [17/50] ( 34%) rand_bo_17_55s_at_1607s          old= 175.03% ( 356.6m) -> new= 200.38% ( 408.3m)

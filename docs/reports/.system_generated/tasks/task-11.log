@@ -1,0 +1,4 @@
+PyTorch version: 2.6.0+cu124
+CUDA available: True
+Device count: 1
+Device 0: NVIDIA GeForce RTX 4060 Laptop GPU

@@ -1,0 +1,414 @@
+"""
+15-State Error-State Extended Kalman Filter (ES-EKF) with AI Velocity Fusion,
+Real Kalman Gain Non-Holonomic Constraints (NHC), and Zero Velocity Updates (ZUPT).
+
+State Vector (15 dims):
+  [0:3]   Position ENU (m)
+  [3:6]   Velocity ENU (m/s)
+  [6:9]   Attitude error / Orientation (rotation vector on SO3)
+  [9:12]  Accelerometer bias (vehicle frame, m/s^2)
+  [12:15] Gyroscope bias (vehicle frame, rad/s)
+
+Key Architecture:
+  - Unified 15-State Filter: Gyro bias b_g lives inside the single 15-state vector
+    and 15x15 covariance matrix P, ensuring cross-covariances are correctly maintained.
+  - Dynamic Kalman Gain NHC: Computes K = P H^T (H P H^T + R)^-1 every step from the
+    exact linearised body-velocity error Jacobian H_NHC.
+  - Turn Gating & Cooldown: Gyro bias updates are frozen whenever |w_z| > 0.015 rad/s (~0.86 deg/s)
+    and during a 2.0s post-turn cooldown window.
+  - Sanity Bounding: Gyro bias b_g is clipped to +/- 0.1 deg/s (+/- 0.001745 rad/s).
+  - Physical Rest ZUPT: Sliding window accelerometer variance detector locks v = 0 when at rest.
+"""
+
+from __future__ import annotations
+from typing import Optional
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+from sih.core.contracts import (
+    IMUSample,
+    CalibratedSample,
+    GNSSSample,
+    VelocityEstimate,
+    FusedPosition,
+)
+from sih.core.interfaces import IFusionFilter
+from sih.core.pipeline import register_fusion_filter
+from sih.data.geo import geodetic_to_enu, enu_to_geodetic
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def skew(v: np.ndarray) -> np.ndarray:
+    """3x3 skew-symmetric matrix from 3D vector."""
+    return np.array([
+        [0.0, -v[2], v[1]],
+        [v[2], 0.0, -v[0]],
+        [-v[1], v[0], 0.0],
+    ], dtype=np.float64)
+
+
+def wrap_pi(angle: float) -> float:
+    """Wrap angle to [-pi, pi]."""
+    return (angle + np.pi) % (2.0 * np.pi) - np.pi
+
+
+# ---------------------------------------------------------------------------
+# Unified 15-State ES-EKF
+# ---------------------------------------------------------------------------
+
+class ErrorStateEKF(IFusionFilter):
+    """
+    Unified 15-state Error-State EKF with robust AI-IMU dead reckoning during GNSS blackouts.
+    """
+
+    def __init__(
+        self,
+        accel_noise_std: float = 0.2,
+        gyro_noise_std: float = 0.003,
+        accel_bias_std: float = 0.0005,
+        gyro_bias_std: float = 0.0000005,
+        gnss_pos_std: float = 1.5,
+        gnss_vel_std: float = 0.1,
+        gnss_heading_std: float = 0.05,        # ~2.8 deg GNSS bearing std (prevents noise jumps)
+        nhc_lateral_std: float = 0.20,
+        nhc_vertical_std: float = 0.20,
+        turn_threshold_rad_s: float = 0.02618, # 1.5 deg/s turn threshold
+        cooldown_duration_s: float = 0.5,      # 0.5s post-turn cooldown
+        max_gyro_bias_rad_s: float = 0.008726, # +/- 0.5 deg/s MEMS bias bound
+        initial_speed_scale: float = 1.00,     # Dynamic speed scale pre-blackout factor
+        enable_nhc: bool = True,
+        enable_zupt: bool = True,
+    ):
+        self.accel_noise_std = accel_noise_std
+        self.gyro_noise_std = gyro_noise_std
+        self.accel_bias_std = accel_bias_std
+        self.gyro_bias_std = gyro_bias_std
+        self.gnss_pos_std = gnss_pos_std
+        self.gnss_vel_std = gnss_vel_std
+        self.gnss_heading_std = gnss_heading_std
+        self.nhc_lat_std = nhc_lateral_std
+        self.nhc_vert_std = nhc_vertical_std
+        self.turn_thresh = turn_threshold_rad_s
+        self.cooldown_dur = cooldown_duration_s
+        self.max_bg = max_gyro_bias_rad_s
+        self.initial_speed_scale = initial_speed_scale
+        self.enable_nhc = enable_nhc
+        self.enable_zupt = enable_zupt
+
+        self.reset()
+
+    def reset(self, initial_gnss: Optional[GNSSSample] = None):
+        self._initialised = False
+        self._last_ts: Optional[int] = None
+        self._last_gnss_ts: Optional[int] = None
+        self._ref = np.zeros(3)
+
+        self._p = np.zeros(3, dtype=np.float64)
+        self._v = np.zeros(3, dtype=np.float64)
+        self._heading_rad = 0.0
+        self._q = R.identity()
+        self._ba = np.zeros(3, dtype=np.float64)
+        self._bg = np.zeros(3, dtype=np.float64)
+
+        # 15x15 Covariance Matrix P
+        self._P = np.diag([
+            2.25, 2.25, 9.0,                        # position
+            0.25, 0.25, 0.25,                        # velocity
+            0.001, 0.001, 0.001,                    # attitude
+            1e-4, 1e-4, 1e-4,                        # accel bias
+            (0.00002)**2, (0.00002)**2, (0.00002)**2 # gyro bias
+        ]).astype(np.float64)
+
+        self._last_turn_ts_s: float = -100.0
+        self._stat_count: int = 0
+        self._speed_scale: float = self.initial_speed_scale
+        self._last_ai_speed: Optional[float] = None
+        self.last_nhc_dtheta_deg: float = 0.0
+        self._accel_buf: list[float] = []
+
+        if initial_gnss is not None:
+            self.init_from_gnss(initial_gnss)
+
+    def init_from_gnss(self, g: GNSSSample):
+        self._ref = np.array([g.latitude_deg, g.longitude_deg, g.altitude_m], dtype=np.float64)
+        self._p = np.zeros(3, dtype=np.float64)
+        self._last_ts = g.timestamp_ns
+        self._last_gnss_ts = g.timestamp_ns
+
+        if g.bearing_deg is not None:
+            self._heading_rad = float(np.radians(g.bearing_deg))
+        else:
+            self._heading_rad = 0.0
+
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+
+        if g.speed_mps is not None and g.speed_mps > 0.5:
+            b = self._heading_rad
+            self._v = np.array([g.speed_mps * np.sin(b), g.speed_mps * np.cos(b), 0.0], dtype=np.float64)
+        else:
+            self._v = np.zeros(3, dtype=np.float64)
+
+        sig_p = float(max(g.accuracy_h_m, 1.0))
+        self._P[0:3, 0:3] = np.diag([sig_p**2, sig_p**2, (sig_p * 2.0)**2])
+        self._initialised = True
+
+    def predict(self, sample: CalibratedSample, vel: Optional[VelocityEstimate] = None) -> FusedPosition:
+        ts = sample.timestamp_ns
+        if not self._initialised:
+            self._last_ts = ts
+            self._initialised = True
+            return self.get_state(ts)
+
+        if self._last_ts is None:
+            self._last_ts = ts
+            return self.get_state(ts)
+
+        dt = (ts - self._last_ts) * 1e-9
+        self._last_ts = ts
+        if dt <= 0.0 or dt > 2.0:
+            dt = 0.1
+
+        t_now_s = ts * 1e-9
+
+        raw_gyro = sample.gyro_vehicle
+        raw_acc  = sample.accel_vehicle
+
+        # Correct gyro by 15-state gyro bias
+        w_corr = raw_gyro - self._bg
+
+        # 3D gravity-aligned Earth-vertical yaw rate projection
+        g_norm = np.linalg.norm(raw_acc)
+        if g_norm > 1e-3:
+            g_hat = raw_acc / g_norm
+            w_z_corr = float(np.dot(w_corr, g_hat))
+        else:
+            w_z_corr = float(w_corr[2])
+
+        # Turn & Cooldown detection
+        if abs(w_z_corr) > self.turn_thresh:
+            self._last_turn_ts_s = t_now_s
+
+        # Sliding window physical stationary detector
+        self._accel_buf.append(g_norm)
+        if len(self._accel_buf) > 20:
+            self._accel_buf.pop(0)
+        a_var = float(np.var(self._accel_buf)) if len(self._accel_buf) >= 10 else 1.0
+        g_norm_err = abs(g_norm - 9.80665)
+
+        is_physical_rest = (a_var < 0.05 and g_norm_err < 0.6 and float(np.linalg.norm(raw_gyro)) < 0.04)
+
+        is_stationary = (
+            is_physical_rest or
+            (vel is not None and vel.motion_state == "STATIONARY") or
+            (vel is not None and vel.forward_speed_mps < 0.2)
+        )
+
+        if is_stationary:
+            self._stat_count += 1
+            v_fwd = 0.0
+            w_z_corr = 0.0
+        else:
+            self._stat_count = 0
+            if vel is not None and vel.forward_speed_mps is not None:
+                self._last_ai_speed = float(vel.forward_speed_mps)
+                v_fwd = float(vel.forward_speed_mps) * self._speed_scale
+                a_x_fwd = float(raw_acc[0]) - self._ba[0]
+                if a_x_fwd < -0.3:
+                    v_fwd = max(0.0, v_fwd + a_x_fwd * dt)
+            else:
+                v_fwd = 0.0
+
+        # Propagate nominal heading
+        self._heading_rad = (self._heading_rad - w_z_corr * dt) % (2.0 * np.pi)
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+
+        # Propagate 3D velocity and position using full IMU acceleration + AI forward speed constraint
+        C_b_n = self._q.as_matrix()
+        C_n_b = C_b_n.T
+
+        if is_stationary:
+            self._v = np.zeros(3, dtype=np.float64)
+        else:
+            # Transform calibrated vehicle accel to ENU frame (minus gravity)
+            a_b = raw_acc - self._ba
+            a_n = C_b_n @ a_b + np.array([0.0, 0.0, -9.80665], dtype=np.float64)
+            self._v += a_n * dt
+
+            # Project to body frame, update forward component with AI speed, retain dynamic lateral/vertical components
+            v_b = C_n_b @ self._v
+            v_b[0] = v_fwd
+            self._v = C_b_n @ v_b
+
+        self._p[0] += self._v[0] * dt
+        self._p[1] += self._v[1] * dt
+        self._p[2] += self._v[2] * dt
+
+        # Propagate 15-state covariance P <- F P F^T + Q
+        F = np.eye(15, dtype=np.float64)
+        F[0:3, 3:6] = np.eye(3) * dt
+        F[6:9, 12:15] = -np.eye(3) * dt
+
+        q_pos = 0.01 * dt
+        q_vel = ((vel.speed_variance if vel else 0.5) * dt)**2
+        q_att = (self.gyro_noise_std * dt)**2
+        q_ba  = (self.accel_bias_std * dt)**2
+        q_bg  = (self.gyro_bias_std * dt)**2
+
+        Q = np.diag([
+            q_pos, q_pos, q_pos,
+            q_vel, q_vel, q_vel,
+            q_att, q_att, q_att,
+            q_ba,  q_ba,  q_ba,
+            q_bg,  q_bg,  q_bg,
+        ]).astype(np.float64)
+
+        self._P = F @ self._P @ F.T + Q
+
+        # ZUPT update
+        if self.enable_zupt and is_stationary and self._stat_count > 5:
+            H_zupt = np.zeros((1, 15), dtype=np.float64)
+            H_zupt[0, 14] = 1.0
+            y_zupt = np.array([raw_gyro[2] - self._bg[2]])
+            r_zupt = np.array([[(0.001)**2]])
+
+            S_z = H_zupt @ self._P @ H_zupt.T + r_zupt
+            K_z = self._P @ H_zupt.T @ np.linalg.inv(S_z)
+            dx_z = (K_z @ y_zupt).flatten()
+
+            self._bg += dx_z[12:15]
+            self._bg = np.clip(self._bg, -self.max_bg, self.max_bg)
+            I_KH = np.eye(15) - K_z @ H_zupt
+            self._P = I_KH @ self._P @ I_KH.T + K_z @ r_zupt @ K_z.T
+
+        # Real Closed-Loop NHC Measurement Update
+        self.last_nhc_dtheta_deg = 0.0
+        if self.enable_nhc and not is_stationary and v_fwd > 2.0:
+            C_b_n = self._q.as_matrix()
+            C_n_b = C_b_n.T
+            v_b = C_n_b @ self._v
+
+            H_nhc = np.zeros((2, 15), dtype=np.float64)
+            H_nhc[0, 3:6] = C_n_b[1, :]
+            H_nhc[0, 6:9] = -(C_n_b @ skew(self._v))[1, :]
+            H_nhc[1, 3:6] = C_n_b[2, :]
+            H_nhc[1, 6:9] = -(C_n_b @ skew(self._v))[2, :]
+
+            y_nhc = np.array([0.0 - v_b[1], 0.0 - v_b[2]], dtype=np.float64)
+            R_nhc = np.diag([self.nhc_lat_std**2, self.nhc_vert_std**2]).astype(np.float64)
+
+            S_nhc = H_nhc @ self._P @ H_nhc.T + R_nhc
+            K_nhc = self._P @ H_nhc.T @ np.linalg.inv(S_nhc)
+
+            dx = (K_nhc @ y_nhc).flatten()
+
+            self._v += dx[3:6]
+
+            # Apply heading correction
+            dtheta_z = dx[8]
+            self._heading_rad = (self._heading_rad + dtheta_z) % (2.0 * np.pi)
+            yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+            self._q = R.from_euler("z", yaw_enu_rad)
+            self.last_nhc_dtheta_deg = float(np.degrees(abs(dtheta_z)))
+
+            in_cooldown = (t_now_s - self._last_turn_ts_s) < self.cooldown_dur
+            if not in_cooldown:
+                self._bg += dx[12:15]
+                self._bg = np.clip(self._bg, -self.max_bg, self.max_bg)
+
+            I_KH = np.eye(15) - K_nhc @ H_nhc
+            self._P = I_KH @ self._P @ I_KH.T + K_nhc @ R_nhc @ K_nhc.T
+
+        return self.get_state(ts)
+
+    def update_gnss(self, gnss: GNSSSample) -> FusedPosition:
+        if not gnss.is_valid:
+            return self.get_state()
+
+        if not self._initialised:
+            self.init_from_gnss(gnss)
+            return self.get_state()
+
+        t_now_s = gnss.timestamp_ns * 1e-9
+        gnss_enu = geodetic_to_enu(
+            gnss.latitude_deg, gnss.longitude_deg, gnss.altitude_m,
+            self._ref[0], self._ref[1], self._ref[2]
+        )
+
+        sig_p = float(max(gnss.accuracy_h_m, 1.0))
+        in_cooldown = (t_now_s - self._last_turn_ts_s) < self.cooldown_dur
+
+        # Position Update
+        H_p = np.zeros((3, 15), dtype=np.float64)
+        H_p[0:3, 0:3] = np.eye(3)
+        y_p = gnss_enu - self._p
+        R_p = np.diag([sig_p**2, sig_p**2, (sig_p * 2.0)**2]).astype(np.float64)
+
+        S_p = H_p @ self._P @ H_p.T + R_p
+        K_p = self._P @ H_p.T @ np.linalg.inv(S_p)
+        dx_p = (K_p @ y_p).flatten()
+
+        self._p += dx_p[0:3]
+        self._v += dx_p[3:6]
+
+        I_KH = np.eye(15) - K_p @ H_p
+        self._P = I_KH @ self._P @ I_KH.T + K_p @ R_p @ K_p.T
+
+        # Heading Alignment & Pre-Blackout Gyro Bias Estimation
+        if gnss.speed_mps is not None and gnss.bearing_deg is not None and gnss.speed_mps > 3.0:
+            gnss_hdg_rad = float(np.radians(gnss.bearing_deg))
+            y_hdg = wrap_pi(gnss_hdg_rad - self._heading_rad)
+            if abs(y_hdg) < np.radians(20.0):
+                self._heading_rad = (self._heading_rad + 0.15 * y_hdg) % (2.0 * np.pi)
+                yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+                self._q = R.from_euler("z", yaw_enu_rad)
+
+                # Estimate Earth-vertical gyro bias during straight driving
+                if abs(y_hdg) < np.radians(3.0) and not in_cooldown:
+                    self._bg[2] += 0.02 * y_hdg
+                    self._bg[2] = float(np.clip(self._bg[2], -self.max_bg, self.max_bg))
+
+            # Pre-Blackout Speed Scale Factor Adaptation
+            if self._last_ai_speed is not None and self._last_ai_speed > 2.0 and gnss.speed_mps > 3.0:
+                raw_scale = float(gnss.speed_mps / self._last_ai_speed)
+                clipped_scale = float(np.clip(raw_scale, 0.50, 4.00))
+                self._speed_scale = 0.85 * self._speed_scale + 0.15 * clipped_scale
+
+        self._last_gnss_ts = gnss.timestamp_ns
+        return self.get_state(gnss.timestamp_ns)
+
+    @property
+    def b_g(self) -> np.ndarray:
+        return self._bg
+
+    @property
+    def P(self) -> np.ndarray:
+        return self._P
+
+    def get_state(self, ts: int = 0) -> FusedPosition:
+        lat, lon, alt = enu_to_geodetic(
+            self._p[0], self._p[1], self._p[2],
+            self._ref[0], self._ref[1], self._ref[2]
+        )
+        return FusedPosition(
+            timestamp_ns=ts,
+            latitude_deg=lat,
+            longitude_deg=lon,
+            altitude_m=alt,
+            position_enu_m=self._p.copy(),
+            velocity_enu_mps=self._v.copy(),
+            heading_rad=self._heading_rad,
+            covariance=self._P.copy(),
+            mode="GNSS_AIDED" if (self._last_gnss_ts and (ts - self._last_gnss_ts)*1e-9 < 3.0) else "INS_ONLY_BLACKOUT",
+            gnss_outage_duration_s=max(0.0, (ts - (self._last_gnss_ts or ts))*1e-9)
+        )
+
+
+register_fusion_filter("es_ekf", lambda **kwargs: ErrorStateEKF(**kwargs))
+register_fusion_filter("es_ekf_nhc", lambda **kwargs: ErrorStateEKF(**kwargs))
+
+

@@ -1,0 +1,22 @@
+Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 100/51746 [00:00<04:16, 201.23it/s]Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 199/51746 [00:00<02:16, 377.16it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 384/51746 [00:00<01:10, 732.19it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 505/51746 [00:00<01:06, 773.26it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 612/51746 [00:01<02:09, 393.82it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 687/51746 [00:01<02:31, 336.13it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 745/51746 [00:02<02:55, 291.08it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 790/51746 [00:02<03:06, 272.83it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 828/51746 [00:02<03:18, 256.04it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 861/51746 [00:02<03:20, 253.45it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 1000/51746 [00:02<01:53, 446.26it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1063/51746 [00:03<02:35, 326.88it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1113/51746 [00:03<02:54, 290.84it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1154/51746 [00:03<03:22, 249.86it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1188/51746 [00:03<03:20, 251.80it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1220/51746 [00:03<03:14, 259.62it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1251/51746 [00:03<03:40, 229.19it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1278/51746 [00:04<03:54, 215.40it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1302/51746 [00:04<03:52, 217.00it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1326/51746 [00:04<03:55, 213.92it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1349/51746 [00:04<04:01, 208.88it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1378/51746 [00:04<03:41, 227.58it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1403/51746 [00:04<03:37, 231.64it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1427/51746 [00:04<04:34, 183.22it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1451/51746 [00:04<04:16, 195.97it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1476/51746 [00:05<04:00, 208.66it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1499/51746 [00:05<04:08, 201.95it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1521/51746 [00:05<04:37, 181.27it/s]                                                                                             Blackout rows: 300
+Start of blackout:
+time_s              120.1
+est_e         -161.526866
+est_n          214.540345
+gt_e          -337.206256
+gt_n            132.49439
+error_m        193.893752
+speed_mps        8.208924
+heading_deg     16.042189
+Name: 1201, dtype: object
+End of blackout:
+time_s            149.999
+est_e          103.500961
+est_n           467.88474
+gt_e          -786.282046
+gt_n            306.59218
+error_m        904.283744
+speed_mps       12.909906
+heading_deg     64.840896
+Name: 1500, dtype: object
+Drift %: 177.21%

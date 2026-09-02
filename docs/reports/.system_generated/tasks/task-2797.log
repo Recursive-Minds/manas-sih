@@ -1,0 +1,39 @@
+=== GPU VECTORIZED EKF SWEEP SOLVER (Device: cuda) ===
+Precomputing PyTorch GPU neural velocity inferences...
+GPU Inferences complete in 4.11s
+python : C:\Users\carpe\SIH\scratch\run_gpu_vectorized_sweep.py:71: UserWarning: Creating a tensor from a list of 
+numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() 
+before converting to a tensor. (Triggered internally at 
+C:\actions-runner\_work\pytorch\pytorch\pytorch\torch\csrc\utils\tensor_new.cpp:257.)
+At line:1 char:1
++ python -u C:\Users\carpe\SIH\scratch\run_gpu_vectorized_sweep.py 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\carpe\...r_new.cpp:257.):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  acc_s1_t = torch.tensor([s.accel_vehicle for s in calib_s1], dtype=torch.float64, device=device)
+
+Running Vectorized GPU Sweep across 19 configurations...
+[ 1/19] turn=0.5�/s, bg=0.3�/s, cool=0.5s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 2/19] turn=0.5�/s, bg=0.5�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 3/19] turn=1.0�/s, bg=0.3�/s, cool=0.5s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 4/19] turn=1.0�/s, bg=0.5�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 5/19] turn=1.0�/s, bg=1.0�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 6/19] turn=1.5�/s, bg=0.5�/s, cool=0.5s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 7/19] turn=1.5�/s, bg=1.0�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 8/19] turn=2.0�/s, bg=0.3�/s, cool=0.5s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[ 9/19] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[10/19] turn=2.0�/s, bg=1.0�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[11/19] turn=2.0�/s, bg=1.5�/s, cool=1.5s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[12/19] turn=3.0�/s, bg=0.5�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[13/19] turn=3.0�/s, bg=1.0�/s, cool=1.0s, scale=1.00 -> Median= 87.15%, Worst=176.59% [FAILED]
+[14/19] turn=1.0�/s, bg=0.5�/s, cool=1.0s, scale=1.05 -> Median= 86.63%, Worst=175.68% [FAILED]
+[15/19] turn=1.5�/s, bg=0.5�/s, cool=1.0s, scale=1.05 -> Median= 86.63%, Worst=175.68% [FAILED]
+[16/19] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=1.05 -> Median= 86.63%, Worst=175.68% [FAILED]
+[17/19] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=1.08 -> Median= 86.31%, Worst=175.13% [FAILED]
+[18/19] turn=2.0�/s, bg=0.8�/s, cool=1.0s, scale=1.05 -> Median= 86.63%, Worst=175.68% [FAILED]
+[19/19] turn=2.5�/s, bg=0.5�/s, cool=1.0s, scale=1.05 -> Median= 86.63%, Worst=175.68% [FAILED]
+
+GPU Sweep Completed across 19 configs in 1.08 seconds!
+
+Sweep finished. Testing finer scale adjustments...

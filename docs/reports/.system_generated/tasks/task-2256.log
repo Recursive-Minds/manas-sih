@@ -1,0 +1,5 @@
+
+--- SINGLE PASS EVALUATION ---
+Time: 33.63s
+Original Baseline: Combined Median Drift = 73.54%, Worst-Case = 806.03%
+Unified 15-State:  Combined Median Drift = 250.14%, Worst-Case = 12723.18%

@@ -1,0 +1,4 @@
+{
+  "summary": "Bootstrap writer that generates run_fixed_sweep.py from the full sweep logic and executes it. Uses the production ErrorStateEKF.",
+  "updatedAt": "2026-09-02T10:23:43.339661500Z"
+}

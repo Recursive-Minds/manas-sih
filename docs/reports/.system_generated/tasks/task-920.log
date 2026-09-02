@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\trace_300s_tick.py", line 43, in <module>
+    print(f"t={t_sec:.1f}s | Heading={np.degrees(ekf._heading_rad):.1f}� | Gyro_v_z={c_s.gyro_vehicle[2]:.4f} rad/s | Pos=({st.position_enu[0]:.1f}, {st.position_enu[1]:.1f})")
+                                                                                                                            ^^^^^^^^^^^^^^^
+AttributeError: 'FusedPosition' object has no attribute 'position_enu'. Did you mean: 'position_enu_m'?

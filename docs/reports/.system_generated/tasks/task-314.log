@@ -1,0 +1,13 @@
+Training Device: cuda NVIDIA GeForce RTX 4060 Laptop GPU
+Train windows: 31505, Val windows: 18756
+Traceback (most recent call last):
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\test_quick_train.py", line 135, in <module>
+    test_quick_train()
+    ~~~~~~~~~~~~~~~~^^
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\test_quick_train.py", line 131, in test_quick_train
+    print(f"Epoch {epoch:02d} | Train Loss: {train_loss/len(train_ds):.4f} | Val RMSE on unseen S-S2: {rmse:.3f} m/s ({rmse*3.6:.2f} km/h){star}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2605' in position 80: character maps to <undefined>

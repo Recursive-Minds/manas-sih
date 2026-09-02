@@ -1,0 +1,26 @@
+Precomputing neural velocity inferences on GPU...
+Launching 16-core parallel grid search across 126 configurations...
+python : C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' 
+is deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+At line:1 char:1
++ python -u C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (C:\Users\carpe\...ringIO' object.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  sweep_df = pd.read_json(sweep_df_json)
+C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' is 
+deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  sweep_df = pd.read_json(sweep_df_json)
+C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' is 
+deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  sweep_df = pd.read_json(sweep_df_json)
+C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' is 
+deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  sweep_df = pd.read_json(sweep_df_json)
+C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' is 
+deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  sweep_df = pd.read_json(sweep_df_json)
+C:\Users\carpe\SIH\scratch\run_parallel_optimizer.py:349: FutureWarning: Passing literal json to 'read_json' is 
+deprecated and will be removed in a future version. To read from a literal string, wrap it in a 'StringIO' object.
+  sweep_df = pd.read_json(sweep_df_json)

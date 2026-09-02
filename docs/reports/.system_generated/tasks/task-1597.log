@@ -1,0 +1,155 @@
+===========================================================================
+PHASE 3 EVALUATION: ES-EKF FUSED WITH AI TCN-ATTENTION VELOCITY MODEL
+===========================================================================
+Hardware Device: cuda (NVIDIA GeForce RTX 4060 Laptop GPU)
+Loaded Trip: S-S1 (5174.5 s, 37162.4 m)
+
+===========================================================================
+EVALUATING ON: Training Trip S-S1 (5174.5 s, 37162.4 m)
+===========================================================================
+
+###########################################################################
+TRIP: S-S1 | SCENARIO: 30s_blackout_at_120s (Duration: ~30.0s)
+###########################################################################
+Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 957/51746 [00:00<00:05, 9562.58it/s]                                                                                             
+--- Naive Baseline ---
+  Distance Travelled:       510.3 m
+  Final Position Error:     1612.52 m
+  Max Position Error:       1612.52 m
+  RMSE Position Error:      645.01 m
+  Drift Percentage:         316.01%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_30s_blackout_at_120s_naive_baseline.png
+Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1216/51746 [00:00<00:04, 12154.39it/s]                                                                                               
+--- Phase 2: ES-EKF + NHC (No AI) ---
+  Distance Travelled:       510.3 m
+  Final Position Error:     483.34 m
+  Max Position Error:       483.34 m
+  RMSE Position Error:      295.28 m
+  Drift Percentage:         94.72%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_30s_blackout_at_120s_phase_2_es-ekf_plus_nhc_no_ai.png
+Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 490/51746 [00:00<00:39, 1310.99it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 622/51746 [00:00<01:10, 720.76it/s] Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 696/51746 [00:00<01:26, 590.90it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 751/51746 [00:01<01:37, 522.53it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 798/51746 [00:01<01:47, 475.31it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 840/51746 [00:01<01:58, 428.42it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 991/51746 [00:01<01:18, 647.23it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1066/51746 [00:01<01:34, 535.34it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1128/51746 [00:01<01:50, 459.56it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1181/51746 [00:02<01:59, 421.64it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1228/51746 [00:02<02:06, 399.89it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1271/51746 [00:02<02:16, 370.03it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1310/51746 [00:02<02:22, 354.74it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1347/51746 [00:02<02:28, 340.47it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1382/51746 [00:02<02:32, 331.06it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1416/51746 [00:02<02:34, 326.48it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1449/51746 [00:02<02:35, 323.21it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1482/51746 [00:03<02:37, 319.04it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1514/51746 [00:03<02:38, 317.05it/s]                                                                                             
+--- Phase 3: ES-EKF + AI Velocity (TCN-Attention) ---
+  Distance Travelled:       510.3 m
+  Final Position Error:     117.11 m
+  Max Position Error:       117.11 m
+  RMSE Position Error:      74.34 m
+  Drift Percentage:         22.95%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_30s_blackout_at_120s_phase_3_es-ekf_plus_ai_velocity_tcn-attention.png
+
+###########################################################################
+TRIP: S-S1 | SCENARIO: 60s_blackout_at_300s (Duration: ~60.0s)
+###########################################################################
+Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   2%|1         | 800/51746 [00:00<00:06, 7996.58it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1600/51746 [00:00<00:06, 7678.19it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2546/51746 [00:00<00:05, 8473.50it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3568/51746 [00:00<00:05, 9153.31it/s]                                                                                              
+--- Naive Baseline ---
+  Distance Travelled:       814.1 m
+  Final Position Error:     1869.10 m
+  Max Position Error:       1869.10 m
+  RMSE Position Error:      555.85 m
+  Drift Percentage:         229.58%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_60s_blackout_at_300s_naive_baseline.png
+Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   2%|2         | 1133/51746 [00:00<00:04, 11321.45it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2287/51746 [00:00<00:04, 11448.64it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3484/51746 [00:00<00:04, 11685.68it/s]                                                                                               
+--- Phase 2: ES-EKF + NHC (No AI) ---
+  Distance Travelled:       814.1 m
+  Final Position Error:     804.91 m
+  Max Position Error:       804.91 m
+  RMSE Position Error:      488.06 m
+  Drift Percentage:         98.87%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_60s_blackout_at_300s_phase_2_es-ekf_plus_nhc_no_ai.png
+Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   1%|          | 496/51746 [00:00<00:10, 4809.87it/s]Evaluating S-S1 [60s_blackout_at_300s]:   2%|1         | 977/51746 [00:01<01:13, 686.79it/s] Evaluating S-S1 [60s_blackout_at_300s]:   2%|2         | 1201/51746 [00:01<01:32, 544.73it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|2         | 1339/51746 [00:02<01:50, 457.63it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|2         | 1434/51746 [00:02<01:58, 424.39it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|2         | 1506/51746 [00:02<02:03, 405.76it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1565/51746 [00:03<02:09, 386.79it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1615/51746 [00:03<02:13, 375.76it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1659/51746 [00:03<02:18, 361.63it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1699/51746 [00:03<02:22, 350.81it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1736/51746 [00:03<02:27, 339.62it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1771/51746 [00:03<02:30, 332.00it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1805/51746 [00:03<02:33, 326.35it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 1838/51746 [00:03<02:36, 318.75it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 1870/51746 [00:04<02:36, 317.83it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 1902/51746 [00:04<02:38, 314.33it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 1934/51746 [00:04<02:39, 312.48it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 1968/51746 [00:04<02:35, 319.30it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 2000/51746 [00:04<02:38, 314.24it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 2032/51746 [00:04<02:40, 309.23it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|3         | 2063/51746 [00:04<02:44, 302.26it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2094/51746 [00:04<02:43, 304.26it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2125/51746 [00:04<02:43, 303.55it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2156/51746 [00:05<02:43, 302.39it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2187/51746 [00:05<02:42, 304.19it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2218/51746 [00:05<02:41, 305.79it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2249/51746 [00:05<02:43, 302.00it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2281/51746 [00:05<02:42, 304.31it/s]Evaluating S-S1 [60s_blackout_at_300s]:   4%|4         | 2314/51746 [00:05<02:39, 309.27it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2345/51746 [00:05<02:43, 302.55it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2377/51746 [00:05<02:40, 307.20it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2408/51746 [00:05<02:41, 305.13it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2439/51746 [00:05<02:47, 295.16it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2471/51746 [00:06<02:43, 300.61it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2502/51746 [00:06<02:44, 299.93it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2533/51746 [00:06<02:43, 300.93it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2565/51746 [00:06<02:40, 305.82it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2596/51746 [00:06<02:44, 299.64it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2627/51746 [00:06<02:42, 302.61it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2658/51746 [00:06<02:44, 297.56it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2689/51746 [00:06<02:44, 299.05it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2719/51746 [00:06<02:44, 297.18it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2751/51746 [00:06<02:42, 302.17it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2782/51746 [00:07<02:42, 300.53it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2813/51746 [00:07<02:41, 303.15it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2845/51746 [00:07<02:39, 306.19it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 2876/51746 [00:07<02:41, 303.05it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 2907/51746 [00:07<02:41, 302.86it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 2938/51746 [00:07<02:41, 302.47it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 2969/51746 [00:07<02:44, 295.98it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 2999/51746 [00:07<02:44, 296.55it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 3031/51746 [00:07<02:41, 300.95it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 3063/51746 [00:08<02:39, 305.98it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|5         | 3094/51746 [00:08<02:39, 304.93it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3125/51746 [00:08<02:39, 305.44it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3156/51746 [00:08<02:40, 303.33it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3187/51746 [00:08<02:50, 285.42it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3216/51746 [00:08<02:56, 275.50it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3244/51746 [00:08<02:56, 275.07it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3275/51746 [00:08<02:50, 284.15it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3305/51746 [00:08<02:48, 287.12it/s]Evaluating S-S1 [60s_blackout_at_300s]:   6%|6         | 3336/51746 [00:08<02:44, 293.60it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3367/51746 [00:09<02:43, 296.63it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3398/51746 [00:09<02:41, 298.93it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3430/51746 [00:09<02:39, 302.32it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3461/51746 [00:09<02:39, 301.98it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3492/51746 [00:09<02:44, 293.95it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3522/51746 [00:09<02:43, 294.08it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3552/51746 [00:09<02:46, 289.40it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3584/51746 [00:09<02:42, 295.59it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3614/51746 [00:09<02:42, 295.68it/s]                                                                                             
+--- Phase 3: ES-EKF + AI Velocity (TCN-Attention) ---
+  Distance Travelled:       814.1 m
+  Final Position Error:     161.48 m
+  Max Position Error:       173.40 m
+  RMSE Position Error:      108.23 m
+  Drift Percentage:         19.83%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S1_60s_blackout_at_300s_phase_3_es-ekf_plus_ai_velocity_tcn-attention.png
+
+===========================================================================
+EVALUATING ON: UNSEEN Validation Trip S-S2 (Zero Data Leakage) (9387.5 s, 73671.7 m)
+===========================================================================
+
+###########################################################################
+TRIP: S-S2 | SCENARIO: S-S2_30s_blackout_at_120s (Duration: ~30.0s)
+###########################################################################
+Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 850/93876 [00:00<00:10, 8496.46it/s]                                                                                                  
+--- Naive Baseline ---
+  Distance Travelled:       99.4 m
+  Final Position Error:     2131.98 m
+  Max Position Error:       2131.98 m
+  RMSE Position Error:      823.37 m
+  Drift Percentage:         2145.13%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_30s_blackout_at_120s_naive_baseline.png
+Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|1         | 1300/93876 [00:00<00:07, 12996.63it/s]                                                                                                    
+--- Phase 2: ES-EKF + NHC (No AI) ---
+  Distance Travelled:       99.4 m
+  Final Position Error:     104.72 m
+  Max Position Error:       104.72 m
+  RMSE Position Error:      65.83 m
+  Drift Percentage:         105.36%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_30s_blackout_at_120s_phase_2_es-ekf_plus_nhc_no_ai.png
+Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 134/93876 [00:00<01:12, 1297.94it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 264/93876 [00:00<03:03, 509.18it/s] Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 339/93876 [00:00<03:29, 447.39it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 396/93876 [00:00<03:51, 403.99it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   0%|          | 443/93876 [00:01<04:05, 380.23it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 485/93876 [00:01<04:12, 370.38it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 524/93876 [00:01<04:27, 349.17it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 560/93876 [00:01<04:37, 336.28it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 594/93876 [00:01<04:41, 331.50it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 827/93876 [00:01<01:51, 831.01it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|          | 921/93876 [00:01<02:40, 578.42it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|1         | 997/93876 [00:02<03:10, 488.64it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|1         | 1245/93876 [00:02<01:47, 860.07it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   1%|1         | 1364/93876 [00:02<02:26, 630.43it/s]Evaluating S-S2 [S-S2_30s_blackout_at_120s]:   2%|1         | 1458/93876 [00:02<02:49, 546.23it/s]                                                                                                  
+--- Phase 3: ES-EKF + AI Velocity (TCN-Attention) ---
+  Distance Travelled:       99.4 m
+  Final Position Error:     25.44 m
+  Max Position Error:       25.64 m
+  RMSE Position Error:      16.97 m
+  Drift Percentage:         25.59%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_30s_blackout_at_120s_phase_3_es-ekf_plus_ai_velocity_tcn-attention.png
+
+###########################################################################
+TRIP: S-S2 | SCENARIO: S-S2_60s_blackout_at_300s (Duration: ~60.0s)
+###########################################################################
+Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 784/93876 [00:00<00:11, 7835.13it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|1         | 1862/93876 [00:00<00:09, 9566.45it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|3         | 2819/93876 [00:00<00:10, 9073.30it/s]                                                                                                   
+--- Naive Baseline ---
+  Distance Travelled:       5.0 m
+  Final Position Error:     1806.04 m
+  Max Position Error:       1806.04 m
+  RMSE Position Error:      781.05 m
+  Drift Percentage:         35931.82%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_60s_blackout_at_300s_naive_baseline.png
+Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|1         | 1255/93876 [00:00<00:07, 12549.53it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2510/93876 [00:00<00:08, 10843.13it/s]                                                                                                    
+--- Phase 2: ES-EKF + NHC (No AI) ---
+  Distance Travelled:       5.0 m
+  Final Position Error:     6.11 m
+  Max Position Error:       6.11 m
+  RMSE Position Error:      3.88 m
+  Drift Percentage:         121.54%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_60s_blackout_at_300s_phase_2_es-ekf_plus_nhc_no_ai.png
+Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 0/93876 [00:00<?, ?it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 133/93876 [00:00<01:12, 1292.77it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 263/93876 [00:00<02:55, 534.53it/s] Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 339/93876 [00:00<03:19, 468.27it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 397/93876 [00:00<03:51, 403.82it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   0%|          | 444/93876 [00:00<04:04, 382.53it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 486/93876 [00:01<04:11, 370.77it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 525/93876 [00:01<04:24, 353.18it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 562/93876 [00:01<04:33, 340.98it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 597/93876 [00:01<04:40, 332.68it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 831/93876 [00:01<01:51, 830.92it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|          | 926/93876 [00:01<02:44, 563.86it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|1         | 1002/93876 [00:02<03:12, 482.08it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|1         | 1263/93876 [00:02<01:46, 869.73it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   1%|1         | 1385/93876 [00:02<02:30, 615.29it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|1         | 1480/93876 [00:02<02:38, 584.45it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|1         | 1697/93876 [00:02<01:48, 850.23it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|1         | 1819/93876 [00:03<02:36, 588.01it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 1914/93876 [00:03<03:14, 473.71it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 1989/93876 [00:03<03:42, 412.76it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2050/93876 [00:04<03:55, 389.26it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2102/93876 [00:04<04:04, 375.67it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2148/93876 [00:04<04:12, 363.99it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2190/93876 [00:04<04:17, 355.82it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2230/93876 [00:04<04:26, 343.85it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2267/93876 [00:04<04:32, 335.77it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2302/93876 [00:04<04:40, 325.96it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   2%|2         | 2336/93876 [00:04<04:46, 319.43it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2369/93876 [00:05<04:49, 316.58it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2401/93876 [00:05<04:52, 312.49it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2433/93876 [00:05<05:03, 301.35it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2464/93876 [00:05<05:10, 294.46it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2494/93876 [00:05<05:15, 289.91it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2602/93876 [00:05<03:03, 497.52it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2653/93876 [00:05<03:33, 427.13it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2698/93876 [00:05<03:56, 385.37it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2739/93876 [00:06<04:08, 366.62it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2778/93876 [00:06<04:17, 353.17it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|2         | 2815/93876 [00:06<04:24, 344.76it/s]Evaluating S-S2 [S-S2_60s_blackout_at_300s]:   3%|3         | 3101/93876 [00:06<01:31, 988.34it/s]                                                                                                  
+--- Phase 3: ES-EKF + AI Velocity (TCN-Attention) ---
+  Distance Travelled:       5.0 m
+  Final Position Error:     6.11 m
+  Max Position Error:       6.11 m
+  RMSE Position Error:      3.88 m
+  Drift Percentage:         121.54%
+  SIH Target (<10%):        FAILED
+  Plot:                     artifacts/S-S2_S-S2_60s_blackout_at_300s_phase_3_es-ekf_plus_ai_velocity_tcn-attention.png
+
+===========================================================================
+PHASE 1 - 3 MULTI-TRIP BENCHMARK MATRIX (TRAINING TRIP + UNSEEN VALIDATION TRIP)
+===========================================================================
+Trip                  Scenario                                      Pipeline Distance (m) Final Error (m) RMSE (m)   Drift % SIH (<10%)
+S-S1      30s_blackout_at_120s                                Naive Baseline        510.3         1612.52   645.01   316.01%       FAIL
+S-S1      30s_blackout_at_120s                 Phase 2: ES-EKF + NHC (No AI)        510.3          483.34   295.28    94.72%       FAIL
+S-S1      30s_blackout_at_120s Phase 3: ES-EKF + AI Velocity (TCN-Attention)        510.3          117.11    74.34    22.95%       FAIL
+S-S1      60s_blackout_at_300s                                Naive Baseline        814.1         1869.10   555.85   229.58%       FAIL
+S-S1      60s_blackout_at_300s                 Phase 2: ES-EKF + NHC (No AI)        814.1          804.91   488.06    98.87%       FAIL
+S-S1      60s_blackout_at_300s Phase 3: ES-EKF + AI Velocity (TCN-Attention)        814.1          161.48   108.23    19.83%       FAIL
+S-S2 S-S2_30s_blackout_at_120s                                Naive Baseline         99.4         2131.98   823.37  2145.13%       FAIL
+S-S2 S-S2_30s_blackout_at_120s                 Phase 2: ES-EKF + NHC (No AI)         99.4          104.72    65.83   105.36%       FAIL
+S-S2 S-S2_30s_blackout_at_120s Phase 3: ES-EKF + AI Velocity (TCN-Attention)         99.4           25.44    16.97    25.59%       FAIL
+S-S2 S-S2_60s_blackout_at_300s                                Naive Baseline          5.0         1806.04   781.05 35931.82%       FAIL
+S-S2 S-S2_60s_blackout_at_300s                 Phase 2: ES-EKF + NHC (No AI)          5.0            6.11     3.88   121.54%       FAIL
+S-S2 S-S2_60s_blackout_at_300s Phase 3: ES-EKF + AI Velocity (TCN-Attention)          5.0            6.11     3.88   121.54%       FAIL
+===========================================================================

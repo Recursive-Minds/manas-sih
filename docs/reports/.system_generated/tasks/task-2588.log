@@ -1,0 +1,4 @@
+
+Sweeping EKF parameters...
+turn_th=0.05 deg/s, max_bg=0.010 deg/s, cool=1.0s -> Median=108.27%, Worst=681.08%  [FAILED]
+turn_th=0.05 deg/s, max_bg=0.010 deg/s, cool=2.0s -> Median=108.27%, Worst=681.08%  [FAILED]

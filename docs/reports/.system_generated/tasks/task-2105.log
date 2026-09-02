@@ -1,0 +1,20 @@
+Loading datasets...
+Precomputing inferences...
+
+Evaluating 50 scenarios with production fixed EKF...
+python : Traceback (most recent call last):
+At line:1 char:1
++ python C:\Users\carpe\SIH\scratch\run_production_fixed_sweep.py 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\carpe\SIH\scratch\run_production_fixed_sweep.py", line 307, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\carpe\SIH\scratch\run_production_fixed_sweep.py", line 177, in main
+    res = run_single_eval(trip, calib, v_preds, t_start, duration)
+  File "C:\Users\carpe\SIH\scratch\run_production_fixed_sweep.py", line 128, in run_single_eval
+    gyro_z_vals = np.array([imu.gyro_rad_s[2] for imu in trip.imu_samples[pre_idx:pre_idx+len(nhc_dthetas)]])
+                            ^^^^^^^^^^^^^^
+AttributeError: 'IMUSample' object has no attribute 'gyro_rad_s'

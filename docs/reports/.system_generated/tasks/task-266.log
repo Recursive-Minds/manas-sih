@@ -1,0 +1,11 @@
+
+================================================================================
+MULTI-TRIP BENCHMARK MATRIX (TCN-Attention + Vehicle Calibrated DR)
+================================================================================
+Trip S-S1  [30.0s at 120.0s]: Dist= 510.3m | FinalErr=198.2m | RMSE= 84.6m | Drift=38.85% | FAIL
+Trip S-S1  [60.0s at 300.0s]: Dist= 814.1m | FinalErr=191.7m | RMSE= 79.8m | Drift=23.54% | FAIL
+Trip S-S2  [30.0s at 120.0s]: Dist= 898.9m | FinalErr=152.3m | RMSE=535.1m | Drift=16.94% | FAIL
+Trip S-S2  [60.0s at 300.0s]: Dist= 407.4m | FinalErr=341.5m | RMSE=151.4m | Drift=83.82% | FAIL
+Trip S-M   [30.0s at 120.0s]: Dist=  31.0m | FinalErr=167.0m | RMSE= 99.3m | Drift=538.91% | FAIL
+Trip S-M   [60.0s at 300.0s]: Dist=1021.0m | FinalErr=943.4m | RMSE=483.6m | Drift=92.40% | FAIL
+================================================================================

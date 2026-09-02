@@ -1,0 +1,5 @@
+{
+  "summary": "Diagnostic report verifying R_NHC Kalman gain wiring, 50-scenario distance bucket breakdown (meters vs drift %), pitch caveats for judges, and final architectural recommendation to proceed to Phase 4 Map-Matching.",
+  "updatedAt": "2026-09-02T14:18:07.349920400Z",
+  "userFacing": true
+}

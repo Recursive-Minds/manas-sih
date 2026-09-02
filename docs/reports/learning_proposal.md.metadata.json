@@ -1,0 +1,6 @@
+{
+  "summary": "Learning proposal capturing three key reusable insights: (1) In smartphone IMU odometry, regressing scalar forward speed with Huber/NLL loss causes shrinkage on high-speed driving unless linear gradient scaling is preserved; (2) In smartphone mounts with 3D tilt, single-axis gyro integration underestimates yaw turns by the cosine of the tilt angle; and (3) Visual trajectory alignment requires evaluating both along-track distance scale and cross-track turn curvature simultaneously.",
+  "updatedAt": "2026-09-02T07:52:01.871573Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

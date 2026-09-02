@@ -1,0 +1,6 @@
+[30s_blackout_at_120s] Pre-Blackout Calibrated: GyroBias = 0.003871 rad/s (0.2218�/s), SpeedScale = 1.4856
+  --> Distance: 512.1 m | Final Error: 139.10 m | Drift: 27.16% | Target (<10%): FAILED
+
+[60s_blackout_at_300s] Pre-Blackout Calibrated: GyroBias = -0.016848 rad/s (-0.9653�/s), SpeedScale = 1.1627
+  --> Distance: 814.8 m | Final Error: 403.29 m | Drift: 49.49% | Target (<10%): FAILED
+

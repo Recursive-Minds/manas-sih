@@ -1,0 +1,5 @@
+{
+  "summary": "Heading Drift Diagnostic Report detailing the gyro bias convergence audit, turn severity correlation analysis, NHC correction strength check, and magnetometer availability audit across IO-VNBD trips.",
+  "updatedAt": "2026-09-02T10:04:55.567841800Z",
+  "userFacing": true
+}

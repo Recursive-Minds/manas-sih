@@ -1,0 +1,13 @@
+FullErrorStateEKF class defined successfully.
+Precomputing inferences...
+
+Evaluating Scenario A (30s @ 120s on S-S1)...
+Traceback (most recent call last):
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\test_proper_es_ekf_eval.py", line 138, in <module>
+    res_sc1 = run_single_eval(trip_s1, calib_s1, v_s1, 120.0, 30.0)
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\test_proper_es_ekf_eval.py", line 91, in run_single_eval
+    ekf.update_gnss(g)
+    ~~~~~~~~~~~~~~~^^^
+  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\test_proper_es_ekf.py", line 287, in update_gnss
+    S_hdg = float(H_hdg @ self._P @ H_hdg.T + self.r_hdg)
+TypeError: only 0-dimensional arrays can be converted to Python scalars

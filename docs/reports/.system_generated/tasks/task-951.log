@@ -1,0 +1,11 @@
+Calibration alignment: MountAlignment(is_calibrated=True, R_phone_to_vehicle=Rotation.from_matrix(array([[ 9.99978035e-01, -6.41097119e-05, -6.62764726e-03],
+                            [-6.41097119e-05,  9.99812883e-01, -1.93441224e-02],
+                            [ 6.62764726e-03,  1.93441224e-02,  9.99790918e-01]])), forward_axis_phone=array([ 9.99978035e-01, -6.41097119e-05, -6.62764726e-03]), lateral_axis_phone=array([-6.41097119e-05,  9.99812883e-01, -1.93441224e-02]), vertical_axis_phone=array([0.00662765, 0.01934412, 0.99979092]), yaw_axis_index=1, yaw_axis_sign=-1.0, mount_yaw_offset_rad=0.0, pitch_deg=1.1084300525696378, roll_deg=-0.37973899600327715)
+
+Scenario 2 (60s blackout at 300s):
+  Distance:    814.1 m
+  Final Error: 538.58 m
+  RMSE Error:  260.71 m
+  Drift %:     66.15%
+  Start Heading: 242.0�
+  End Heading:   196.6�

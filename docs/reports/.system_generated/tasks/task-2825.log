@@ -1,0 +1,48 @@
+=== PyTorch GPU Target Benchmark Optimizer (Device: cuda) ===
+Sweeping 216 target scale configurations on GPU...
+[ 15/216] turn=1.5�/s, bg=0.5�/s, cool=0.5s, scale=3.20 -> Median= 74.53%, Worst=136.41% [FAILED]
+[ 17/216] turn=1.5�/s, bg=0.5�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[ 18/216] turn=1.5�/s, bg=0.5�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[ 30/216] turn=1.5�/s, bg=0.5�/s, cool=1.0s, scale=2.90 -> Median= 76.33%, Worst=141.89% [FAILED]
+[ 35/216] turn=1.5�/s, bg=0.5�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[ 36/216] turn=1.5�/s, bg=0.5�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[ 45/216] turn=1.5�/s, bg=1.0�/s, cool=0.5s, scale=2.60 -> Median= 77.00%, Worst=147.37% [FAILED]
+[ 53/216] turn=1.5�/s, bg=1.0�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[ 54/216] turn=1.5�/s, bg=1.0�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[ 60/216] turn=1.5�/s, bg=1.0�/s, cool=1.0s, scale=2.30 -> Median= 78.88%, Worst=152.85% [FAILED]
+[ 71/216] turn=1.5�/s, bg=1.0�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[ 72/216] turn=1.5�/s, bg=1.0�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[ 75/216] turn=2.0�/s, bg=0.5�/s, cool=0.5s, scale=2.00 -> Median= 79.70%, Worst=158.33% [FAILED]
+[ 89/216] turn=2.0�/s, bg=0.5�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[ 90/216] turn=2.0�/s, bg=0.5�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[105/216] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=3.20 -> Median= 74.53%, Worst=136.41% [FAILED]
+[107/216] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[108/216] turn=2.0�/s, bg=0.5�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[120/216] turn=2.0�/s, bg=1.0�/s, cool=0.5s, scale=2.90 -> Median= 76.33%, Worst=141.89% [FAILED]
+[125/216] turn=2.0�/s, bg=1.0�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[126/216] turn=2.0�/s, bg=1.0�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[135/216] turn=2.0�/s, bg=1.0�/s, cool=1.0s, scale=2.60 -> Median= 77.00%, Worst=147.37% [FAILED]
+[143/216] turn=2.0�/s, bg=1.0�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[144/216] turn=2.0�/s, bg=1.0�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[150/216] turn=3.0�/s, bg=0.5�/s, cool=0.5s, scale=2.30 -> Median= 78.88%, Worst=152.85% [FAILED]
+[161/216] turn=3.0�/s, bg=0.5�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[162/216] turn=3.0�/s, bg=0.5�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[165/216] turn=3.0�/s, bg=0.5�/s, cool=1.0s, scale=2.00 -> Median= 79.70%, Worst=158.33% [FAILED]
+[179/216] turn=3.0�/s, bg=0.5�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[180/216] turn=3.0�/s, bg=0.5�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[195/216] turn=3.0�/s, bg=1.0�/s, cool=0.5s, scale=3.20 -> Median= 74.53%, Worst=136.41% [FAILED]
+[197/216] turn=3.0�/s, bg=1.0�/s, cool=0.5s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[198/216] turn=3.0�/s, bg=1.0�/s, cool=0.5s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+[210/216] turn=3.0�/s, bg=1.0�/s, cool=1.0s, scale=2.90 -> Median= 76.33%, Worst=141.89% [FAILED]
+[215/216] turn=3.0�/s, bg=1.0�/s, cool=1.0s, scale=3.40 -> Median= 72.74%, Worst=132.76% [SUCCESS (BEATS BOTH!)]
+[216/216] turn=3.0�/s, bg=1.0�/s, cool=1.0s, scale=3.50 -> Median= 72.90%, Worst=130.94% [SUCCESS (BEATS BOTH!)]
+
+GPU Target Optimizer Completed across 216 configs in 9.98 seconds!
+
+==========================================================================
+                 OPTIMAL GPU PARAMETERS FOUND (BEATS BOTH!)               
+==========================================================================
+ Parameters:  turn_th=1.5�/s, max_bg=0.5�/s, cool=0.5s, scale=3.40
+ Metrics:     Combined Median = 72.74%,   Combined Worst-Case = 132.76%
+ Targets:     Baseline Median < 73.54%,  Baseline Worst-Case < 806.03%
+==========================================================================

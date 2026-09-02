@@ -1,0 +1,8 @@
+GNSS @ 120s: speed=15.55 m/s, COG bearing=272.0�
+
+RESULTS FOR CLEAN INTEGRATION:
+  Distance:    510.3 m
+  Start Error: 0.43 m
+  Final Error: 201.78 m
+  RMSE Error:  84.30 m
+  Drift %:     39.54%

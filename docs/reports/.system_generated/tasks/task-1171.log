@@ -1,0 +1,32 @@
+Ingesting trips for training...
+Dataset ready in 0.90s! Train: 78,762 windows, Val: 18,756 windows
+Epoch 01/30 | Train NLL: 1.5738 | Val RMSE (UNSEEN S-S2): 3.859 m/s (13.9 km/h) | Val MAE: 2.554 m/s [BEST CHECKPOINT]
+Epoch 02/30 | Train NLL: 1.0031 | Val RMSE (UNSEEN S-S2): 3.678 m/s (13.2 km/h) | Val MAE: 2.514 m/s [BEST CHECKPOINT]
+Epoch 03/30 | Train NLL: 0.7220 | Val RMSE (UNSEEN S-S2): 3.719 m/s (13.4 km/h) | Val MAE: 2.558 m/s 
+Epoch 04/30 | Train NLL: 0.5611 | Val RMSE (UNSEEN S-S2): 3.813 m/s (13.7 km/h) | Val MAE: 2.544 m/s 
+Epoch 05/30 | Train NLL: 0.4369 | Val RMSE (UNSEEN S-S2): 3.796 m/s (13.7 km/h) | Val MAE: 2.725 m/s 
+Epoch 06/30 | Train NLL: 0.3394 | Val RMSE (UNSEEN S-S2): 3.754 m/s (13.5 km/h) | Val MAE: 2.571 m/s 
+Epoch 07/30 | Train NLL: 0.2556 | Val RMSE (UNSEEN S-S2): 3.775 m/s (13.6 km/h) | Val MAE: 2.641 m/s 
+Epoch 08/30 | Train NLL: 0.2007 | Val RMSE (UNSEEN S-S2): 3.867 m/s (13.9 km/h) | Val MAE: 2.613 m/s 
+Epoch 09/30 | Train NLL: 0.1323 | Val RMSE (UNSEEN S-S2): 3.769 m/s (13.6 km/h) | Val MAE: 2.584 m/s 
+Epoch 10/30 | Train NLL: 0.0767 | Val RMSE (UNSEEN S-S2): 3.757 m/s (13.5 km/h) | Val MAE: 2.582 m/s 
+Epoch 11/30 | Train NLL: 0.0247 | Val RMSE (UNSEEN S-S2): 3.740 m/s (13.5 km/h) | Val MAE: 2.551 m/s 
+Epoch 12/30 | Train NLL: -0.0256 | Val RMSE (UNSEEN S-S2): 3.793 m/s (13.7 km/h) | Val MAE: 2.567 m/s 
+Epoch 13/30 | Train NLL: -0.0596 | Val RMSE (UNSEEN S-S2): 3.740 m/s (13.5 km/h) | Val MAE: 2.546 m/s 
+Epoch 14/30 | Train NLL: -0.1107 | Val RMSE (UNSEEN S-S2): 3.722 m/s (13.4 km/h) | Val MAE: 2.537 m/s 
+Epoch 15/30 | Train NLL: -0.1440 | Val RMSE (UNSEEN S-S2): 3.736 m/s (13.4 km/h) | Val MAE: 2.549 m/s 
+Epoch 16/30 | Train NLL: -0.1809 | Val RMSE (UNSEEN S-S2): 3.724 m/s (13.4 km/h) | Val MAE: 2.541 m/s 
+Epoch 17/30 | Train NLL: -0.2251 | Val RMSE (UNSEEN S-S2): 3.749 m/s (13.5 km/h) | Val MAE: 2.548 m/s 
+Epoch 18/30 | Train NLL: -0.2617 | Val RMSE (UNSEEN S-S2): 3.762 m/s (13.5 km/h) | Val MAE: 2.555 m/s 
+Epoch 19/30 | Train NLL: -0.2874 | Val RMSE (UNSEEN S-S2): 3.742 m/s (13.5 km/h) | Val MAE: 2.533 m/s 
+Epoch 20/30 | Train NLL: -0.3247 | Val RMSE (UNSEEN S-S2): 3.735 m/s (13.4 km/h) | Val MAE: 2.547 m/s 
+Epoch 21/30 | Train NLL: -0.3465 | Val RMSE (UNSEEN S-S2): 3.728 m/s (13.4 km/h) | Val MAE: 2.548 m/s 
+Epoch 22/30 | Train NLL: -0.3724 | Val RMSE (UNSEEN S-S2): 3.748 m/s (13.5 km/h) | Val MAE: 2.530 m/s 
+Epoch 23/30 | Train NLL: -0.4024 | Val RMSE (UNSEEN S-S2): 3.735 m/s (13.4 km/h) | Val MAE: 2.546 m/s 
+Epoch 24/30 | Train NLL: -0.4241 | Val RMSE (UNSEEN S-S2): 3.755 m/s (13.5 km/h) | Val MAE: 2.546 m/s 
+Epoch 25/30 | Train NLL: -0.4384 | Val RMSE (UNSEEN S-S2): 3.742 m/s (13.5 km/h) | Val MAE: 2.551 m/s 
+Epoch 26/30 | Train NLL: -0.4590 | Val RMSE (UNSEEN S-S2): 3.753 m/s (13.5 km/h) | Val MAE: 2.544 m/s 
+Epoch 27/30 | Train NLL: -0.4669 | Val RMSE (UNSEEN S-S2): 3.765 m/s (13.6 km/h) | Val MAE: 2.527 m/s 
+Epoch 28/30 | Train NLL: -0.4744 | Val RMSE (UNSEEN S-S2): 3.751 m/s (13.5 km/h) | Val MAE: 2.542 m/s 
+Epoch 29/30 | Train NLL: -0.4850 | Val RMSE (UNSEEN S-S2): 3.751 m/s (13.5 km/h) | Val MAE: 2.541 m/s 
+Epoch 30/30 | Train NLL: -0.4887 | Val RMSE (UNSEEN S-S2): 3.749 m/s (13.5 km/h) | Val MAE: 2.539 m/s 

@@ -1,0 +1,8 @@
+
+Scenario 2 (60s blackout at 300s) with yaw_axis_sign = +1.0:
+  Distance:    814.1 m
+  Final Error: 206.07 m
+  RMSE Error:  186.25 m
+  Drift %:     25.31%
+  Start Heading: 241.9� (GT: 242.0�)
+  End Heading:   287.2� (GT: 323.5�)

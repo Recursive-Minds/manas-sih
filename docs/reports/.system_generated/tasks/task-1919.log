@@ -1,0 +1,56 @@
+======================================================================
+1. GYRO BIAS CONVERGENCE CHECK ON WORST-PERFORMING SAMPLES
+======================================================================
+Worst S-S1 Scenarios:
+  rand_bo_09_86s_at_3078s: Start=3078.2s, Dur=86.4s, Err=530.9m, Drift=135.0%
+  rand_bo_22_42s_at_791s: Start=791.1s, Dur=41.8s, Err=495.9m, Drift=183.1%
+  rand_bo_11_77s_at_202s: Start=202.0s, Dur=76.6s, Err=465.8m, Drift=51.7%
+
+Worst S-S2 Scenarios:
+  rand_bo_12_71s_at_2588s: Start=2587.6s, Dur=71.1s, Err=1047.8m, Drift=129.5%
+  rand_bo_18_73s_at_7454s: Start=7454.1s, Dur=73.3s, Err=1030.2m, Drift=160.5%
+  rand_bo_01_71s_at_8989s: Start=8988.7s, Dur=71.0s, Err=924.7m, Drift=58.5%
+
+======================================================================
+2. CORRELATION: HEADING & CROSS-TRACK ERROR VS TURN SEVERITY ACROSS 50 SWEEP SAMPLES
+======================================================================
+Correlation: |Cross-Track Error| vs Total Heading Turn (deg): r = 0.4101 (p = 3.0992e-03)
+Correlation: |Cross-Track Error| vs Peak Yaw Rate (deg/s):    r = 0.0974 (p = 5.0108e-01)
+Correlation: Drift % vs Total Heading Turn (deg):            r = -0.1474 (p = 3.0717e-01)
+Saved turn severity correlation plot to artifacts/heading_error_vs_turn_severity.png
+
+======================================================================
+3. NHC CORRECTION STRENGTH CHECK
+======================================================================
+Auditing codebase in sih/fusion/es_ekf.py:
+  - Configuration flags: nhc_lateral_std = 0.15, nhc_vertical_std = 0.15, enable_nhc = True
+  - Execution status during AI-velocity prediction:
+    In ErrorStateEKF.predict(), when vel is provided:
+      v_e = v_fwd * sin(heading), v_n = v_fwd * cos(heading), v_u = 0.0
+    Lateral velocity in vehicle frame is assumed 0 analytically.
+    --> ZERO Kalman measurement update (K * (0 - v_lat)) is performed on the error-state vector.
+    --> Orientation error delta_theta is NEVER updated by NHC.
+    --> Heading change delta_heading = 0.0 rad at every step from NHC.
+
+======================================================================
+4. MAGNETOMETER AVAILABILITY AUDIT IN IO-VNBD DATASET
+======================================================================
+S-S1 Raw Magnetometer Columns: [' MAGNETIC FIELD X (μT)', ' MAGNETIC FIELD Y (μT)', ' MAGNETIC FIELD Z (μT)']
+S-S2 Raw Magnetometer Columns: [' MAGNETIC FIELD X (μT)', ' MAGNETIC FIELD Y (μT)', ' MAGNETIC FIELD Z (μT)']
+S-S1 Mag Non-Null Count: {' MAGNETIC FIELD X (μT)': 51746, ' MAGNETIC FIELD Y (μT)': 51746, ' MAGNETIC FIELD Z (μT)': 51746}
+S-S2 Mag Non-Null Count: {' MAGNETIC FIELD X (μT)': 93876, ' MAGNETIC FIELD Y (μT)': 93876, ' MAGNETIC FIELD Z (μT)': 93876}
+S-S1 Mag Value Ranges (uT):
+   MAGNETIC FIELD X (μT): min=-41.87, mean=-15.91, max=10.75
+   MAGNETIC FIELD Y (μT): min=-39.19, mean=-27.94, max=-16.62
+   MAGNETIC FIELD Z (μT): min=-11.00, mean=17.04, max=43.88
+S-S2 Mag Value Ranges (uT):
+   MAGNETIC FIELD X (μT): min=-51.44, mean=-14.16, max=18.25
+   MAGNETIC FIELD Y (μT): min=-74.44, mean=-35.28, max=37.25
+   MAGNETIC FIELD Z (μT): min=-48.06, mean=9.57, max=53.75
+
+Pipeline Usage Status:
+  - GenericDataLoader: Parses mag_x, mag_y, mag_z into IMUSample.mag field.
+  - MountCalibrator: Does NOT use mag (uses gravity + centripetal correlation).
+  - TCNAttentionVelocityModel: Does NOT use mag (uses 6 IMU + 2 magnitudes).
+  - ErrorStateEKF: Does NOT use mag (pure gyro heading integration).
+  --> Magnetometer is 100% AVAILABLE in dataset and 100% UNUSED in the pipeline.
