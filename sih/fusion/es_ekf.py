@@ -233,6 +233,17 @@ class ErrorStateEKF(IFusionFilter):
         yaw_enu_rad = np.pi / 2.0 - self._heading_rad
         self._q = R.from_euler("z", yaw_enu_rad)
 
+        # Critical: Align navigation velocity vector with the new seeded heading
+        # Otherwise, NHC on step 0 sees an artificial lateral velocity slip and violently yanks heading back
+        v_speed = float(np.linalg.norm(self._v))
+        if v_speed > 0.1:
+            v_b = np.array([v_speed, 0.0, 0.0], dtype=np.float64)
+            self._v = self._q.as_matrix() @ v_b
+
+        # Decouple attitude cross-covariances so pre-blackout velocity innovations cannot rotate the seeded heading
+        self._P[6:9, :] = 0.0
+        self._P[:, 6:9] = 0.0
+
         if is_consistent:
             self._P[8, 8] = float(np.radians(2.0))**2
         else:

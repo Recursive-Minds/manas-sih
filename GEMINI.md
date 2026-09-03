@@ -13,3 +13,10 @@ Refer to [CLAUDE.md](file:///c:/Users/carpe/SIH/CLAUDE.md) for full context, rul
 8. **High-Speed Velocity Scaling**: When training neural velocity estimators from IMU, avoid loss functions that compress gradients on high speeds (e.g. tight Huber thresholds). Verify that the predicted speed scale ratio $\frac{\sum \hat{v}}{\sum v_{\text{GT}}} \approx 1.00$.
 9. **3D Mount Invariance**: Always apply 3D SO(3) rotational data augmentation during IMU model training to prevent memorization of static cradle gravity vectors.
 10. **Trajectory Error Decomposition**: When evaluating dead-reckoning performance on real data, decompose position errors into along-track (speed scale) and cross-track (turn rate / heading) components to diagnose drift root causes.
+11. **End-to-End Benchmark & Report Synchronization Pipeline**:
+Whenever any algorithmic change, model retraining, or parameter update is made, follow this mandatory 4-step execution chain:
+- **Step 1**: Implement the changes directly in production code (`benchmarks/run_final_benchmark.py`, `sih/`).
+- **Step 2**: Re-run the full 35-scenario benchmark on real data to produce new coordinates and error metrics.
+- **Step 3**: Re-render all trajectory maps, gallery plots, and distribution charts from the newly generated benchmark run.
+- **Step 4**: Re-generate BOTH `FINAL_JUDGE_EVALUATION_REPORT.md` AND `FINAL_JUDGE_EVALUATION_REPORT.html` with updated tables, scorecards, and newly rendered base64 images embedded directly. Never report an update complete without running this entire chain end-to-end.
+

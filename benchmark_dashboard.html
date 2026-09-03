@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SIH Intelligent Dead Reckoning - Benchmark Dashboard</title>
+  <title>SIH Intelligent Dead Reckoning - Fresh Benchmark Dashboard</title>
   <style>
     :root {
       --bg: #0b0f19;
       --card-bg: rgba(22, 30, 49, 0.85);
       --border: rgba(255, 255, 255, 0.08);
       --accent: #3b82f6;
-      --accent-glow: rgba(59, 130, 246, 0.35);
       --tier1: #10b981;
       --tier2: #f59e0b;
       --tier3: #ef4444;
@@ -29,9 +28,9 @@
 
     header {
       max-width: 1300px;
-      margin: 0 auto 2rem auto;
+      margin: 0 auto 1.5rem auto;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 1.5rem;
+      padding-bottom: 1rem;
     }
 
     .badge {
@@ -63,13 +62,12 @@
       font-size: 1.05rem;
     }
 
-    /* Metric Cards */
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 1.25rem;
       max-width: 1300px;
-      margin: 0 auto 2.5rem auto;
+      margin: 0 auto 2rem auto;
     }
 
     .metric-card {
@@ -79,11 +77,6 @@
       padding: 1.25rem 1.5rem;
       backdrop-filter: blur(12px);
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s, border-color 0.2s;
-    }
-    .metric-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(59, 130, 246, 0.4);
     }
 
     .metric-title {
@@ -106,26 +99,27 @@
       margin-top: 0.25rem;
     }
 
-    /* Section Layout */
     .container {
       max-width: 1300px;
       margin: 0 auto;
     }
 
     .section-title {
-      font-size: 1.4rem;
+      font-size: 1.35rem;
       font-weight: 600;
-      margin-bottom: 1rem;
+      margin: 2rem 0 1rem 0;
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      border-left: 4px solid var(--accent);
+      padding-left: 0.75rem;
     }
 
     .gallery-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
       gap: 1.5rem;
-      margin-bottom: 3rem;
+      margin-bottom: 2rem;
     }
 
     .full-width-card {
@@ -145,11 +139,12 @@
     .img-card-header {
       padding: 1rem 1.25rem;
       border-bottom: 1px solid var(--border);
-      background: rgba(11, 15, 25, 0.4);
+      background: rgba(11, 15, 25, 0.6);
     }
     .img-card-header h3 {
       font-size: 1.05rem;
       font-weight: 600;
+      color: #fff;
     }
     .img-card-header p {
       font-size: 0.82rem;
@@ -157,32 +152,32 @@
     }
 
     .img-wrapper {
-      background: #000;
+      background: #0f1422;
       position: relative;
       cursor: pointer;
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden;
+      padding: 0.5rem;
     }
 
     .img-wrapper img {
-      width: 100%;
+      max-width: 100%;
       height: auto;
       display: block;
-      transition: transform 0.25s ease;
+      border-radius: 6px;
+      transition: transform 0.2s ease;
     }
     .img-wrapper:hover img {
-      transform: scale(1.02);
+      transform: scale(1.01);
     }
 
-    /* Legend */
     .legend-bar {
       display: flex;
       gap: 1.5rem;
       flex-wrap: wrap;
-      background: rgba(22, 30, 49, 0.6);
-      padding: 0.75rem 1.25rem;
+      background: rgba(22, 30, 49, 0.8);
+      padding: 0.85rem 1.25rem;
       border-radius: 8px;
       border: 1px solid var(--border);
       margin-bottom: 1.5rem;
@@ -195,7 +190,6 @@
     .dot.green { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
     .dot.yellow { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
 
-    /* Modal for Fullscreen inspection */
     #modal {
       display: none;
       position: fixed;
@@ -210,23 +204,22 @@
       max-width: 95vw;
       max-height: 95vh;
       border-radius: 8px;
-      box-shadow: 0 0 40px rgba(0,0,0,0.8);
     }
   </style>
 </head>
 <body>
 
   <header>
-    <div class="badge">Official SIH Benchmark Verified: 9.91% Median Drift</div>
+    <div class="badge">Freshly Re-Rendered Benchmark Results (Cache-Busted)</div>
     <h1>Intelligent Dead Reckoning Engine</h1>
-    <p class="subtitle">Complete visual verification on 35 real-world driving blackout scenarios (Unseen Trip: S-M.csv)</p>
+    <p class="subtitle">Inspecting updated initial angle seeding across the 35 scenarios of unseen trip S-M.csv</p>
   </header>
 
   <div class="metrics-grid">
     <div class="metric-card">
       <div class="metric-title">Overall Median Drift</div>
       <div class="metric-val pass">9.91%</div>
-      <div class="metric-sub">Target &lt; 10% (OFFICIALLY PASSED)</div>
+      <div class="metric-sub">Target &lt; 10% (PASSED)</div>
     </div>
     <div class="metric-card">
       <div class="metric-title">Tier 1 Pass Rate (&lt; 10%)</div>
@@ -239,106 +232,96 @@
       <div class="metric-sub">31 of 35 scenarios &le; 30% drift</div>
     </div>
     <div class="metric-card">
-      <div class="metric-title">P90 (Worst Decile) Drift</div>
-      <div class="metric-val">30.30%</div>
-      <div class="metric-sub">Down from 89.32% in pure IMU</div>
+      <div class="metric-title">Initial Heading Bias</div>
+      <div class="metric-val pass">+0.66°</div>
+      <div class="metric-sub">Mean error across all 35 runs</div>
     </div>
   </div>
 
   <div class="container">
     <div class="legend-bar">
-      <div class="legend-item"><div class="dot blue"></div> <strong>Blue Dot:</strong> Phase 4 Map-Matched (AI + EKF + Map)</div>
-      <div class="legend-item"><div class="dot red"></div> <strong>Red Dot:</strong> Pure 6-Axis EKF (IMU + AI, No Maps)</div>
-      <div class="legend-item"><div class="dot green"></div> <strong>Green 'X':</strong> True Ground Truth Exit Position</div>
-      <div class="legend-item"><div class="dot yellow"></div> <strong>Yellow Circle:</strong> Blackout Entry Point</div>
+      <div class="legend-item"><div class="dot blue"></div> <strong>Blue Dot / Line:</strong> Phase 4 Map-Matched (AI + EKF + Map)</div>
+      <div class="legend-item"><div class="dot red"></div> <strong>Red Dot / Dotted Line:</strong> Pure 6-Axis EKF (IMU + AI, No Maps)</div>
+      <div class="legend-item"><div class="dot green"></div> <strong>Green / Black 'X':</strong> True Ground Truth Exit Position</div>
+      <div class="legend-item"><div class="dot yellow"></div> <strong>Black Dot:</strong> Blackout Entry Point</div>
     </div>
 
-    <!-- Master Gallery -->
-    <div class="section-title">1. High-Resolution Trajectory Gallery (All Scenarios)</div>
+    <!-- Fresh Focus Runs -->
+    <div class="section-title">1. Freshly Regenerated Single Scenario Runs (Post-Heading Fix)</div>
+    <div class="gallery-grid">
+      <div class="img-card">
+        <div class="img-card-header">
+          <h3>Scenario #01: Highway Entry (From Your Screenshot)</h3>
+          <p>Initial heading 333.06° perfectly matched to ground truth</p>
+        </div>
+        <div class="img-wrapper" onclick="openModal(this)">
+          <img src="artifacts/unseen_sm_tier1_best_run.png?t=1725357400" alt="Scenario 1 Fresh">
+        </div>
+      </div>
+
+      <div class="img-card">
+        <div class="img-card-header">
+          <h3>Scenario #30: Highway Off-Ramp Fork Split</h3>
+          <p>403m outage, 0.79% drift (3.18m error) - Fork resolved</p>
+        </div>
+        <div class="img-wrapper" onclick="openModal(this)">
+          <img src="artifacts/map_scenario_30_highway_off_ramp_fork_split.png?t=1725357400" alt="Scenario 30 Fork Split">
+        </div>
+      </div>
+
+      <div class="img-card">
+        <div class="img-card-header">
+          <h3>Scenario #12: Town Double-S Turn (Median Tier 2 Run)</h3>
+          <p>495m outage, error decays instead of diverging post-turn</p>
+        </div>
+        <div class="img-wrapper" onclick="openModal(this)">
+          <img src="artifacts/unseen_sm_tier2_median_run.png?t=1725357400" alt="Scenario 12 Median Run">
+        </div>
+      </div>
+
+      <div class="img-card">
+        <div class="img-card-header">
+          <h3>Scenario #14: Urban Chicane Navigation</h3>
+          <p>167m tight urban maneuvers, held within Tier 2 (15.8% drift)</p>
+        </div>
+        <div class="img-wrapper" onclick="openModal(this)">
+          <img src="artifacts/map_scenario_14_urban_chicane_navigation.png?t=1725357400" alt="Scenario 14 Urban Chicanes">
+        </div>
+      </div>
+    </div>
+
+    <!-- Master 9-Panel Gallery -->
+    <div class="section-title">2. Full 9-Panel All-Tiers Gallery (Re-Rendered)</div>
     <div class="gallery-grid">
       <div class="img-card full-width-card">
         <div class="img-card-header">
-          <h3>Unseen S-M Dataset: All-Tiers Comprehensive Comparison</h3>
-          <p>Click image to expand to full resolution</p>
+          <h3>Comprehensive Comparison Across Tier 1, Tier 2, and Tier 3</h3>
+          <p>Click image to open fullscreen zoom</p>
         </div>
         <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/unseen_sm_all_tiers_gallery.png" alt="All Tiers Gallery">
+          <img src="artifacts/unseen_sm_all_tiers_gallery.png?t=1725357400" alt="All Tiers Gallery Re-Rendered">
         </div>
       </div>
     </div>
 
-    <!-- Performance Charts -->
-    <div class="section-title">2. Drift Distribution & Progression Charts</div>
+    <!-- Overall Drift Distribution -->
+    <div class="section-title">3. Statistical Distribution Chart</div>
     <div class="gallery-grid">
-      <div class="img-card">
+      <div class="img-card full-width-card">
         <div class="img-card-header">
-          <h3>Unseen S-M Dataset Drift Distribution</h3>
-          <p>Distribution across all 35 test runs (Phase 4 vs Pure 6-Axis)</p>
+          <h3>Phase 4 Map-Matched vs Pure 6-Axis Drift Histogram (35 Scenarios)</h3>
+          <p>Median 9.91% (Phase 4) vs 32.77% (Pure 6-Axis)</p>
         </div>
         <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/phase4_unseen_sm_drift_comparison_chart.png" alt="Drift Distribution">
-        </div>
-      </div>
-
-      <div class="img-card">
-        <div class="img-card-header">
-          <h3>4-Stage Architecture Progression</h3>
-          <p>From Naive Baseline (>1000%) down to Phase 4 (9.91%)</p>
-        </div>
-        <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/comprehensive_4stage_benchmark_chart.png" alt="4-Stage Progression">
+          <img src="artifacts/phase4_unseen_sm_drift_comparison_chart.png?t=1725357400" alt="Drift Comparison Chart">
         </div>
       </div>
     </div>
 
-    <!-- Specific Outage Scenarios -->
-    <div class="section-title">3. Representative Real-Drive Scenarios</div>
-    <div class="gallery-grid">
-      <div class="img-card">
-        <div class="img-card-header">
-          <h3>Long Outage Navigation (&gt; 700m)</h3>
-          <p>Sustained highway navigation without GNSS</p>
-        </div>
-        <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/map_new_unseen_sm_long_outage.png" alt="Long Outage">
-        </div>
-      </div>
-
-      <div class="img-card">
-        <div class="img-card-header">
-          <h3>90-Degree Highway Turn Outage</h3>
-          <p>Abrupt 90-degree curve navigation during outage</p>
-        </div>
-        <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/map_new_unseen_sm_90deg_turn.png" alt="90-degree turn">
-        </div>
-      </div>
-
-      <div class="img-card">
-        <div class="img-card-header">
-          <h3>Urban Curved Maneuver Outage</h3>
-          <p>Dynamic turn-rate adaptation in urban corridors</p>
-        </div>
-        <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/map_new_unseen_sm_urban_turn.png" alt="Urban Turn">
-        </div>
-      </div>
-
-      <div class="img-card">
-        <div class="img-card-header">
-          <h3>Medium Highway Outage (200m–500m)</h3>
-          <p>Standard tunnel & underpass blackout</p>
-        </div>
-        <div class="img-wrapper" onclick="openModal(this)">
-          <img src="artifacts/map_new_unseen_sm_medium_outage.png" alt="Medium Outage">
-        </div>
-      </div>
-    </div>
   </div>
 
-  <!-- Modal for Zoom -->
   <div id="modal" onclick="closeModal()">
-    <img id="modal-img" src="" alt="Fullscreen Image">
+    <img id="modal-img" src="" alt="Fullscreen View">
   </div>
 
   <script>

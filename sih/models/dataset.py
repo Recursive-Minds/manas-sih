@@ -34,6 +34,7 @@ class IMUVelocityDataset(Dataset):
         step_size: int = 2,            # Stride between windows (0.2s)
         in_channels: int = 8,          # 6 IMU + 2 magnitudes
         is_train: bool = True,
+        use_calibrated: bool = True,
         mean: Optional[np.ndarray] = None,
         std: Optional[np.ndarray] = None,
     ) -> None:
@@ -50,8 +51,17 @@ class IMUVelocityDataset(Dataset):
                 continue
 
             imu_ts = np.array([s.timestamp_ns for s in trip.imu_samples], dtype=np.int64)
-            accels = np.array([s.accel for s in trip.imu_samples], dtype=np.float32)
-            gyros = np.array([s.gyro for s in trip.imu_samples], dtype=np.float32)
+            if use_calibrated:
+                from sih.calibration.mount import MountCalibrator
+                calib = MountCalibrator(window_size=100)
+                for g in trip.gnss_samples:
+                    calib.observe_gnss(g)
+                calib_samples = [calib.update(s) for s in trip.imu_samples]
+                accels = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
+                gyros = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
+            else:
+                accels = np.array([s.accel for s in trip.imu_samples], dtype=np.float32)
+                gyros = np.array([s.gyro for s in trip.imu_samples], dtype=np.float32)
 
             # GNSS speed profile
             gnss_ts = np.array([g.timestamp_ns for g in trip.gnss_samples], dtype=np.int64)
