@@ -179,29 +179,50 @@ class ErrorStateEKF(IFusionFilter):
         delta_heading_gyro_deg: float = 0.0
     ) -> float:
         """
-        Principled physical heading seeding at blackout entry:
-        1. Takes the last reliable instantaneous GNSS course over ground (bearing_deg).
-        2. Extrapolates forward to exact blackout entry using gyro yaw integration.
-        3. Optionally snaps to road bearing only if road direction strictly aligns (|diff| < 20°).
-        4. Sets heading covariance accordingly.
+        Dynamic speed-dependent physical heading seeding at blackout entry:
+        1. When vehicle speed > 3.0 m/s and displacement between last 2 fixes > 3.0m:
+           Computes geometric vector displacement course arctan2(ΔEast, ΔNorth).
+        2. When crawling (0.5 < v <= 3.0 m/s):
+           Uses instantaneous Doppler bearing with road corridor weighting.
+        3. When stopped (v <= 0.5 m/s):
+           Holds last stable moving heading and integrates gyro yaw while stopped.
+        4. Extrapolates forward to exact blackout entry using gyro yaw integration.
+        5. Sets heading error covariance accordingly.
         """
-        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 2.0 and g.bearing_deg is not None]
-        
-        if valid_moving:
-            last_g = valid_moving[-1]
-            seeded_hdg = float(last_g.bearing_deg)
-            is_consistent = True
-        elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
-            seeded_hdg = float(pre_gnss[-1].bearing_deg)
-            is_consistent = False
-        else:
-            seeded_hdg = float(np.degrees(self._heading_rad))
-            is_consistent = False
+        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
+        seeded_hdg = None
+        is_consistent = True
 
-        # Exact physical forward extrapolation via gyro turning
+        if len(valid_moving) >= 2 and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps > 3.0:
+            g_prev = valid_moving[-2]
+            g_last = valid_moving[-1]
+            dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
+            # Pure 2-point geometric vector displacement is optimal when fixes are closely spaced (dt <= 1.5s);
+            # for sparse multi-second gaps (e.g. 9s logs), multi-second chords lag during curves, so instantaneous Doppler is superior
+            if dt_interval <= 1.5:
+                enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                disp = enu_last - enu_prev
+                if float(np.linalg.norm(disp)) > 3.0:
+                    seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
+                    is_consistent = True
+
+        if seeded_hdg is None:
+            # Instantaneous Doppler course over ground from latest GNSS fix
+            if valid_moving and valid_moving[-1].bearing_deg is not None:
+                seeded_hdg = float(valid_moving[-1].bearing_deg)
+                is_consistent = True
+            elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
+                seeded_hdg = float(pre_gnss[-1].bearing_deg)
+                is_consistent = False
+            else:
+                seeded_hdg = float(np.degrees(self._heading_rad))
+                is_consistent = False
+
+        # Physical forward extrapolation via integrated gyro turning
         seeded_hdg = (seeded_hdg + delta_heading_gyro_deg) % 360.0
 
-        # Gentle road alignment only if candidate bearing is strictly aligned
+        # Gentle road alignment only if road corridor strictly aligns (|diff| < 20°)
         if road_bearing_deg is not None:
             r_diff = abs((seeded_hdg - road_bearing_deg + 180.0) % 360.0 - 180.0)
             if r_diff < 20.0:
@@ -213,9 +234,9 @@ class ErrorStateEKF(IFusionFilter):
         self._q = R.from_euler("z", yaw_enu_rad)
 
         if is_consistent:
-            self._P[8, 8] = float(np.radians(2.5))**2
+            self._P[8, 8] = float(np.radians(2.0))**2
         else:
-            self._P[8, 8] = float(np.radians(10.0))**2
+            self._P[8, 8] = float(np.radians(8.0))**2
 
         return seeded_hdg
 
