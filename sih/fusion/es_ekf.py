@@ -132,9 +132,19 @@ class ErrorStateEKF(IFusionFilter):
         if initial_gnss is not None:
             self.init_from_gnss(initial_gnss)
 
-    def init_from_gnss(self, g: GNSSSample):
-        self._ref = np.array([g.latitude_deg, g.longitude_deg, g.altitude_m], dtype=np.float64)
-        self._p = np.zeros(3, dtype=np.float64)
+    def init_from_gnss(
+        self,
+        g: GNSSSample,
+        reference_lat_deg: Optional[float] = None,
+        reference_lon_deg: Optional[float] = None,
+        reference_alt_m: Optional[float] = None,
+    ):
+        if reference_lat_deg is not None and reference_lon_deg is not None:
+            self._ref = np.array([reference_lat_deg, reference_lon_deg, reference_alt_m or 0.0], dtype=np.float64)
+            self._p = geodetic_to_enu(g.latitude_deg, g.longitude_deg, g.altitude_m, self._ref[0], self._ref[1], self._ref[2])
+        else:
+            self._ref = np.array([g.latitude_deg, g.longitude_deg, g.altitude_m], dtype=np.float64)
+            self._p = np.zeros(3, dtype=np.float64)
         self._last_ts = g.timestamp_ns
         self._last_gnss_ts = g.timestamp_ns
 
@@ -155,6 +165,72 @@ class ErrorStateEKF(IFusionFilter):
         sig_p = float(max(g.accuracy_h_m, 1.0))
         self._P[0:3, 0:3] = np.diag([sig_p**2, sig_p**2, (sig_p * 2.0)**2])
         self._initialised = True
+
+    def align_heading_to_road(self, road_bearing_deg: float):
+        """Align vehicle heading directly to road network segment azimuth."""
+        self._heading_rad = float(np.radians(road_bearing_deg))
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+
+    def seed_pre_blackout_heading(
+        self,
+        pre_gnss: List[GNSSSample],
+        road_bearing_deg: Optional[float] = None,
+        delta_heading_gyro_deg: float = 0.0
+    ) -> float:
+        """
+        Principled physical heading seeding at blackout entry:
+        1. Takes the last reliable instantaneous GNSS course over ground (bearing_deg).
+        2. Extrapolates forward to exact blackout entry using gyro yaw integration.
+        3. Optionally snaps to road bearing only if road direction strictly aligns (|diff| < 20°).
+        4. Sets heading covariance accordingly.
+        """
+        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 2.0 and g.bearing_deg is not None]
+        
+        if valid_moving:
+            last_g = valid_moving[-1]
+            seeded_hdg = float(last_g.bearing_deg)
+            is_consistent = True
+        elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
+            seeded_hdg = float(pre_gnss[-1].bearing_deg)
+            is_consistent = False
+        else:
+            seeded_hdg = float(np.degrees(self._heading_rad))
+            is_consistent = False
+
+        # Exact physical forward extrapolation via gyro turning
+        seeded_hdg = (seeded_hdg + delta_heading_gyro_deg) % 360.0
+
+        # Gentle road alignment only if candidate bearing is strictly aligned
+        if road_bearing_deg is not None:
+            r_diff = abs((seeded_hdg - road_bearing_deg + 180.0) % 360.0 - 180.0)
+            if r_diff < 20.0:
+                seeded_hdg = (seeded_hdg + 0.5 * ((road_bearing_deg - seeded_hdg + 180.0) % 360.0 - 180.0)) % 360.0
+                is_consistent = True
+
+        self._heading_rad = float(np.radians(seeded_hdg))
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+
+        if is_consistent:
+            self._P[8, 8] = float(np.radians(2.5))**2
+        else:
+            self._P[8, 8] = float(np.radians(10.0))**2
+
+        return seeded_hdg
+
+    def reanchor_heading(self, road_bearing_deg: float, confidence: float = 1.0):
+        """
+        Fast re-anchoring when confirmed back on a straight road segment.
+        Gently pulls heading and contracts attitude covariance.
+        """
+        r_rad = float(np.radians(road_bearing_deg))
+        diff_rad = (r_rad - self._heading_rad + np.pi) % (2.0 * np.pi) - np.pi
+        gain = 0.15 * min(1.0, max(0.0, confidence))
+        self._heading_rad = (self._heading_rad + gain * diff_rad) % (2.0 * np.pi)
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+        self._P[8, 8] = float(0.85 * self._P[8, 8] + 0.15 * (np.radians(2.5))**2)
 
     def predict(self, sample: CalibratedSample, vel: Optional[VelocityEstimate] = None) -> FusedPosition:
         ts = sample.timestamp_ns
@@ -255,7 +331,12 @@ class ErrorStateEKF(IFusionFilter):
 
         q_pos = 0.01 * dt
         q_vel = ((vel.speed_variance if vel else 0.5) * dt)**2
-        q_att = (self.gyro_noise_std * dt)**2
+
+        # Rate-adaptive attitude process noise: scales with |w_z| during turns
+        gyro_scale_factor_std = 0.03
+        turn_rate = abs(w_z_corr)
+        q_att = ((self.gyro_noise_std**2 + (gyro_scale_factor_std * turn_rate)**2) * (dt**2))
+
         q_ba  = (self.accel_bias_std * dt)**2
         q_bg  = (self.gyro_bias_std * dt)**2
 
@@ -315,10 +396,15 @@ class ErrorStateEKF(IFusionFilter):
             self._q = R.from_euler("z", yaw_enu_rad)
             self.last_nhc_dtheta_deg = float(np.degrees(abs(dtheta_z)))
 
-            in_cooldown = (t_now_s - self._last_turn_ts_s) < self.cooldown_dur
-            if not in_cooldown:
-                self._bg += dx[12:15]
-                self._bg = np.clip(self._bg, -self.max_bg, self.max_bg)
+            # Continuous Lorentzian damping of gyro bias updates during turns
+            omega_turn_ref = 0.02 # ~1.15 deg/s
+            turn_damping = 1.0 / (1.0 + (abs(w_z_corr) / omega_turn_ref)**2)
+            time_since_turn = max(0.0, t_now_s - self._last_turn_ts_s)
+            cooldown_factor = min(1.0, time_since_turn / max(self.cooldown_dur, 0.1))
+            bias_gain = float(turn_damping * cooldown_factor)
+
+            self._bg += bias_gain * dx[12:15]
+            self._bg = np.clip(self._bg, -self.max_bg, self.max_bg)
 
             I_KH = np.eye(15) - K_nhc @ H_nhc
             self._P = I_KH @ self._P @ I_KH.T + K_nhc @ R_nhc @ K_nhc.T
@@ -359,18 +445,21 @@ class ErrorStateEKF(IFusionFilter):
         self._P = I_KH @ self._P @ I_KH.T + K_p @ R_p @ K_p.T
 
         # Heading Alignment & Pre-Blackout Gyro Bias Estimation
-        if gnss.speed_mps is not None and gnss.bearing_deg is not None and gnss.speed_mps > 3.0:
+        if gnss.speed_mps is not None and gnss.bearing_deg is not None and gnss.speed_mps > 2.5:
             gnss_hdg_rad = float(np.radians(gnss.bearing_deg))
             y_hdg = wrap_pi(gnss_hdg_rad - self._heading_rad)
-            if abs(y_hdg) < np.radians(20.0):
-                self._heading_rad = (self._heading_rad + 0.15 * y_hdg) % (2.0 * np.pi)
-                yaw_enu_rad = np.pi / 2.0 - self._heading_rad
-                self._q = R.from_euler("z", yaw_enu_rad)
+            # Smooth innovation update: never completely ignore valid motion heading,
+            # but bound single-step correction to prevent wild receiver outliers from jerking the filter
+            max_step_rad = np.radians(15.0)
+            step_rad = 0.20 * np.clip(y_hdg, -max_step_rad, max_step_rad)
+            self._heading_rad = (self._heading_rad + step_rad) % (2.0 * np.pi)
+            yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+            self._q = R.from_euler("z", yaw_enu_rad)
 
-                # Estimate Earth-vertical gyro bias during straight driving
-                if abs(y_hdg) < np.radians(3.0) and not in_cooldown:
-                    self._bg[2] += 0.02 * y_hdg
-                    self._bg[2] = float(np.clip(self._bg[2], -self.max_bg, self.max_bg))
+            # Estimate Earth-vertical gyro bias during straight driving
+            if abs(y_hdg) < np.radians(3.0) and not in_cooldown:
+                self._bg[2] += 0.02 * y_hdg
+                self._bg[2] = float(np.clip(self._bg[2], -self.max_bg, self.max_bg))
 
             # Pre-Blackout Speed Scale Factor Adaptation
             if self._last_ai_speed is not None and self._last_ai_speed > 2.0 and gnss.speed_mps > 3.0:

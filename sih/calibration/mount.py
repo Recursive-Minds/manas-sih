@@ -93,7 +93,7 @@ class MountCalibrator(ICalibration):
 
         # 2. Correlate gyro channels with horizontal centripetal acceleration and GNSS turn rates
         yaw_idx = 2
-        yaw_sign = -1.0 # Default right-handed ENU where bearing decreases with positive CCW yaw
+        yaw_sign = 1.0 # Default ENU convention: clockwise turn produces negative gyro, -(-wz) increases heading
 
         # Centripetal cross-correlation: a_lat = v * w_yaw
         if len(self._accel_buf) >= 30 and len(self._gyro_buf) >= 30:
@@ -123,6 +123,7 @@ class MountCalibrator(ICalibration):
             gyros_arr = np.array(self._gyro_buf)
 
             d_theta_yaw = np.zeros(len(d_theta_gnss), dtype=np.float64)
+            valid_mask = np.zeros(len(d_theta_gnss), dtype=bool)
             for i in range(len(d_theta_gnss)):
                 t_start = g_ts[i]
                 t_end = g_ts[i + 1]
@@ -130,10 +131,16 @@ class MountCalibrator(ICalibration):
                 if np.sum(mask) > 1:
                     dt_imu = np.diff(imu_ts_arr[mask]) * 1e-9
                     d_theta_yaw[i] = np.sum(0.5 * (gyros_arr[mask, yaw_idx][:-1] + gyros_arr[mask, yaw_idx][1:]) * dt_imu)
+                    valid_mask[i] = True
 
-            c = np.corrcoef(d_theta_gnss, d_theta_yaw)[0, 1]
-            if not np.isnan(c) and abs(c) > 0.15:
-                yaw_sign = 1.0 if c < 0 else -1.0
+            if np.sum(valid_mask) >= 3:
+                turn_mask = valid_mask & (np.abs(d_theta_gnss) > np.radians(2.0))
+                eval_mask = turn_mask if np.sum(turn_mask) >= 3 else valid_mask
+                c = np.corrcoef(d_theta_gnss[eval_mask], d_theta_yaw[eval_mask])[0, 1]
+                if not np.isnan(c) and abs(c) > 0.08:
+                    yaw_sign = 1.0 if c < 0 else -1.0
+                else:
+                    yaw_sign = 1.0
             else:
                 yaw_sign = 1.0
 

@@ -142,8 +142,11 @@ VELOCITY_FACTORIES: Dict[str, Callable[..., IVelocityEstimator]] = {
 
 FUSION_FACTORIES: Dict[str, Callable[..., IFusionFilter]] = {}
 
+from sih.map.matcher import HMMMapMatcher
+
 MAP_MATCHER_FACTORIES: Dict[str, Callable[..., IMapMatcher]] = {
     "pass_through": lambda **params: PassThroughMapMatcher(**params),
+    "hmm_matcher": lambda **params: HMMMapMatcher(**params),
 }
 
 HANDOFF_FACTORIES: Dict[str, Callable[..., IGNSSHandoffPolicy]] = {
