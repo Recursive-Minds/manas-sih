@@ -3,11 +3,11 @@
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-14%2F14%20Passing-brightgreen.svg)](tests/)
-[![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#benchmark-performance-matrix)
-[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-13.40%25%20Median%20Drift-success.svg)](#benchmark-performance-matrix)
+[![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
+[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-13.40%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Smart India Hackathon (SIH)** — Edge-deployable automotive navigation engine running entirely on low-cost consumer smartphone sensors ($10\text{ Hz}$ IMU + $1\text{ Hz}$ GNSS). Maintains continuous, sub-lane vehicular localization during prolonged satellite outages (tunnels, urban canyons, dense canopies, underpasses) with **zero vehicle CAN-bus or OBD-II wheel wiring**.
+> **Smart India Hackathon (SIH)** -- Edge-deployable automotive navigation engine running entirely on low-cost consumer smartphone sensors (10 Hz IMU + 1 Hz GNSS). Maintains continuous, sub-lane vehicular localization during prolonged satellite outages (tunnels, urban canyons, dense canopies, underpasses) with **zero vehicle CAN-bus or OBD-II wheel wiring**.
 
 ---
 
@@ -20,19 +20,19 @@
   - [Stage 2: Dilated TCN-Attention AI Velocity Estimator](#stage-2-dilated-tcn-attention-ai-velocity-estimator)
   - [Stage 3: 15-State Error-State Extended Kalman Filter (ES-EKF)](#stage-3-15-state-error-state-extended-kalman-filter-es-ekf)
   - [Stage 4: Speed-Regime GPS Vector Initial Heading Seeder](#stage-4-speed-regime-gps-vector-initial-heading-seeder)
-  - [Stage 5: Topological Map-Matching & Road Snapping Engine](#stage-5-topological-map-matching--road-snapping-engine)
-- [4. Current Phase Benchmarks & Results Uptil Now](#4-current-phase-benchmarks--results-uptil-now)
+  - [Stage 5: Topological Map-Matching and Road Snapping Engine](#stage-5-topological-map-matching-and-road-snapping-engine)
+- [4. Current Phase Benchmarks and Results Uptil Now](#4-current-phase-benchmarks-and-results-uptil-now)
   - [4.1 4-Stage Architectural Progression Benchmark](#41-4-stage-architectural-progression-benchmark)
-  - [4.2 Official SIH Multi-Tier Scorecard (Unseen `S-M.csv`)](#42-official-sih-multi-tier-scorecard-unseen-s-mcsv)
+  - [4.2 Official SIH Multi-Tier Scorecard (Unseen S-M.csv)](#42-official-sih-multi-tier-scorecard-unseen-s-mcsv)
   - [4.3 Blackout Duration Degradation Dynamics](#43-blackout-duration-degradation-dynamics)
-  - [4.4 Visual Trajectory Maps & Master Benchmark Gallery](#44-visual-trajectory-maps--master-benchmark-gallery)
+  - [4.4 Visual Trajectory Maps and Master Benchmark Gallery](#44-visual-trajectory-maps-and-master-benchmark-gallery)
   - [4.5 Real-Time Dynamic Uncertainty Ellipses (95% Confidence)](#45-real-time-dynamic-uncertainty-ellipses-95-confidence)
   - [4.6 Complete 35-Scenario Real-Data Evaluation Log](#46-complete-35-scenario-real-data-evaluation-log)
-  - [4.7 Key Kinematic & Operational Breakthroughs](#47-key-kinematic--operational-breakthroughs)
+  - [4.7 Key Kinematic and Operational Breakthroughs](#47-key-kinematic-and-operational-breakthroughs)
 - [5. Full Upcoming Phases Roadmap](#5-full-upcoming-phases-roadmap)
 - [6. Repository Structure](#6-repository-structure)
-- [7. Quickstart & Reproduction Guide](#7-quickstart--reproduction-guide)
-- [8. Scientific Integrity & Verification Standards](#8-scientific-integrity--verification-standards)
+- [7. Quickstart and Reproduction Guide](#7-quickstart-and-reproduction-guide)
+- [8. Scientific Integrity and Verification Standards](#8-scientific-integrity-and-verification-standards)
 
 ---
 
@@ -40,19 +40,19 @@
 
 ### The Operational Challenge
 In multi-level flyovers, tunnels, dense forest cover, and urban concrete canyons, smartphones experience severe **GNSS signal degradation or total blackout**:
-* Standard mobile navigation apps freeze, extrapolate straight into buildings, or suffer chaotic 50–100m position jumps upon reacquisition.
-* Tactical-grade pre-aligned Inertial Navigation Systems ($>\$10,000$) and wheel encoders wired via OBD-II/CAN bus are standard in autonomous testbeds but **absent in consumer vehicles**.
+* Standard mobile navigation apps freeze, extrapolate straight into buildings, or suffer chaotic 50-100 m position jumps upon reacquisition.
+* Tactical-grade pre-aligned Inertial Navigation Systems (costing over 10,000 USD) and wheel encoders wired via OBD-II/CAN bus are standard in autonomous testbeds but **absent in consumer vehicles**.
 * Over **95% of vehicles on Indian roads** (two-wheelers, delivery trucks, auto-rickshaws, older passenger cars) rely solely on driver smartphones placed in loose handlebar cradles, dashboard clips, or cup holders.
 
 ### The Physics Failure Mode in Raw MEMS IMUs
 When GNSS signal is lost, classical inertial navigation fails exponentially:
-1. **Quadratic Acceleration Integration Divergence**: Integrating uncalibrated phone accelerometers ($\mathbf{p} = \iint \mathbf{a}\,dt^2$) with even a minute $0.05\text{ m/s}^2$ sensor bias accumulates **$90\text{ m}$ of drift in 60 seconds**.
-2. **Cubic Heading Tilt Error**: A $0.5^\circ/\text{s}$ gyroscope bias causes Earth gravity ($9.81\text{ m/s}^2$) to leak into the lateral plane, causing position error to grow as $\sim \frac{1}{6} g\,\delta\omega\,t^3$ (**$> 1,000\%$ drift**).
-3. **Severe Cabin Magnetic Distortion**: Vehicle steel subframes and audio speakers distort consumer phone magnetometers by **$+28.4^\circ$ to $+76.2^\circ$**, making magnetic heading useless.
+1. **Quadratic Acceleration Integration Divergence**: Integrating uncalibrated phone accelerometers without GNSS causes a minute $0.05\text{ m/s}^2$ sensor bias to accumulate **90 m of drift in 60 seconds** ($\mathbf{p} = \iint \mathbf{a}\,dt^2$).
+2. **Cubic Heading Tilt Error**: A $0.5^\circ/\text{s}$ gyroscope bias causes Earth gravity ($9.81\text{ m/s}^2$) to leak into the lateral plane, causing position error to grow cubically as $\sim \frac{1}{6} g\,\delta\omega\,t^3$ (**> 1,000% drift**).
+3. **Severe Cabin Magnetic Distortion**: Vehicle steel subframes and audio speakers distort consumer phone magnetometers by **+28.4° to +76.2°**, making magnetic compass heading completely unreliable.
 
 ### Target Benchmark
-* **Competition Metric**: Total drift **$< 10\%$ of distance traveled** during blackout ($< 5\text{ m}$ over $50\text{ m}$, or $< 100\text{ m}$ over $1\text{ km}$).
-* **Sensor-Agnostic Dual Deliverable**: Operates seamlessly on consumer smartphone sensors ($10\text{ Hz}$ IMU) and scales up to high-rate external IMUs ($200\text{ Hz}$).
+* **Competition Metric**: Total drift **< 10% of distance traveled** during blackout (< 5 m over 50 m, or < 100 m over 1 km).
+* **Sensor-Agnostic Dual Deliverable**: Operates seamlessly on consumer smartphone sensors (10 Hz IMU) and scales up to high-rate external IMUs (200 Hz).
 * **Zero Data Leakage**: Evaluated strictly on out-of-sample unseen trips with zero row-level memorization.
 
 ---
@@ -61,7 +61,9 @@ When GNSS signal is lost, classical inertial navigation fails exponentially:
 
 The pipeline enforces an immutable, contract-driven interface behind abstract base classes:
 
-$$\mathbf{IMUSample} \longrightarrow \mathbf{CalibratedSample} \longrightarrow \mathbf{VelocityEstimate} \longrightarrow \mathbf{FusedPosition} \longrightarrow \mathbf{MatchedPosition}$$
+$$
+\text{IMUSample} \longrightarrow \text{CalibratedSample} \longrightarrow \text{VelocityEstimate} \longrightarrow \text{FusedPosition} \longrightarrow \text{MatchedPosition}
+$$
 
 ```
  ┌────────────────────────┐       ┌────────────────────────┐
@@ -110,7 +112,7 @@ $$\mathbf{IMUSample} \longrightarrow \mathbf{CalibratedSample} \longrightarrow \
  │ Stage 5: Topological Map-Matching Engine                │
  │ - Spatial Hash Grid Index (O(1) Polyline Retrieval)     │
  │ - Multi-Feature Gaussian Likelihood (Perp Dist + Azim)  │
- │ - Dynamic Turn-Inflated Heading Covariance (σ >= 45°)   │
+ │ - Dynamic Turn-Inflated Heading Covariance (sigma >= 45°)   │
  │ - Branch Fork Gating & Graceful Off-Road Fallback       │
  └───────────┬─────────────────────────────────────────────┘
              ▼
@@ -128,10 +130,21 @@ $$\mathbf{IMUSample} \longrightarrow \mathbf{CalibratedSample} \longrightarrow \
 *Module: [`sih/calibration/mount.py`](sih/calibration/mount.py)*
 
 Smartphones rest at arbitrary angles in windshield cradles, handlebars, or cup holders.
-1. **Gravity Leveling Matrix ($R_{\text{level}} \in \mathrm{SO}(3)$)**:
-   Extracts static reaction to gravity $\hat{\mathbf{g}} = \frac{\bar{\mathbf{a}}}{\|\bar{\mathbf{a}}\|}$ and computes the orthogonal rotation mapping $\hat{\mathbf{g}}$ to vehicle vertical unit vector $[0, 0, 1]^T$ via Rodrigues' formula.
+1. **Gravity Leveling Matrix** ($R_{\text{level}} \in \mathrm{SO}(3)$):
+   Extracts static reaction to gravity $\hat{\mathbf{g}} = \frac{\bar{\mathbf{a}}}{\|\bar{\mathbf{a}}\|}$ and computes the orthogonal rotation mapping $\hat{\mathbf{g}}$ to vehicle vertical unit vector $[0, 0, 1]^T$ via Rodrigues' formula:
+
+$$
+\mathbf{R}_{\text{level}} = \mathbf{I} + [\mathbf{v}]_{\times} + [\mathbf{v}]_{\times}^2 \frac{1 - c}{s^2}
+$$
+
 2. **Centripetal Turning Yaw-Axis Identification**:
-   Vehicles obey lateral kinematic acceleration during turns: $a_{\text{lateral}}(t) = v_{\text{fwd}}(t) \cdot \omega_{\text{yaw}}(t)$. The calibrator computes the Pearson cross-correlation between each gyro channel and horizontal acceleration to lock the true vertical yaw axis.
+   Vehicles obey lateral kinematic acceleration during turns:
+
+$$
+a_{\text{lateral}}(t) = v_{\text{fwd}}(t) \cdot \omega_{\text{yaw}}(t)
+$$
+
+   The calibrator computes the Pearson cross-correlation between each gyro channel and horizontal acceleration to lock the true vertical yaw axis.
 3. **Turn Polarity Lock**: Resolves clockwise vs. counterclockwise orientation by correlating integrated gyro yaw against pre-blackout GNSS Course-Over-Ground (COG).
 
 ---
@@ -139,7 +152,7 @@ Smartphones rest at arbitrary angles in windshield cradles, handlebars, or cup h
 ### Stage 2: Dilated TCN-Attention AI Velocity Estimator
 *Module: [`sih/models/tcn_attention.py`](sih/models/tcn_attention.py), [`sih/velocity/ai_estimator.py`](sih/velocity/ai_estimator.py)*
 
-Rather than double-integrating noisy acceleration ($\iint a\,dt^2$), our neural network directly regresses instantaneous forward speed $v(t)$ from 10-second IMU vibration patterns, reducing position tracking to a single integration $\int v\,dt$ ($\mathcal{O}(t)$ linear error growth instead of $\mathcal{O}(t^2)$).
+Rather than double-integrating noisy acceleration ($\iint a\,dt^2$), our neural network directly regresses instantaneous forward speed $v(t)$ from 10-second IMU vibration patterns, reducing position tracking to a single integration $\int v\,dt$ (linear error growth $\mathcal{O}(t)$ instead of quadratic $\mathcal{O}(t^2)$).
 
 ```
 Input: (Batch, 8 Channels, 100 Samples @ 10Hz)
@@ -156,13 +169,17 @@ Multi-Head Temporal Self-Attention (4 Heads, Dim=128)
 Global Dual Pooling (Mean Pool || Max Pool -> Dim 256)
   ├──────────────────────────────┐
   ▼                              ▼
-Speed Head: Forward Speed v    Variance Head: log(σ^2)
+Speed Head: Forward Speed v    Variance Head: log(sigma^2)
 (ReLU activated, v >= 0)       (Heteroscedastic EKF weight)
 ```
 
 * **Balanced High-Speed Loss**: Prevents low-speed urban stops from compressing high-speed highway predictions:
-  $$\mathcal{L} = \text{MSE}(\hat{v}, v_{\text{GT}}) + 2.0 \cdot \left(\frac{\sum \hat{v}_i}{\sum v_{\text{GT}, i}} - 1.0\right)^2 + 0.5 \cdot \frac{\sum \mathbf{1}_{\{v > 8\}} (\hat{v}_i - v_{\text{GT}, i})^2}{\sum \mathbf{1}_{\{v > 8\}} + \epsilon}$$
-* **Speed Scale Ratio**: Achieves an exact **$1.00\times$ ratio** ($\sum \hat{v} / \sum v_{\text{GT}}$) on unseen test data with **$\text{RMSE} = 0.963\text{ m/s}$**.
+
+$$
+\mathcal{L} = \text{MSE}(\hat{v}, v_{\text{GT}}) + 2.0 \left(\frac{\sum \hat{v}_i}{\sum v_{\text{GT}, i}} - 1.0\right)^2 + 0.5 \frac{\sum \mathbf{1}_{\{v > 8\}} (\hat{v}_i - v_{\text{GT}, i})^2}{\sum \mathbf{1}_{\{v > 8\}} + \epsilon}
+$$
+
+* **Speed Scale Ratio**: Achieves an exact **1.00x ratio** on unseen test data with **RMSE = 0.963 m/s**.
 
 ---
 
@@ -170,50 +187,70 @@ Speed Head: Forward Speed v    Variance Head: log(σ^2)
 *Module: [`sih/fusion/es_ekf.py`](sih/fusion/es_ekf.py)*
 
 The 15-state error state vector couples position, velocity, orientation, and sensor biases:
-$$\delta\mathbf{x} = \begin{bmatrix} \delta\mathbf{p}_{3\times 1} & \delta\mathbf{v}_{3\times 1} & \delta\boldsymbol{\theta}_{3\times 1} & \delta\mathbf{b}_{a, 3\times 1} & \delta\mathbf{b}_{g, 3\times 1} \end{bmatrix}^T \in \mathbb{R}^{15}$$
+
+$$
+\delta\mathbf{x} = \begin{bmatrix} \delta\mathbf{p}_{3\times 1} & \delta\mathbf{v}_{3\times 1} & \delta\boldsymbol{\theta}_{3\times 1} & \delta\mathbf{b}_{a, 3\times 1} & \delta\mathbf{b}_{g, 3\times 1} \end{bmatrix}^T \in \mathbb{R}^{15}
+$$
 
 1. **Closed-Loop Non-Holonomic Constraints (NHC)**:
    Land vehicles do not slip laterally or launch vertically ($v_{\text{lat}} \approx 0, v_{\text{vert}} \approx 0$).
-   $$\mathbf{y}_{\text{NHC}} = \begin{bmatrix} 0 - v_{\text{body}, y} \\ 0 - v_{\text{body}, z} \end{bmatrix}, \quad \mathbf{K} = \mathbf{P}\mathbf{H}^T(\mathbf{H}\mathbf{P}\mathbf{H}^T + \mathbf{R}_{\text{NHC}})^{-1}$$
+
+$$
+\mathbf{y}_{\text{NHC}} = \begin{bmatrix} 0 - v_{\text{body}, y} \\ 0 - v_{\text{body}, z} \end{bmatrix}, \quad \mathbf{K} = \mathbf{P}\mathbf{H}^T(\mathbf{H}\mathbf{P}\mathbf{H}^T + \mathbf{R}_{\text{NHC}})^{-1}
+$$
+
 2. **Lorentzian Turn-Damped Gyro Bias Filter**:
    During aggressive turns, centrifugal forces can bleed into the lateral innovation. Gyro bias updates are dynamically damped using a Lorentzian bell curve:
-   $$\gamma = \frac{1}{1 + \left(\frac{|\omega_z|}{\omega_0}\right)^2} \cdot \min\left(1.0, \frac{\Delta t_{\text{post-turn}}}{t_{\text{cooldown}}}\right)$$
+
+$$
+\gamma = \frac{1}{1 + \left(\frac{|\omega_z|}{\omega_0}\right)^2} \cdot \min\left(1.0, \frac{\Delta t_{\text{post-turn}}}{t_{\text{cooldown}}}\right)
+$$
+
    This freezes gyro bias during cornering and prevents post-turn heading corruption.
 3. **Physical Rest ZUPT**: Sliding acceleration variance ($\sigma_a^2 < 0.04\text{ m}^2/\text{s}^4$) detects red lights and stops, clamping velocity to zero and suppressing idle engine vibrations.
-4. **Dynamic Pre-Blackout Speed Scaling**: Computes pavement vibration damping scale factor $s_v = \frac{\bar{v}_{\text{GPS}}}{\bar{v}_{\text{AI}}}$ over the 25s pre-blackout window to adapt to smooth asphalt vs. rough concrete.
+4. **Dynamic Pre-Blackout Speed Scaling**: Computes pavement vibration damping scale factor over the 25s pre-blackout window to adapt to smooth asphalt vs. rough concrete:
+
+$$
+s_v = \frac{\bar{v}_{\text{GPS}}}{\bar{v}_{\text{AI}}}
+$$
 
 ---
 
 ### Stage 4: Speed-Regime GPS Vector Initial Heading Seeder
 *Module: [`sih/fusion/es_ekf.py`](sih/fusion/es_ekf.py)*
 
-* **Problem**: In-vehicle phone magnetometers suffer systematic cabin distortions of $+28.4^\circ$. Starting a 1km blackout with even a $2.5^\circ$ heading error induces **$43.6\text{ m}$ of lateral drift** regardless of velocity accuracy.
+* **Problem**: In-vehicle phone magnetometers suffer systematic cabin distortions of +28.4°. Starting a 1 km blackout with even a 2.5° heading error induces **43.6 m of lateral drift** regardless of velocity accuracy.
 * **Solution**: A multi-regime geometric vector seeder:
   * *High-Speed Regime ($v > 3.0\text{ m/s}$)*: Computes true 2-point vector displacement heading $\theta_{\text{seed}} = \text{atan2}(E_k - E_{k-1}, N_k - N_{k-1})$.
   * *Crawl Regime ($0.5 < v \le 3.0\text{ m/s}$)*: GNSS Doppler bearing weighted against road corridor.
   * *Stopped Regime ($v \le 0.5\text{ m/s}$)*: Forward-integrates gyro yaw from last confirmed stop.
-* **Result**: Average heading seeding error across 35 unseen scenarios is **$0.66^\circ$** (compared to $28.4^\circ$ for magnetometers).
+* **Result**: Average heading seeding error across 35 unseen scenarios is **0.66°** (compared to 28.4° for magnetometers).
 
 ---
 
-### Stage 5: Topological Map-Matching & Road Snapping Engine
+### Stage 5: Topological Map-Matching and Road Snapping Engine
 *Module: [`sih/map/network.py`](sih/map/network.py), [`sih/map/matcher.py`](sih/map/matcher.py)*
 
 Binds dead-reckoning trajectories to digitized road polylines:
-1. **Spatial Hash Grid ($O(1)$ Retrieval)**: Segments indexed into $100\text{m}$ cells for real-time edge execution.
+1. **Spatial Hash Grid ($O(1)$ Retrieval)**: Segments indexed into 100 m cells for real-time edge execution.
 2. **Multi-Feature Gaussian Likelihood**:
-   $$\mathcal{L}(s_i | \mathbf{p}, \theta) = \exp\left(-\frac{d_\perp^2}{2\sigma_{\text{dist}}^2}\right) \cdot \exp\left(-\frac{\Delta\theta^2}{2\sigma_{\text{eff}}^2}\right) \cdot f_{\text{end}}$$
-3. **Turn-Inflated Covariance ($\sigma_{\text{eff}} \ge 45^\circ$)**: Expands heading tolerance during turns so the filter readily latches onto perpendicular cross-streets.
+
+$$
+\mathcal{L}(s_i \mid \mathbf{p}, \theta) = \exp\left(-\frac{d_\perp^2}{2\sigma_{\text{dist}}^2}\right) \cdot \exp\left(-\frac{\Delta\theta^2}{2\sigma_{\text{eff}}^2}\right) \cdot f_{\text{end}}
+$$
+
+3. **Turn-Inflated Heading Covariance** ($\sigma_{\text{eff}} \ge 45^\circ$): Expands heading tolerance during turns so the filter readily latches onto perpendicular cross-streets.
 4. **Branch Fork Gating**: Disables straight-road heading re-anchoring at acute highway splits and intersections, allowing gyro turn physics to guide the vehicle onto the correct fork branch.
 5. **Graceful Off-Road Fallback**: Automatically disables snapping when confidence $< 0.25$, reverting to pure 15-state ES-EKF on unmapped rural tracks or open farmland.
 
 ---
 
-## 4. Current Phase Benchmarks & Results Uptil Now
+<a id="benchmark-performance-matrix"></a>
+## 4. Current Phase Benchmarks and Results Uptil Now
 
 All benchmarks are evaluated on the official **IO-VNBD real-world smartphone automotive dataset**:
-* **Training Set**: Trips `S-S1.csv` and `S-S2.csv` ($108,000$ samples, $84.5\text{ km}$, mixed urban & highway).
-* **Held-Out Test Set**: Trip `S-M.csv` ($105,974$ samples, $58.2\text{ km}$, completely unseen vehicle, phone, and road network).
+* **Training Set**: Trips `S-S1.csv` and `S-S2.csv` (108,000 samples, 84.5 km, mixed urban & highway).
+* **Held-Out Test Set**: Trip `S-M.csv` (105,974 samples, 58.2 km, completely unseen vehicle, phone, and road network).
 * **Strict Evaluation Protocol**: **Zero row-level leakage**; 35 independent GNSS blackout scenarios spanning 30s to 75s.
 
 ---
@@ -231,15 +268,15 @@ Demonstrates the empirical error reduction achieved at each development mileston
 
 ---
 
-### 4.2 Official SIH Multi-Tier Scorecard (Unseen `S-M.csv`)
+### 4.2 Official SIH Multi-Tier Scorecard (Unseen S-M.csv)
 
 Evaluated on 35 independent outages across all competition operational regimes:
 
 | Operational Regime | Speed & Distance Scale | Outage Duration | Pipeline Performance (Unseen `S-M`) | SIH Target Benchmark | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Tier 1: Traffic Crawl** | $< 20\text{ km/h}$ / $< 200\text{ m}$ | 30s – 60s | **9.1 m Median Error** | $< 10\text{ m}$ ($< 5\text{ m}$ over 50m) | **PASSED** |
-| **Tier 2: City Maneuvers** | $20 - 50\text{ km/h}$ / $200 - 550\text{ m}$ | 30s – 60s | **14.22% Median Drift** | $< 15\%$ (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
-| **Tier 3: Highway Cruising** | $> 50\text{ km/h}$ / $> 550\text{ m} - 1.2\text{ km}$ | 60s – 75s | **11.52% Median Drift** | $< 100\text{ m}$ over 1km ($< 10\%$) | **NEAR TARGET (< 12%)** |
+| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200 m | 30s - 60s | **9.1 m Median Error** | &lt; 10 m (&lt; 5 m over 50m) | **PASSED** |
+| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **14.22% Median Drift** | &lt; 15% (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
+| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 550 m - 1.2 km | 60s - 75s | **11.52% Median Drift** | &lt; 100 m over 1km (&lt; 10%) | **NEAR TARGET (&lt; 12%)** |
 
 * **Overall Median Drift**: **13.40%**
 * **Initial Heading Seeding Error**: **0.66°**
@@ -260,9 +297,9 @@ Position error growth as GNSS outage duration scales from 30s to 75s:
 
 ---
 
-### 4.4 Visual Trajectory Maps & Master Benchmark Gallery
+### 4.4 Visual Trajectory Maps and Master Benchmark Gallery
 
-#### 9-Panel Master Benchmark Gallery (Unseen Drive `S-M.csv`)
+#### 9-Panel Master Benchmark Gallery (Unseen Drive S-M.csv)
 The master gallery below illustrates 9 real-world outage trajectories across all three competition operational tiers (Green = Ground Truth GPS, Red Dashed = Pure 6-Axis IMU, Blue Solid = Phase 4 Production Pipeline):
 
 ![9-Panel Master Gallery](artifacts/unseen_sm_all_tiers_gallery.png)
@@ -272,18 +309,18 @@ Progression chart demonstrating error reduction from Naive Baseline to Productio
 
 ![4-Stage Progression](artifacts/comprehensive_4stage_benchmark_chart.png)
 
-#### Unseen `S-M` Drift Percentage Distribution
+#### Unseen S-M Drift Percentage Distribution
 Drift distribution across all 35 evaluated blackout scenarios:
 
 ![Drift Comparison Chart](artifacts/phase4_unseen_sm_drift_comparison_chart.png)
 
 #### Spotlight Scenario #30: Complex Highway Off-Ramp Fork Split
-Branch-gated map matching guides the vehicle through an acute highway exit split with **1.42% drift (5.7m error)**:
+Branch-gated map matching guides the vehicle through an acute highway exit split with **1.42% drift (5.7 m error)**:
 
 ![Scenario 30 Off-Ramp](artifacts/map_scenario_30_highway_off_ramp_fork_split.png)
 
 #### Spotlight Scenario #02: 90° Sharp Highway Curve Outage
-Maintains continuous curve tracking during a 45s high-speed blackout (**0.32% drift, 1.8m error**):
+Maintains continuous curve tracking during a 45s high-speed blackout (**0.32% drift, 1.8 m error**):
 
 ![Scenario 02 Sharp Curve](artifacts/map_scenario_02_90_degree_sharp_highway_turn.png)
 
@@ -291,7 +328,7 @@ Maintains continuous curve tracking during a 45s high-speed blackout (**0.32% dr
 
 ### 4.5 Real-Time Dynamic Uncertainty Ellipses (95% Confidence)
 
-The 15-state ES-EKF continuously propagates the 2D position covariance $\mathbf{P}_{pp} \in \mathbb{R}^{2\times 2}$ in real time, projecting live $2\sigma$ ($95\%$ confidence) error ellipses:
+The 15-state ES-EKF continuously propagates the 2D position covariance $\mathbf{P}_{pp} \in \mathbb{R}^{2\times 2}$ in real time, projecting live $2\sigma$ (95% confidence) error ellipses:
 
 | Highway 75s Outage (Growing Confidence Bounds) | Urban 45s Outage (Turn-Adaptive Bounds) |
 | :---: | :---: |
@@ -343,12 +380,12 @@ Full quantitative log of all 35 evaluated scenarios on unseen held-out trip `S-M
 
 ---
 
-### 4.7 Key Kinematic & Operational Breakthroughs
+### 4.7 Key Kinematic and Operational Breakthroughs
 
-1. **Magnetometer Cabin Distortion Audit**: Discovered phone internal magnetometers deviate by **$+28.42^\circ$** with local distortion spikes up to **$+76.19^\circ$**. Replacing magnetic heading with the Speed-Regime GPS Vector Seeder improved initial heading accuracy to **$0.66^\circ$**.
+1. **Magnetometer Cabin Distortion Audit**: Discovered phone internal magnetometers deviate by **+28.42°** with local distortion spikes up to **+76.19°**. Replacing magnetic heading with the Speed-Regime GPS Vector Seeder improved initial heading accuracy to **0.66°**.
 2. **Intersection Fork Gating**: Fixed acute fork trapping by disabling heading re-anchoring whenever competing road candidates diverge ($\Delta\theta > 15^\circ, \mathcal{L}_2 > 0.20\mathcal{L}_1$), allowing natural gyro dynamics to steer the filter.
-3. **Low-Speed Traffic Crawl Clamping**: Clamped forward velocity during entry crawls ($v_{\text{entry}} < 4.0\text{ m/s}$), preventing engine idle vibrations from simulating $25-30\text{ km/h}$ cruising.
-4. **Pavement Vibration Scale Factor**: Online pre-blackout scale adaptation ($s_v = v_{\text{GPS}} / v_{\text{AI}}$) eliminated 240m shortfalls on ultra-smooth highway asphalt.
+3. **Low-Speed Traffic Crawl Clamping**: Clamped forward velocity during entry crawls ($v_{\text{entry}} < 4.0\text{ m/s}$), preventing engine idle vibrations from simulating 25-30 km/h cruising.
+4. **Pavement Vibration Scale Factor**: Online pre-blackout scale adaptation ($s_v = v_{\text{GPS}} / v_{\text{AI}}$) eliminated 240 m shortfalls on ultra-smooth highway asphalt.
 
 ---
 
@@ -384,13 +421,13 @@ Full quantitative log of all 35 evaluated scenarios on unseen held-out trip `S-M
 
 ### Phase 6: Edge Optimization & Embedded C++ / ONNX Core Runtime
 * **PyTorch to ONNX / TensorRT / NNAPI Export**: Convert the PyTorch TCN-Attention velocity model to optimized ONNX Runtime and Android Neural Networks API (NNAPI) execution graphs.
-* **INT8 / FP16 Model Quantization**: Compress the 128-channel dilated TCN model to $< 2.5\text{ MB}$, achieving **$< 5\text{ ms}$ inference per window** on mobile ARM CPUs/NPUs with negligible thermal/battery drain.
+* **INT8 / FP16 Model Quantization**: Compress the 128-channel dilated TCN model to < 2.5 MB, achieving **< 5 ms inference per window** on mobile ARM CPUs/NPUs with negligible thermal/battery drain.
 * **Standalone C++ Core Engine**: Rewrite the 15-state ES-EKF and map-matching core into clean, zero-dependency modern C++ (C++20) for microcontrollers and dual-deliverable embedded telematics boxes.
 
 ### Phase 7: Android Production Mobile App & Real-Time Navigation UI
 * **Native Android App (Kotlin + Jetpack Compose)**:
   * JNI bindings connecting the UI directly to the high-rate C++ dead-reckoning engine.
-  * Sensor event listener collecting triaxial IMU at $100\text{ Hz}$ with nanosecond hardware timestamp unwrapping.
+  * Sensor event listener collecting triaxial IMU at 100 Hz with nanosecond hardware timestamp unwrapping.
 * **Continuous Navigation Puck Tracking**: Smooth spline interpolation eliminating UI jumps during GNSS loss and signal reacquisition.
 * **Live 95% Dynamic Uncertainty Ellipses**: Real-time rendering of the 15-state covariance bounds on MapLibre / OpenStreetMap vectors.
 * **Two-Wheeler Lean-Angle Mode**: Real-time motorcycle roll angle estimation ($\phi = \text{atan2}(a_y, a_z)$) that dynamically relaxes lateral NHC during vehicle banking.
@@ -398,7 +435,7 @@ Full quantitative log of all 35 evaluated scenarios on unseen held-out trip `S-M
 ### Phase 8: Real-World Indian Road Field Trials & Telematics HIL
 * **Multi-City Fleet Deployment**: Field trials across complex Indian transit environments (Delhi-NCR flyovers, Mumbai coastal tunnels, Bengaluru tech corridor underpasses).
 * **Multi-Vehicle Heterogeneity**: Validation across two-wheelers (Bajaj Pulsar, Honda Activa), commercial trucks (Tata Ace), and auto-rickshaws.
-* **Dual-Deliverable High-Rate IMU Validation**: Hardware-in-the-Loop (HIL) testing validating the core engine with external tactical MEMS/FOG IMUs streaming at $200\text{ Hz}$.
+* **Dual-Deliverable High-Rate IMU Validation**: Hardware-in-the-Loop (HIL) testing validating the core engine with external tactical MEMS/FOG IMUs streaming at 200 Hz.
 
 ---
 
@@ -456,7 +493,7 @@ Full quantitative log of all 35 evaluated scenarios on unseen held-out trip `S-M
 
 ---
 
-## 7. Quickstart & Reproduction Guide
+## 7. Quickstart and Reproduction Guide
 
 ### Prerequisites
 * Python 3.10 or higher
@@ -494,7 +531,7 @@ Open [`benchmark_dashboard.html`](benchmark_dashboard.html) directly in any web 
 
 ---
 
-## 8. Scientific Integrity & Verification Standards
+## 8. Scientific Integrity and Verification Standards
 
 To ensure complete transparency and reproducibility before expert evaluation panels, this repository enforces strict scientific guidelines:
 
@@ -507,4 +544,4 @@ To ensure complete transparency and reproducibility before expert evaluation pan
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License -- see the [LICENSE](LICENSE) file for details.
