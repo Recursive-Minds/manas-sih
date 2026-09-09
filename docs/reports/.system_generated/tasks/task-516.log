@@ -1,8 +1,0 @@
-
-RESULTS FOR 30s BLACKOUT AT 120s:
-  Distance: 510.3 m
-  Start Error: 0.73 m
-  Final Error: 809.50 m
-  Max Error:   809.50 m
-  RMSE Error:  457.51 m
-  Drift %:     158.64%

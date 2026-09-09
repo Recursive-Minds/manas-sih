@@ -1,5 +1,0 @@
-
-Evaluating position-uncorrupted NHC Unified EKF...
-Time: 165.59s
-Original Baseline Target:  Median < 73.54%,  Worst-Case < 806.03%
-Corrected Unified EKF:     Median = 133.91%,   Worst-Case = 5896.73%

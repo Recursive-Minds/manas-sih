@@ -52,7 +52,19 @@ class RoadSegment:
         return proj, dist_perp, t_clamped
 
 
+    @property
+    def tangent_unit(self) -> np.ndarray:
+        """Unit vector along road segment direction [East, North]."""
+        ab = self.end_enu_m - self.start_enu_m
+        norm = float(np.linalg.norm(ab))
+        if norm > 1e-6:
+            return ab / norm
+        b_rad = np.radians(self.bearing_deg)
+        return np.array([np.sin(b_rad), np.cos(b_rad)], dtype=np.float64)
+
+
 class RoadNetwork:
+
     """
     Spatial database of road segments with grid-based spatial indexing.
     """

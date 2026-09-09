@@ -1,8 +1,0 @@
-Sample rows during blackout (every 5 seconds):
-t=120.1s | EstPos=(-163.6,  198.0) | GTPos=(-337.2,  132.5) | Err=185.6m | EstSpeed=11.85m/s | AISpeed=15.16m/s | Heading=351.6 deg
-t=125.0s | EstPos=(-155.3,  260.5) | GTPos=(-424.5,  135.5) | Err=296.9m | EstSpeed=13.22m/s | AISpeed=15.25m/s | Heading= 41.3 deg
-t=130.0s | EstPos=( -86.1,  281.3) | GTPos=(-513.6,  141.6) | Err=449.8m | EstSpeed=17.55m/s | AISpeed=15.80m/s | Heading= 97.9 deg
-t=135.0s | EstPos=( -14.8,  249.4) | GTPos=(-602.9,  159.8) | Err=594.8m | EstSpeed=14.59m/s | AISpeed=15.39m/s | Heading=128.0 deg
-t=140.0s | EstPos=(  40.2,  195.2) | GTPos=(-678.5,  194.6) | Err=718.6m | EstSpeed=14.47m/s | AISpeed=15.97m/s | Heading=145.0 deg
-t=145.0s | EstPos=(  75.2,  127.9) | GTPos=(-735.3,  252.5) | Err=820.1m | EstSpeed=16.15m/s | AISpeed=14.92m/s | Heading=164.7 deg
-t=150.0s | EstPos=(  80.4,   52.2) | GTPos=(-786.3,  306.6) | Err=903.2m | EstSpeed=15.07m/s | AISpeed=14.81m/s | Heading=185.3 deg

@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\trace_300s_tick.py", line 35, in <module>
-    v_s = vel_est.estimate_velocity(c_s)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'AIVelocityEstimator' object has no attribute 'estimate_velocity'

@@ -1,9 +1,0 @@
-
-RESULTS WITH TRUE VEHICLE YAW AXIS:
-  Distance:    510.3 m
-  Start Error: 0.43 m
-  Final Error: 70.40 m
-  Max Error:   70.40 m
-  RMSE Error:  46.65 m
-  Drift %:     13.80%
-  Final Estimated Heading: 322.0� (GT: 315.8�)

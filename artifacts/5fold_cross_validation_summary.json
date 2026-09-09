@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-09-08 23:22:53",
+  "total_time_min": 18.107393809159596,
+  "mean_rmse": 5.867110347747802,
+  "mean_mae": 4.612013530731201,
+  "mean_speed_scale_ratio": 0.559937185049057,
+  "folds": [
+    {
+      "fold": 1,
+      "best_rmse": 6.194038391113281,
+      "best_mae": 5.025121688842773,
+      "speed_scale_ratio": 0.44779258966445923,
+      "checkpoint": "models/checkpoints/5fold\\moe_fold_1.pt"
+    },
+    {
+      "fold": 2,
+      "best_rmse": 3.9995174407958984,
+      "best_mae": 3.095142364501953,
+      "speed_scale_ratio": 0.727435827255249,
+      "checkpoint": "models/checkpoints/5fold\\moe_fold_2.pt"
+    },
+    {
+      "fold": 3,
+      "best_rmse": 8.18594741821289,
+      "best_mae": 6.478104114532471,
+      "speed_scale_ratio": 0.40196308493614197,
+      "checkpoint": "models/checkpoints/5fold\\moe_fold_3.pt"
+    },
+    {
+      "fold": 4,
+      "best_rmse": 4.9313530921936035,
+      "best_mae": 3.736027717590332,
+      "speed_scale_ratio": 0.6357978582382202,
+      "checkpoint": "models/checkpoints/5fold\\moe_fold_4.pt"
+    },
+    {
+      "fold": 5,
+      "best_rmse": 6.02469539642334,
+      "best_mae": 4.725671768188477,
+      "speed_scale_ratio": 0.5866965651512146,
+      "checkpoint": "models/checkpoints/5fold\\moe_fold_5.pt"
+    }
+  ]
+}

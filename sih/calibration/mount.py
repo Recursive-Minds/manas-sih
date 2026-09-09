@@ -50,6 +50,9 @@ class MountCalibrator(ICalibration):
         self._imu_ts: List[int] = []
         self._gnss_buf: List[GNSSSample] = []
         self._alignment: Optional[MountAlignment] = None
+        self._turn_events: List[Tuple[float, float, float, float]] = []
+        self._prev_turn_gnss: Optional[GNSSSample] = None
+        self._yaw_locked: bool = False
 
     @property
     def is_calibrated(self) -> bool:
@@ -69,12 +72,30 @@ class MountCalibrator(ICalibration):
         """Accumulate GNSS samples for turn-rate and course-over-ground calibration."""
         if gnss.is_valid and gnss.bearing_deg is not None and (gnss.speed_mps or 0.0) >= self.min_speed_mps:
             self._gnss_buf.append(gnss)
-            if len(self._accel_buf) >= self.min_samples and len(self._gnss_buf) >= 3:
+
+            # Detect genuine turn event between consecutive moving GNSS fixes
+            if self._prev_turn_gnss is not None and not self._yaw_locked:
+                prev_g = self._prev_turn_gnss
+                dt_g = (gnss.timestamp_ns - prev_g.timestamp_ns) * 1e-9
+                if 0.2 <= dt_g <= 15.0:
+                    d_b_deg = (gnss.bearing_deg - prev_g.bearing_deg + 180.0) % 360.0 - 180.0
+                    if abs(d_b_deg) >= 2.5:
+                        t1, t2 = prev_g.timestamp_ns, gnss.timestamp_ns
+                        all_ts = np.array(self._imu_ts)
+                        mask = (all_ts >= t1) & (all_ts <= t2)
+                        if np.sum(mask) > 1:
+                            sub_gy = np.array(self._gyro_buf)[mask]
+                            dt_imu = np.diff(all_ts[mask]) * 1e-9
+                            d_th = np.sum(0.5 * (sub_gy[:-1] + sub_gy[1:]) * dt_imu[:, None], axis=0)
+                            self._turn_events.append((float(np.radians(d_b_deg)), float(d_th[0]), float(d_th[1]), float(d_th[2])))
+            self._prev_turn_gnss = gnss
+
+            if len(self._accel_buf) >= self.min_samples and len(self._gnss_buf) >= 3 and not self._yaw_locked:
                 self._compute_calibration()
 
     def _compute_calibration(self) -> None:
-        accels = np.array(self._accel_buf)
-        g_body = np.mean(accels[:min(len(accels), 300)], axis=0)
+        accels = np.array(self._accel_buf[:min(len(self._accel_buf), 300)])
+        g_body = np.mean(accels, axis=0)
         g_norm = np.linalg.norm(g_body)
         g_body_norm = g_body / max(g_norm, 1e-4)
 
@@ -91,58 +112,38 @@ class MountCalibrator(ICalibration):
             angle = float(np.arctan2(cross_norm, dot))
             R_level = R.from_rotvec(axis * angle)
 
-        # 2. Correlate gyro channels with horizontal centripetal acceleration and GNSS turn rates
-        yaw_idx = 2
-        yaw_sign = 1.0 # Default ENU convention: clockwise turn produces negative gyro, -(-wz) increases heading
+        # 2. Correlate gyro channels with genuine GNSS turn events
+        yaw_idx = self._alignment.yaw_axis_index if self._alignment else 2
+        yaw_sign = self._alignment.yaw_axis_sign if self._alignment else 1.0
+        is_locked = self._yaw_locked
 
-        # Centripetal cross-correlation: a_lat = v * w_yaw
-        if len(self._accel_buf) >= 30 and len(self._gyro_buf) >= 30:
-            accels_arr = np.array(self._accel_buf)
-            gyros_arr = np.array(self._gyro_buf)
-            
-            # Check which gyro axis correlates most strongly with horizontal acceleration
-            centripetal_scores = {}
-            for g_axis in [0, 1, 2]:
-                for a_axis in [0, 1]:
-                    c = np.corrcoef(accels_arr[:, a_axis], gyros_arr[:, g_axis])[0, 1]
-                    if not np.isnan(c):
-                        centripetal_scores[(g_axis, a_axis)] = abs(c)
-            if len(centripetal_scores) > 0:
-                best_g_axis, best_a_axis = max(centripetal_scores, key=lambda k: centripetal_scores[k])
-                if centripetal_scores[(best_g_axis, best_a_axis)] > 0.25:
-                    yaw_idx = best_g_axis
+        if len(self._turn_events) >= 8:
+            evs = np.array(self._turn_events)
+            energies = np.array([np.mean(np.abs(evs[:, a + 1])) for a in range(3)])
+            corrs = np.array([np.corrcoef(evs[:, 0], evs[:, a + 1])[0, 1] for a in range(3)])
+            valid_c = np.where(np.isnan(corrs), 0.0, corrs)
+            scores = np.abs(valid_c) * (energies + 1e-6)
+            best_a = int(np.argmax(scores))
 
-        # If GNSS turns are available, calculate integrated angular changes to sign the identified yaw axis
-        if len(self._gnss_buf) >= 3 and len(self._imu_ts) > 50:
-            g_ts = np.array([g.timestamp_ns for g in self._gnss_buf])
-            g_brg = np.array([g.bearing_deg for g in self._gnss_buf])
-            g_brg_unwrap = np.unwrap(np.radians(g_brg))
-            d_theta_gnss = np.diff(g_brg_unwrap)
+            # Directional slope: in EKF, heading_rad = heading_rad - w_z * dt
+            # If d_bearing > 0 (right turn) and d_theta < 0, w_z must be positive to increase heading -> yaw_sign = +1.0
+            # If d_bearing > 0 and d_theta > 0, yaw_sign = -1.0
+            slope = np.polyfit(evs[:, best_a + 1], evs[:, 0], 1)[0]
+            computed_sign = -1.0 if slope > 0 else 1.0
 
-            imu_ts_arr = np.array(self._imu_ts)
-            gyros_arr = np.array(self._gyro_buf)
-
-            d_theta_yaw = np.zeros(len(d_theta_gnss), dtype=np.float64)
-            valid_mask = np.zeros(len(d_theta_gnss), dtype=bool)
-            for i in range(len(d_theta_gnss)):
-                t_start = g_ts[i]
-                t_end = g_ts[i + 1]
-                mask = (imu_ts_arr >= t_start) & (imu_ts_arr <= t_end)
-                if np.sum(mask) > 1:
-                    dt_imu = np.diff(imu_ts_arr[mask]) * 1e-9
-                    d_theta_yaw[i] = np.sum(0.5 * (gyros_arr[mask, yaw_idx][:-1] + gyros_arr[mask, yaw_idx][1:]) * dt_imu)
-                    valid_mask[i] = True
-
-            if np.sum(valid_mask) >= 3:
-                turn_mask = valid_mask & (np.abs(d_theta_gnss) > np.radians(2.0))
-                eval_mask = turn_mask if np.sum(turn_mask) >= 3 else valid_mask
-                c = np.corrcoef(d_theta_gnss[eval_mask], d_theta_yaw[eval_mask])[0, 1]
-                if not np.isnan(c) and abs(c) > 0.08:
-                    yaw_sign = 1.0 if c < 0 else -1.0
-                else:
-                    yaw_sign = 1.0
-            else:
-                yaw_sign = 1.0
+            if abs(valid_c[best_a]) >= 0.12:
+                yaw_idx = best_a
+                yaw_sign = computed_sign
+                sorted_scores = np.sort(scores)
+                separation = sorted_scores[-1] / max(sorted_scores[-2], 1e-6)
+                if len(self._turn_events) >= 15 and abs(valid_c[best_a]) >= 0.35 and separation >= 1.5:
+                    is_locked = True
+        elif len(self._accel_buf) >= 30 and len(self._gyro_buf) >= 30 and not self._alignment:
+            # Initial heuristic based on gyro dynamic variance across axes
+            gyros_arr = np.array(self._gyro_buf[:min(len(self._gyro_buf), 200)])
+            stds = np.std(gyros_arr, axis=0)
+            yaw_idx = int(np.argmax(stds))
+            yaw_sign = 1.0
 
         euler = R_level.as_euler("xyz", degrees=True)
         self._alignment = MountAlignment(
@@ -157,6 +158,7 @@ class MountCalibrator(ICalibration):
             pitch_deg=float(euler[0]),
             roll_deg=float(euler[1]),
         )
+        self._yaw_locked = is_locked
 
     def update(self, imu: IMUSample) -> CalibratedSample:
         """Transform IMUSample to vehicle CalibratedSample."""
@@ -180,11 +182,14 @@ class MountCalibrator(ICalibration):
         R_mat = self._alignment.R_phone_to_vehicle.as_matrix()
         acc_v = R_mat @ imu.accel
 
-        # Transform 3D gyro vector into leveled vehicle frame
+        # Transform 3D gyro vector into leveled vehicle frame:
+        # Z-axis is assigned the signed vehicle yaw rate; X and Y represent roll and pitch
         gyro_v = np.zeros(3, dtype=np.float64)
-        gyro_v[0] = imu.gyro[0]
-        gyro_v[1] = imu.gyro[1]
-        gyro_v[2] = self._alignment.yaw_axis_sign * imu.gyro[self._alignment.yaw_axis_index]
+        yaw_idx = self._alignment.yaw_axis_index
+        gyro_v[2] = self._alignment.yaw_axis_sign * imu.gyro[yaw_idx]
+        rem_axes = [a for a in [0, 1, 2] if a != yaw_idx]
+        gyro_v[0] = imu.gyro[rem_axes[0]]
+        gyro_v[1] = imu.gyro[rem_axes[1]]
 
         return CalibratedSample(
             timestamp_ns=imu.timestamp_ns,

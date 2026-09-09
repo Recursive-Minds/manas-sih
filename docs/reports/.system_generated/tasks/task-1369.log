@@ -1,8 +1,0 @@
-[30s_blackout_at_120s] Pre-blackout calibrated turn scale factor: 1.4588
-[30s_blackout_at_120s] Pre-blackout calibrated speed scale factor: 1.7463
-  --> RESULT: Distance = 512.1 m | Final Error = 258.01 m | Drift = 50.39% | Target (<10%): FAILED
-
-[60s_blackout_at_300s] Pre-blackout calibrated turn scale factor: 1.1230
-[60s_blackout_at_300s] Pre-blackout calibrated speed scale factor: 1.1915
-  --> RESULT: Distance = 814.8 m | Final Error = 101.71 m | Drift = 12.48% | Target (<10%): FAILED
-

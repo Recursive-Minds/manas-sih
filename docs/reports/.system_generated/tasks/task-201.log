@@ -1,9 +1,0 @@
-Estimated Gyro Z Bias: -0.001200 rad/s (-0.069 deg/s)
-
-================ CLEAN AI DEAD RECKONING RESULTS ================
-  Distance Travelled:   510.3 m
-  Final Position Error: 408.66 m
-  Max Position Error:   408.66 m
-  RMSE Position Error:  289.68 m
-  Drift Percentage:     80.09%
-  Passed (<10%):        False

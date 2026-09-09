@@ -1,6 +1,0 @@
-Dataset / Scenario,Environment,Pure 6-Axis Drift (%),Phase 4 Map-Matched Drift (%),Target Achieved (<10%),Error Reduction
-Highway (S-S1) 75s Outage (810m),Highway High-Speed (25-30 m/s),61.75,7.38,YES (7.4%),88.0% improvement
-Urban (S-S2) 45s Chicane (239m),Urban Chicanes & Sharp Turns,52.53,15.46,Close (15.5%),70.6% improvement
-Brand-New Unseen (S-M) Long Outages (>500m),Unseen Intercity & Highway Corridor,31.15603087567714,13.829769474629,Sub-40% uncalibrated,55.6% improvement
-Brand-New Unseen (S-M) Medium Outages (200-500m),Unseen Arterial Roads & Intersections,28.850109170215,19.2936251324202,Sub-70% uncalibrated,33.1% improvement
-Brand-New Unseen (S-M) Overall (35 Scenarios),Complete 3-Hour Unseen Trip,31.15603087567714,17.42251337696084,Generalization Verified,44.1% improvement

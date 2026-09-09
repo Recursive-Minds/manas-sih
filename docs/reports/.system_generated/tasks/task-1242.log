@@ -1,21 +1,0 @@
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 490/51746 [00:00<00:38, 1338.84it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 624/51746 [00:00<01:09, 735.41it/s] Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 700/51746 [00:00<01:21, 625.65it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 759/51746 [00:01<01:34, 537.33it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 807/51746 [00:01<01:41, 504.25it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 852/51746 [00:01<01:47, 474.24it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 1017/51746 [00:01<01:10, 724.32it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1099/51746 [00:01<01:25, 595.42it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1168/51746 [00:01<01:35, 526.99it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1227/51746 [00:02<01:43, 486.14it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1280/51746 [00:02<01:50, 455.87it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1328/51746 [00:02<01:55, 436.51it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1373/51746 [00:02<02:02, 410.89it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1415/51746 [00:02<02:06, 396.60it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1455/51746 [00:02<02:09, 389.75it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1494/51746 [00:02<02:10, 384.86it/s]                                                                                             Traceback (most recent call last):
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 3812, in get_loc
-    return self._engine.get_loc(casted_key)
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
-  File "pandas/_libs/index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
-  File "pandas/_libs/index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
-  File "pandas/_libs/hashtable_class_helper.pxi", line 7096, in pandas._libs.hashtable.PyObjectHashTable.get_item
-KeyError: 'gt_speed_mps'
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\diagnose_30s_breakdown.py", line 33, in <module>
-    df_bo["cum_gt_dist"] = np.cumsum(df_bo["gt_speed_mps"] * 0.1)
-                                     ~~~~~^^^^^^^^^^^^^^^^
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\frame.py", line 4113, in __getitem__
-    indexer = self.columns.get_loc(key)
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 3819, in get_loc
-    raise KeyError(key) from err
-KeyError: 'gt_speed_mps'

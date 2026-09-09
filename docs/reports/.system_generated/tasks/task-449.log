@@ -1,30 +1,0 @@
-===========================================================================
-PHASE 3 EVALUATION: ES-EKF FUSED WITH AI TCN-ATTENTION VELOCITY MODEL
-===========================================================================
-Hardware Device: cuda (NVIDIA GeForce RTX 4060 Laptop GPU)
-Loaded Trip: S-S1 (5174.5 s, 37162.4 m)
-
-###########################################################################
-SCENARIO: 30s_blackout_at_120s (Duration: ~30.0s)
-###########################################################################
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1369/51746 [00:00<00:03, 13678.92it/s]                                                                                               
---- Naive Baseline ---
-  Distance Travelled:       510.3 m
-  Final Position Error:     1612.52 m
-  Max Position Error:       1612.52 m
-  RMSE Position Error:      645.01 m
-  Drift Percentage:         316.01%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/30s_blackout_at_120s_naive_baseline.png
-Traceback (most recent call last):
-  File "C:\Users\carpe\SIH\benchmarks\run_phase3_ai_fusion.py", line 126, in <module>
-    run_phase3_benchmarks()
-    ~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\carpe\SIH\benchmarks\run_phase3_ai_fusion.py", line 90, in run_phase3_benchmarks
-    runner = BenchmarkRunner(config=config)
-  File "C:\Users\carpe\SIH\sih\eval\benchmark.py", line 62, in __init__
-    self.pipeline = assemble_pipeline(config)
-                    ~~~~~~~~~~~~~~~~~^^^^^^^^
-  File "C:\Users\carpe\SIH\sih\core\pipeline.py", line 246, in assemble_pipeline
-    raise ValueError(f"Unknown calibration algorithm: {calib_algo}. Available: {list(CALIBRATION_FACTORIES.keys())}")
-ValueError: Unknown calibration algorithm: auto. Available: ['pass_through']

@@ -1,68 +1,0 @@
-======================================================================
-PHASE 2 EVALUATION: ES-EKF + NON-HOLONOMIC CONSTRAINTS (NHC)
-======================================================================
-Hardware Device: cuda (NVIDIA GeForce RTX 4060 Laptop GPU)
-Loaded Trip: S-S1 (5174.5 s, 37162.4 m)
-
-######################################################################
-SCENARIO: 30s_blackout_at_120s (Duration: ~30.0s)
-######################################################################
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 722/51746 [00:00<00:07, 7213.68it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1493/51746 [00:00<00:06, 7502.94it/s]                                                                                              
---- Naive Baseline ---
-  Distance Travelled:       510.3 m
-  Final Position Error:     1773.44 m
-  Max Position Error:       1773.44 m
-  RMSE Position Error:      709.84 m
-  Drift Percentage:         347.54%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/30s_blackout_at_120s_naive_baseline.png
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1363/51746 [00:00<00:03, 13626.24it/s]                                                                                               
---- ES-EKF (No NHC) ---
-  Distance Travelled:       510.3 m
-  Final Position Error:     483.34 m
-  Max Position Error:       483.34 m
-  RMSE Position Error:      295.28 m
-  Drift Percentage:         94.72%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/30s_blackout_at_120s_es-ekf_no_nhc.png
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1507/51746 [00:00<00:03, 15068.25it/s]                                                                                               
---- ES-EKF + NHC ---
-  Distance Travelled:       510.3 m
-  Final Position Error:     483.34 m
-  Max Position Error:       483.34 m
-  RMSE Position Error:      295.28 m
-  Drift Percentage:         94.72%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/30s_blackout_at_120s_es-ekf_plus_nhc.png
-
-######################################################################
-SCENARIO: 60s_blackout_at_300s (Duration: ~60.0s)
-######################################################################
-Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   2%|1         | 864/51746 [00:00<00:05, 8631.16it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|3         | 1728/51746 [00:00<00:06, 7975.47it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2632/51746 [00:00<00:05, 8439.36it/s]Evaluating S-S1 [60s_blackout_at_300s]:   7%|6         | 3480/51746 [00:00<00:06, 7984.13it/s]                                                                                              
---- Naive Baseline ---
-  Distance Travelled:       814.1 m
-  Final Position Error:     3234.51 m
-  Max Position Error:       3234.51 m
-  RMSE Position Error:      1258.11 m
-  Drift Percentage:         397.29%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/60s_blackout_at_300s_naive_baseline.png
-Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   3%|2         | 1343/51746 [00:00<00:03, 13421.09it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|5         | 2686/51746 [00:00<00:03, 13182.38it/s]                                                                                               
---- ES-EKF (No NHC) ---
-  Distance Travelled:       814.1 m
-  Final Position Error:     804.91 m
-  Max Position Error:       804.91 m
-  RMSE Position Error:      488.06 m
-  Drift Percentage:         98.87%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/60s_blackout_at_300s_es-ekf_no_nhc.png
-Evaluating S-S1 [60s_blackout_at_300s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [60s_blackout_at_300s]:   2%|2         | 1112/51746 [00:00<00:04, 11114.90it/s]Evaluating S-S1 [60s_blackout_at_300s]:   5%|4         | 2435/51746 [00:00<00:03, 12356.33it/s]                                                                                               
---- ES-EKF + NHC ---
-  Distance Travelled:       814.1 m
-  Final Position Error:     804.91 m
-  Max Position Error:       804.91 m
-  RMSE Position Error:      488.06 m
-  Drift Percentage:         98.87%
-  SIH Target (<10%):        FAILED
-  Plot:                     artifacts/60s_blackout_at_300s_es-ekf_plus_nhc.png
-======================================================================

@@ -98,9 +98,24 @@ class ErrorStateEKF(IFusionFilter):
         self.enable_nhc = enable_nhc
         self.enable_zupt = enable_zupt
 
+        self.init_highway_extensions()
         self.reset()
 
-    def reset(self, initial_gnss: Optional[GNSSSample] = None):
+    def init_highway_extensions(self):
+        """Initializes highway straight-line lock (ZARU) and hybrid speed state."""
+        self.straight_drive_timer = 0.0
+        self.locked_straight_heading = None
+        self.v_chassis_prev = 0.0
+        self.latest_calibrated_gyro = np.zeros(3, dtype=np.float64)
+        self.latest_calibrated_accel = np.zeros(3, dtype=np.float64)
+        self.last_dt = 0.1
+
+    def reset(
+        self,
+        initial_gnss: Optional[GNSSSample] = None,
+        init_pos: Optional[np.ndarray] = None,
+        init_heading: Optional[float] = None,
+    ):
         self._initialised = False
         self._last_ts: Optional[int] = None
         self._last_gnss_ts: Optional[int] = None
@@ -123,14 +138,28 @@ class ErrorStateEKF(IFusionFilter):
         ]).astype(np.float64)
 
         self._last_turn_ts_s: float = -100.0
+        self._last_w_z_corr: float = 0.0
         self._stat_count: int = 0
         self._speed_scale: float = self.initial_speed_scale
         self._last_ai_speed: Optional[float] = None
         self.last_nhc_dtheta_deg: float = 0.0
         self._accel_buf: list[float] = []
 
+        self.init_highway_extensions()
+
+        if init_pos is not None:
+            self._p = init_pos.copy().astype(np.float64)
+            self._initialised = True
+
+        if init_heading is not None:
+            self._heading_rad = float(init_heading)
+            yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+            self._q = R.from_euler("z", yaw_enu_rad)
+            self._initialised = True
+
         if initial_gnss is not None:
             self.init_from_gnss(initial_gnss)
+
 
     def init_from_gnss(
         self,
@@ -193,25 +222,33 @@ class ErrorStateEKF(IFusionFilter):
         seeded_hdg = None
         is_consistent = True
 
-        if len(valid_moving) >= 2 and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps > 3.0:
-            g_prev = valid_moving[-2]
-            g_last = valid_moving[-1]
-            dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
-            # Pure 2-point geometric vector displacement is optimal when fixes are closely spaced (dt <= 1.5s);
-            # for sparse multi-second gaps (e.g. 9s logs), multi-second chords lag during curves, so instantaneous Doppler is superior
-            if dt_interval <= 1.5:
-                enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
-                enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
-                disp = enu_last - enu_prev
-                if float(np.linalg.norm(disp)) > 3.0:
-                    seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
-                    is_consistent = True
-
-        if seeded_hdg is None:
-            # Instantaneous Doppler course over ground from latest GNSS fix
-            if valid_moving and valid_moving[-1].bearing_deg is not None:
+        # Check if latest valid fix is moving stably (v >= 2.5 m/s)
+        if valid_moving and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps >= 2.5:
+            if len(valid_moving) >= 2 and valid_moving[-2].speed_mps is not None and valid_moving[-2].speed_mps >= 2.5:
+                g_prev = valid_moving[-2]
+                g_last = valid_moving[-1]
+                dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
+                # Pure 2-point geometric vector displacement if fixes are closely spaced (dt <= 1.5s)
+                if dt_interval <= 1.5:
+                    enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                    enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                    disp = enu_last - enu_prev
+                    if float(np.linalg.norm(disp)) > 3.0:
+                        seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
+                        is_consistent = True
+            if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
                 seeded_hdg = float(valid_moving[-1].bearing_deg)
                 is_consistent = True
+        else:
+            # Vehicle is crawling (< 2.5 m/s) or stopped.
+            # Look back for the last stable moving fix (v >= 2.0 m/s)
+            stable_fixes = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None]
+            if stable_fixes:
+                seeded_hdg = float(stable_fixes[-1].bearing_deg)
+                is_consistent = True
+            elif valid_moving and valid_moving[-1].bearing_deg is not None:
+                seeded_hdg = float(valid_moving[-1].bearing_deg)
+                is_consistent = False
             elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
                 seeded_hdg = float(pre_gnss[-1].bearing_deg)
                 is_consistent = False
@@ -251,52 +288,81 @@ class ErrorStateEKF(IFusionFilter):
 
         return seeded_hdg
 
-    def reanchor_heading(self, road_bearing_deg: float, confidence: float = 1.0):
+    def reanchor_heading(self, road_bearing_deg: float, confidence: float = 1.0, forward_speed_mps: Optional[float] = None):
         """
         Fast re-anchoring when confirmed back on a straight road segment.
-        Gently pulls heading and contracts attitude covariance.
+        Gently pulls heading, realigns velocity vector to prevent false NHC lateral slip,
+        and decouples attitude cross-covariances.
         """
         r_rad = float(np.radians(road_bearing_deg))
         diff_rad = (r_rad - self._heading_rad + np.pi) % (2.0 * np.pi) - np.pi
-        gain = 0.15 * min(1.0, max(0.0, confidence))
+        gain = 0.05 * min(1.0, max(0.0, confidence))
         self._heading_rad = (self._heading_rad + gain * diff_rad) % (2.0 * np.pi)
         yaw_enu_rad = np.pi / 2.0 - self._heading_rad
         self._q = R.from_euler("z", yaw_enu_rad)
-        self._P[8, 8] = float(0.85 * self._P[8, 8] + 0.15 * (np.radians(2.5))**2)
 
-    def predict(self, sample: CalibratedSample, vel: Optional[VelocityEstimate] = None) -> FusedPosition:
-        ts = sample.timestamp_ns
-        if not self._initialised:
+        # Realign ENU velocity with the updated heading to eliminate false NHC lateral slip innovation
+        v_fwd = forward_speed_mps if forward_speed_mps is not None else float(np.linalg.norm(self._v[:2]))
+        if v_fwd > 0.5:
+            C_b_n = self._q.as_matrix()
+            self._v = C_b_n @ np.array([v_fwd, 0.0, self._v[2]], dtype=np.float64)
+
+        # Bound attitude yaw covariance smoothly without breaking positive semi-definiteness
+        self._P[8, 8] = float(0.90 * self._P[8, 8] + 0.10 * (np.radians(2.0))**2)
+
+    def predict(
+        self,
+        sample,
+        vel: Any = None,
+        dt_opt: Optional[float] = None,
+        v_fused_opt: Optional[float] = None,
+    ) -> FusedPosition:
+        if isinstance(sample, CalibratedSample):
+            ts = sample.timestamp_ns
+            if not self._initialised:
+                self._last_ts = ts
+                self._initialised = True
+                return self.get_state(ts)
+
+            if self._last_ts is None:
+                self._last_ts = ts
+                return self.get_state(ts)
+
+            dt = (ts - self._last_ts) * 1e-9
+            self._last_ts = ts
+            if dt <= 0.0 or dt > 2.0:
+                dt = 0.1
+
+            raw_gyro = sample.gyro_vehicle.copy()
+            raw_acc  = sample.accel_vehicle.copy()
+            passed_v_fwd = None
+        else:
+            # Array inputs: sample is accel (3,), vel is gyro (3,), dt_opt is dt, v_fused_opt is v_fused
+            raw_acc = np.asarray(sample, dtype=np.float64)
+            raw_gyro = np.asarray(vel, dtype=np.float64)
+            dt = float(dt_opt) if dt_opt is not None else 0.01
+            ts = 0 if self._last_ts is None else self._last_ts + int(dt * 1e9)
             self._last_ts = ts
             self._initialised = True
-            return self.get_state(ts)
-
-        if self._last_ts is None:
-            self._last_ts = ts
-            return self.get_state(ts)
-
-        dt = (ts - self._last_ts) * 1e-9
-        self._last_ts = ts
-        if dt <= 0.0 or dt > 2.0:
-            dt = 0.1
+            passed_v_fwd = float(v_fused_opt) if v_fused_opt is not None else None
+            vel = None
 
         t_now_s = ts * 1e-9
+        g_norm = float(np.linalg.norm(raw_acc))
 
-        raw_gyro = sample.gyro_vehicle
-        raw_acc  = sample.accel_vehicle
+        self.latest_calibrated_gyro = raw_gyro.copy()
+        self.latest_calibrated_accel = raw_acc.copy()
+        self.last_dt = float(dt)
 
         # Correct gyro by 15-state gyro bias
         w_corr = raw_gyro - self._bg
 
-        # 3D gravity-aligned Earth-vertical yaw rate projection
-        g_norm = np.linalg.norm(raw_acc)
-        if g_norm > 1e-3:
-            g_hat = raw_acc / g_norm
-            w_z_corr = float(np.dot(w_corr, g_hat))
-        else:
-            w_z_corr = float(w_corr[2])
+        # Direct Earth-vertical yaw rate projection from calibrated vehicle frame:
+        # sample.gyro_vehicle is already in the leveled vehicle frame, so yaw rate is strictly Z-axis
+        w_z_corr = float(w_corr[2])
 
         # Turn & Cooldown detection
+        self._last_w_z_corr = w_z_corr
         if abs(w_z_corr) > self.turn_thresh:
             self._last_turn_ts_s = t_now_s
 
@@ -307,21 +373,28 @@ class ErrorStateEKF(IFusionFilter):
         a_var = float(np.var(self._accel_buf)) if len(self._accel_buf) >= 10 else 1.0
         g_norm_err = abs(g_norm - 9.80665)
 
-        is_physical_rest = (a_var < 0.05 and g_norm_err < 0.6 and float(np.linalg.norm(raw_gyro)) < 0.04)
+        # Physical Rest ZUPT Decoupling (Phase 4.5 breakthrough):
+        # When IMU variance and angular rate indicate physical rest, clamp unconditionally.
+        is_physical_rest = (a_var < 0.04 and g_norm_err < 0.6 and float(np.linalg.norm(raw_gyro)) < 0.04)
 
         is_stationary = (
             is_physical_rest or
             (vel is not None and vel.motion_state == "STATIONARY") or
-            (vel is not None and vel.forward_speed_mps < 0.2)
+            (vel is not None and vel.forward_speed_mps is not None and vel.forward_speed_mps < 0.2) or
+            (passed_v_fwd is not None and passed_v_fwd < 0.2)
         )
 
         if is_stationary:
             self._stat_count += 1
             v_fwd = 0.0
-            w_z_corr = 0.0
+            if is_physical_rest:
+                w_z_corr = 0.0
         else:
             self._stat_count = 0
-            if vel is not None and vel.forward_speed_mps is not None:
+            if passed_v_fwd is not None:
+                self._last_ai_speed = passed_v_fwd
+                v_fwd = passed_v_fwd
+            elif vel is not None and vel.forward_speed_mps is not None:
                 self._last_ai_speed = float(vel.forward_speed_mps)
                 v_fwd = float(vel.forward_speed_mps) * self._speed_scale
                 a_x_fwd = float(raw_acc[0]) - self._ba[0]
@@ -329,6 +402,7 @@ class ErrorStateEKF(IFusionFilter):
                     v_fwd = max(0.0, v_fwd + a_x_fwd * dt)
             else:
                 v_fwd = 0.0
+
 
         # Propagate nominal heading
         self._heading_rad = (self._heading_rad - w_z_corr * dt) % (2.0 * np.pi)
@@ -493,11 +567,18 @@ class ErrorStateEKF(IFusionFilter):
                 self._bg[2] += 0.02 * y_hdg
                 self._bg[2] = float(np.clip(self._bg[2], -self.max_bg, self.max_bg))
 
-            # Pre-Blackout Speed Scale Factor Adaptation
-            if self._last_ai_speed is not None and self._last_ai_speed > 2.0 and gnss.speed_mps > 3.0:
+            # Pre-Blackout Speed Scale Factor Adaptation with persistent excitation safeguard
+            if (
+                self._last_ai_speed is not None
+                and self._last_ai_speed > 2.5
+                and gnss.speed_mps > 3.0
+                and abs(self._last_w_z_corr) < 0.02
+                and abs(y_hdg) < np.radians(3.0)
+                and not in_cooldown
+            ):
                 raw_scale = float(gnss.speed_mps / self._last_ai_speed)
-                clipped_scale = float(np.clip(raw_scale, 0.50, 4.00))
-                self._speed_scale = 0.85 * self._speed_scale + 0.15 * clipped_scale
+                clipped_scale = float(np.clip(raw_scale, 0.75, 1.35))
+                self._speed_scale = 0.90 * self._speed_scale + 0.10 * clipped_scale
 
         self._last_gnss_ts = gnss.timestamp_ns
         return self.get_state(gnss.timestamp_ns)
@@ -509,6 +590,134 @@ class ErrorStateEKF(IFusionFilter):
     @property
     def P(self) -> np.ndarray:
         return self._P
+
+    @P.setter
+    def P(self, new_p: np.ndarray):
+        self._P = new_p.copy()
+
+    @property
+    def q(self):
+        q_xyzw = self._q.as_quat()
+        return np.array([q_xyzw[3], q_xyzw[0], q_xyzw[1], q_xyzw[2]], dtype=np.float64)
+
+    @q.setter
+    def q(self, q_val):
+        if isinstance(q_val, R):
+            self._q = q_val
+        else:
+            q_xyzw = np.array([q_val[1], q_val[2], q_val[3], q_val[0]], dtype=np.float64)
+            q_xyzw /= max(1e-12, np.linalg.norm(q_xyzw))
+            self._q = R.from_quat(q_xyzw)
+        yaw_enu_rad = self._q.as_euler("zyx")[0]
+        self._heading_rad = (np.pi / 2.0 - yaw_enu_rad) % (2.0 * np.pi)
+
+    def _quaternion_multiply(self, q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
+        w1, x1, y1, z1 = q1
+        w2, x2, y2, z2 = q2
+        return np.array([
+            w1*w2 - x1*x2 - y1*y2 - z1*z2,
+            w1*x2 + x1*w2 + y1*z2 - z1*y2,
+            w1*y2 - x1*z2 + y1*w2 + z1*x2,
+            w1*z2 + x1*y2 - y1*x2 + z1*w2
+        ], dtype=np.float64)
+
+    @property
+    def x_nominal(self) -> np.ndarray:
+        rotvec = self._q.as_rotvec()
+        return np.concatenate([self._p, self._v, rotvec, self._ba, self._bg])
+
+    @x_nominal.setter
+    def x_nominal(self, x: np.ndarray):
+        self._p = x[0:3].copy()
+        self._v = x[3:6].copy()
+        self._q = R.from_rotvec(x[6:9])
+        yaw_enu_rad = self._q.as_euler("zyx")[0]
+        self._heading_rad = (np.pi / 2.0 - yaw_enu_rad) % (2.0 * np.pi)
+        self._ba = x[9:12].copy()
+        self._bg = x[12:15].copy()
+
+    def get_nav_azimuth_rad(self) -> float:
+        return float(self._heading_rad)
+
+    def update_straight_line_lock(self, active_road_bearing_rad: Optional[float] = None) -> None:
+        """
+        Zero Angular Rate Update (ZARU) / Heading Lock.
+        Suppresses cubic yaw drift divergence during straight highway cruising.
+        """
+        current_speed = float(np.linalg.norm(self._v[:2]))
+        w_z_corr = float(self.latest_calibrated_gyro[2] - self._bg[2])
+
+        # Trigger: vehicle speed > 15 m/s with minimal turning (|w_z| < 0.005 rad/s) for > 2.0s
+        if current_speed > 15.0 and abs(w_z_corr) < 0.005:
+            self.straight_drive_timer += self.last_dt
+        else:
+            self.straight_drive_timer = 0.0
+            self.locked_straight_heading = None
+            return
+
+        if self.straight_drive_timer < 2.0:
+            return
+
+        current_heading = self.get_nav_azimuth_rad()
+        if active_road_bearing_rad is not None:
+            target_heading = float(active_road_bearing_rad)
+        else:
+            if self.locked_straight_heading is None:
+                self.locked_straight_heading = current_heading
+            target_heading = self.locked_straight_heading
+
+        # Heading innovation wrapped to [-pi, pi]
+        y_heading = wrap_pi(target_heading - current_heading)
+
+        # Measurement Jacobian H (maps error state attitude delta_theta_z at index 8)
+        H = np.zeros((1, 15), dtype=np.float64)
+        H[0, 8] = 1.0
+
+        # Observation noise covariance (tight constraint: ~1.15 degrees)
+        R_heading = np.array([[0.02**2]], dtype=np.float64)
+
+        # Kalman gain & state correction
+        S = H @ self._P @ H.T + R_heading
+        try:
+            S_inv = np.linalg.inv(S)
+        except np.linalg.LinAlgError:
+            return
+        K = self._P @ H.T @ S_inv
+        delta_x = (K * y_heading).ravel()
+
+        # Update nominal position, velocity, attitude, and biases
+        self._p += delta_x[0:3]
+        self._v += delta_x[3:6]
+
+        dtheta_z = delta_x[8]
+        self._heading_rad = (self._heading_rad + dtheta_z) % (2.0 * np.pi)
+        yaw_enu_rad = np.pi / 2.0 - self._heading_rad
+        self._q = R.from_euler("z", yaw_enu_rad)
+
+        v_fwd = float(np.linalg.norm(self._v[:2]))
+        if v_fwd > 0.5:
+            C_b_n = self._q.as_matrix()
+            self._v = C_b_n @ np.array([v_fwd, 0.0, self._v[2]], dtype=np.float64)
+
+        self._ba += delta_x[9:12]
+        self._bg += delta_x[12:15]
+        self._bg = np.clip(self._bg, -self.max_bg, self.max_bg)
+
+        # Joseph-form covariance update
+        I_KH = np.eye(15, dtype=np.float64) - K @ H
+        self._P = I_KH @ self._P @ I_KH.T + K @ R_heading @ K.T
+
+    def compute_hybrid_speed(self, v_moe: float, spectral_power_3_8hz: float, dt: float) -> float:
+        """
+        Blends MoE speed with forward inertial integration when spectral road texture cues drop.
+        """
+        alpha = float(1.0 / (1.0 + np.exp(-(spectral_power_3_8hz - 0.25) * 15.0)))
+        accel_fwd = float(self.latest_calibrated_accel[0] - self._ba[0])
+        v_inertial = max(0.0, float(self.v_chassis_prev + accel_fwd * dt))
+
+        v_fused = (alpha * float(v_moe)) + ((1.0 - alpha) * v_inertial)
+        self.v_chassis_prev = v_fused
+        return float(v_fused)
 
     def get_state(self, ts: int = 0) -> FusedPosition:
         lat, lon, alt = enu_to_geodetic(
@@ -527,6 +736,7 @@ class ErrorStateEKF(IFusionFilter):
             mode="GNSS_AIDED" if (self._last_gnss_ts and (ts - self._last_gnss_ts)*1e-9 < 3.0) else "INS_ONLY_BLACKOUT",
             gnss_outage_duration_s=max(0.0, (ts - (self._last_gnss_ts or ts))*1e-9)
         )
+
 
 
 register_fusion_filter("es_ekf", lambda **kwargs: ErrorStateEKF(**kwargs))

@@ -1,5 +1,0 @@
-EKF state at 300s:
-  _bg (gyro bias): [0. 0. 0.]
-  _bg[2] in deg/s: 0.0000 deg/s
-  _heading_rad: 243.89�
-  _p: [-2005.11039229   375.86010705     8.69204494]

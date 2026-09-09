@@ -1,5 +1,0 @@
-Pre-blackout empirical AI speed scale factor (t < 120s): 1.3415
-
-30s Blackout Comparison:
-  Unscaled AI Velocity: Final Error = 130.27 m (26.95% drift)
-  Scaled AI Velocity:   Final Error = 87.87 m (18.18% drift)

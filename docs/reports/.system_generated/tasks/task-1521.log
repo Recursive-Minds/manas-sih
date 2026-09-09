@@ -1,14 +1,0 @@
-Evaluating S-S1 [30s_blackout_at_120s]:   0%|          | 0/51746 [00:00<?, ?it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|          | 490/51746 [00:00<00:28, 1778.82it/s]Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 668/51746 [00:00<01:01, 829.67it/s] Evaluating S-S1 [30s_blackout_at_120s]:   1%|1         | 766/51746 [00:00<01:15, 673.92it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 837/51746 [00:01<01:25, 593.82it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|1         | 1004/51746 [00:01<01:04, 783.07it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1101/51746 [00:01<01:19, 637.06it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1179/51746 [00:01<01:34, 534.00it/s]Evaluating S-S1 [30s_blackout_at_120s]:   2%|2         | 1243/51746 [00:01<01:43, 488.11it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1298/51746 [00:02<01:49, 459.83it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1348/51746 [00:02<01:52, 446.93it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1395/51746 [00:02<01:57, 429.08it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1439/51746 [00:02<02:01, 414.99it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1481/51746 [00:02<02:02, 411.34it/s]Evaluating S-S1 [30s_blackout_at_120s]:   3%|2         | 1523/51746 [00:02<02:02, 408.38it/s]                                                                                             Columns in history_df: ['time_s', 'timestamp_ns', 'est_lat', 'est_lon', 'est_e', 'est_n', 'est_u', 'gt_e', 'gt_n', 'gt_u', 'error_m', 'heading_deg', 'speed_mps', 'in_blackout', 'mode']
-Traceback (most recent call last):
-  File "C:\Users\carpe\.gemini\antigravity-ide\brain\10a4684a-0cfa-486c-a598-6a3b7a170b92\scratch\inspect_detailed_bo.py", line 35, in <module>
-    print(df_bo[["time_in_bo", "est_speed", "gt_speed", "est_heading_deg", "gt_heading_deg", "pos_error_m"]].iloc[::30].to_string())
-          ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\frame.py", line 4119, in __getitem__
-    indexer = self.columns._get_indexer_strict(key, "columns")[1]
-              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 6212, in _get_indexer_strict
-    self._raise_if_missing(keyarr, indexer, axis_name)
-    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\carpe\AppData\Local\Programs\Python\Python313\Lib\site-packages\pandas\core\indexes\base.py", line 6264, in _raise_if_missing
-    raise KeyError(f"{not_found} not in index")
-KeyError: "['est_speed', 'gt_speed', 'est_heading_deg', 'gt_heading_deg', 'pos_error_m'] not in index"

@@ -4,3 +4,9 @@ __pycache__/
 .idea/
 .vscode/
 *.tmp
+*.obj
+*.exp
+*.lib
+scratch/
+.gemini/
+data/cache/

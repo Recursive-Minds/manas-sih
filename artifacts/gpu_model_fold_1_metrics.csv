@@ -1,0 +1,18 @@
+metric,value,unit
+device,NVIDIA GeForce RTX 4060 Laptop GPU (8.0 GB),string
+model_type,moe_bayesian,string
+peak_vram_mb,65.5,MB
+latency_ms,0.055,ms
+throughput_fps,18244.8,Hz
+rmse,6.1940,m/s
+mae,5.0251,m/s
+speed_scale_ratio,0.4478,ratio
+dynamics_variance_ratio,0.9849,ratio
+pearson_r,0.3277,correlation
+r2_score,-1.5049,r2
+integrated_drift_m,5307.76,m
+integrated_drift_pct,55.22,%
+stationary_mae,0.1731,m/s
+low_speed_mae,2.6506,m/s
+mid_speed_mae,4.8799,m/s
+high_speed_mae,9.3527,m/s
