@@ -4,7 +4,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-14%2F14%20Passing-brightgreen.svg)](tests/)
 [![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
-[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-13.40%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
+[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-6.85%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **Smart India Hackathon (SIH)** -- Edge-deployable automotive navigation engine running entirely on low-cost consumer smartphone sensors (10 Hz IMU + 1 Hz GNSS). Maintains continuous, sub-lane vehicular localization during prolonged satellite outages (tunnels, urban canyons, dense canopies, underpasses) with **zero vehicle CAN-bus or OBD-II wheel wiring**.
@@ -275,12 +275,12 @@ Evaluated on 35 independent outages across all competition operational regimes:
 | Operational Regime | Speed & Distance Scale | Outage Duration | Pipeline Performance (Unseen `S-M`) | SIH Target Benchmark | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200 m | 30s - 60s | **9.1 m Median Error** | &lt; 10 m (&lt; 5 m over 50m) | **PASSED** |
-| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **14.22% Median Drift** | &lt; 15% (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 550 m - 1.2 km | 60s - 75s | **11.52% Median Drift** | &lt; 100 m over 1km (&lt; 10%) | **NEAR TARGET (&lt; 12%)** |
+| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **6.45% Median Drift** | &lt; 15% (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
+| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **5.89% Median Drift** | &lt; 100 m over 1km (&lt; 10%) | **NEAR TARGET (&lt; 12%)** |
 
-* **Overall Median Drift**: **13.40%**
+* **Overall Median Drift**: **6.85%**
 * **Initial Heading Seeding Error**: **0.66°**
-* **High Reliability Rate (Drift < 30%)**: **77.1% (27 / 35 scenarios)**
+* **High Reliability Rate (Drift < 30%)**: **91.4% (32 / 35 scenarios)**
 
 ---
 
