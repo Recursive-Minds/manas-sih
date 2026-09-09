@@ -7,7 +7,7 @@ Features explicit Off-Road gating to prevent false snapping on unmapped farmland
 """
 
 from __future__ import annotations
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any, Dict
 import numpy as np
 
 from sih.core.contracts import FusedPosition, MatchedPosition
@@ -88,19 +88,30 @@ class HMMMapMatcher(IMapMatcher):
         self._last_timestamp_ns = None
         self._consecutive_unmatched_count = 0
 
-    def match(self, position: FusedPosition) -> MatchedPosition:
+    def set_active_segment(self, segment: Optional[RoadSegment]) -> None:
+        """Explicitly initialize or update the active road segment."""
+        self._active_segment = segment
+
+    def match(
+        self,
+        position: FusedPosition,
+        ekf: Optional[Any] = None,
+        domain: str = "Highway",
+        v_fwd: Optional[float] = None,
+        **kwargs,
+    ) -> MatchedPosition:
         """
-        Match continuous fused position to road network.
+        Match continuous fused position to road network with topological corridor retention.
         Guarantees strict road corridor attachment via topological network traversal.
-        If off-road or on unmapped track, safely falls back without snapping.
+        Supports closed-loop EKF updating and domain-appropriate lateral snapping.
         """
-        p_enu = position.position_enu_m[:2]
+        p_enu = position.position_enu_m[:2].copy()
         v_heading_deg = float(np.degrees(position.heading_rad)) % 360.0
-        v_speed = float(np.linalg.norm(position.velocity_enu_mps[:2]))
+        v_speed = float(v_fwd) if v_fwd is not None else float(np.linalg.norm(position.velocity_enu_mps[:2]))
 
         # Topological candidate retrieval:
         # Includes active segment, its downstream topological successors, and spatial radius
-        cands_dict = {}
+        cands_dict: Dict[str, Tuple[RoadSegment, str]] = {}
         if self._active_segment is not None:
             cands_dict[self._active_segment.segment_id] = (self._active_segment, "active")
             for succ in self._succ_map.get(self._active_segment.segment_id, []):
@@ -108,7 +119,7 @@ class HMMMapMatcher(IMapMatcher):
                 for s2 in self._succ_map.get(succ.segment_id, []):
                     cands_dict[s2.segment_id] = (s2, "succ2")
 
-        for s in self.road_network.find_candidates(p_enu, radius_m=self.max_snap_dist_m * 1.5):
+        for s in self.road_network.find_candidates(p_enu, radius_m=max(45.0, self.max_snap_dist_m * 1.5)):
             if s.segment_id not in cands_dict:
                 cands_dict[s.segment_id] = (s, "spatial")
 
@@ -127,37 +138,44 @@ class HMMMapMatcher(IMapMatcher):
         is_turning = turn_rate_dps > 1.5
 
         # Extract EKF heading uncertainty from covariance matrix
-        sigma_yaw_ekf_deg = self.sigma_heading_deg
-        if position.covariance is not None and position.covariance.shape[0] >= 9:
+        sigma_yaw_deg = self.sigma_heading_deg
+        if ekf is not None and hasattr(ekf, "_P") and ekf._P.shape[0] >= 9:
+            var_yaw = float(ekf._P[8, 8])
+            if var_yaw > 0.0:
+                sigma_yaw_deg = float(np.degrees(np.sqrt(var_yaw)))
+        elif position.covariance is not None and position.covariance.shape[0] >= 9:
             var_yaw = float(position.covariance[8, 8])
             if var_yaw > 0.0:
-                sigma_yaw_ekf_deg = float(np.degrees(np.sqrt(var_yaw)))
+                sigma_yaw_deg = float(np.degrees(np.sqrt(var_yaw)))
 
-        sigma_eff = float(np.sqrt(sigma_yaw_ekf_deg**2 + self.sigma_heading_deg**2))
+        sigma_eff = float(np.sqrt(sigma_yaw_deg**2 + 15.0**2))
         if is_turning:
             sigma_eff = max(sigma_eff, 45.0)
 
-        scored_candidates: List[Tuple[RoadSegment, np.ndarray, float, float, float]] = []
+        # Universal Corridor Retention:
+        # Check if the candidate pool has competing divergent branches.
+        # If single-path corridor (no branching forks within 35m), widen heading tolerance
+        # so transient mid-turn gyro phase lag cannot cause candidate pool starvation.
+        num_succs = len(self._succ_map.get(self._active_segment.segment_id, [])) if self._active_segment else 0
+        is_single_corridor = (num_succs <= 1)
 
+        scored_candidates = []
         for sid, (seg, role) in cands_dict.items():
             proj_enu, d_perp, frac = seg.project_point(p_enu)
-            if d_perp > self.max_snap_dist_m:
+            if d_perp > 35.0:
                 continue
 
             h_diff = abs((v_heading_deg - seg.bearing_deg + 180.0) % 360.0 - 180.0)
 
-            # Curve-tolerant topological gating:
-            # Allow connected successors to accommodate turns up to 60 deg
-            max_allowed_hdiff = 60.0 if role in ("succ", "succ2") else 45.0
+            # Max allowable heading discrepancy:
+            if role in ("succ", "succ2"):
+                max_allowed_hdiff = 105.0
+            elif is_single_corridor:
+                max_allowed_hdiff = 85.0
+            else:
+                max_allowed_hdiff = 50.0
+
             if v_speed > 1.0 and h_diff > max_allowed_hdiff:
-                continue
-
-            # Soft Likelihood
-            p_dist = np.exp(-0.5 * (d_perp / self.sigma_dist_m) ** 2)
-            p_head = np.exp(-0.5 * (h_diff / sigma_eff) ** 2)
-            emission_score = float(p_dist * p_head)
-
-            if emission_score < 1e-4:
                 continue
 
             # Topological transition prior
@@ -170,31 +188,53 @@ class HMMMapMatcher(IMapMatcher):
             elif role == "succ2":
                 topo_bonus = 1.0
 
-            total_score = emission_score * topo_bonus
-            scored_candidates.append((seg, proj_enu, d_perp, h_diff, total_score))
+            # Soft Likelihood
+            p_dist = np.exp(-0.5 * (d_perp / 12.0) ** 2)
+            p_head = np.exp(-0.5 * (h_diff / 35.0) ** 2)
+            score = float(p_dist * p_head * topo_bonus)
+
+            scored_candidates.append((seg, proj_enu, d_perp, h_diff, score, frac))
 
         if not scored_candidates:
             return self._create_unmatched(position, p_enu, v_heading_deg)
 
         scored_candidates.sort(key=lambda x: x[4], reverse=True)
-        best_seg, best_proj, best_dist, best_h_diff, best_score = scored_candidates[0]
+        best_seg, best_proj, best_dist, best_h_diff, best_score, frac = scored_candidates[0]
 
-        confidence = min(1.0, max(0.0, best_score))
-        if confidence < self.min_confidence_threshold:
-            return self._create_unmatched(position, p_enu, v_heading_deg)
+        # Domain-Appropriate Road Snapping:
+        if domain == "Urban" or best_h_diff > 40.0 or turn_rate_dps > 2.5:
+            # Urban grid intersections & sharp turns: project to corner point
+            snapped_enu = best_proj.copy()
+        else:
+            # Highway / Arterial corridor: strictly perpendicular lateral snap
+            # Preserves along-track DR integration without coordinate teleportation
+            seg_vec = best_seg.end_enu_m - best_seg.start_enu_m
+            seg_len = float(np.linalg.norm(seg_vec))
+            if seg_len > 1e-3:
+                u_seg = seg_vec / seg_len
+                u_norm = np.array([-u_seg[1], u_seg[0]])
+                d_lat = float(np.dot(best_proj - p_enu, u_norm))
+                snapped_enu = p_enu + d_lat * u_norm
+            else:
+                snapped_enu = best_proj.copy()
 
-        # STRICT ROAD ATTACHMENT:
-        # Snaps directly to the road centerline projection
-        smooth_enu = best_proj
+        # Closed-Loop EKF Feedback (if EKF instance provided):
+        if ekf is not None:
+            if hasattr(ekf, "_p"):
+                ekf._p[0] = snapped_enu[0]
+                ekf._p[1] = snapped_enu[1]
+            if hasattr(ekf, "reanchor_heading"):
+                conf = 0.5 if turn_rate_dps < 2.0 else 0.25
+                ekf.reanchor_heading(best_seg.bearing_deg, confidence=conf, forward_speed_mps=v_speed)
 
         self._active_segment = best_seg
-        self._last_matched_enu = smooth_enu
+        self._last_matched_enu = snapped_enu
         self._last_fused_enu = p_enu
         self._consecutive_unmatched_count = 0
 
         # Convert matched ENU back to WGS-84 Geodetic Lat/Lon
         lat_deg, lon_deg, _ = enu_to_geodetic(
-            smooth_enu[0], smooth_enu[1], position.altitude_m,
+            snapped_enu[0], snapped_enu[1], position.altitude_m,
             self.ref_lat, self.ref_lon, self.ref_alt
         )
 
@@ -205,7 +245,7 @@ class HMMMapMatcher(IMapMatcher):
             bearing_deg=float(best_seg.bearing_deg),
             road_segment_id=best_seg.segment_id,
             distance_to_road_m=float(best_dist),
-            confidence=float(confidence),
+            confidence=float(min(1.0, max(0.0, best_score))),
             is_matched=True,
         )
 

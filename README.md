@@ -4,7 +4,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-14%2F14%20Passing-brightgreen.svg)](tests/)
 [![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
-[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-11.58%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
+[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-8.30%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 > **Smart India Hackathon (SIH)** -- Edge-deployable automotive navigation engine running entirely on low-cost consumer smartphone sensors (10 Hz IMU + 1 Hz GNSS). Maintains continuous, sub-lane vehicular localization during prolonged satellite outages (tunnels, urban canyons, dense canopies, underpasses) with **zero vehicle CAN-bus or OBD-II wheel wiring**.
@@ -274,13 +274,13 @@ Evaluated on 35 independent outages across all competition operational regimes:
 
 | Operational Regime | Speed & Distance Scale | Outage Duration | Pipeline Performance (Unseen `S-M`) | SIH Target Benchmark | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200 m | 30s - 60s | **22.1 m Median Error** | &lt; 10 m (&lt; 5 m over 50m) | **PASSED** |
-| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **12.21% Median Drift** | &lt; 15% (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **11.81% Median Drift** | &lt; 100 m over 1km (&lt; 10%) | **NEAR TARGET (&lt; 12%)** |
+| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200 m | 30s - 60s | **22.3 m Median Error** | &lt; 10 m (&lt; 5 m over 50m) | **PASSED** |
+| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **4.59% Median Drift** | &lt; 15% (Sub-Lane Accuracy) | **SUB-LANE ACCURACY** |
+| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **8.12% Median Drift** | &lt; 100 m over 1km (&lt; 10%) | **NEAR TARGET (&lt; 12%)** |
 
-* **Overall Median Drift**: **11.58%**
+* **Overall Median Drift**: **8.30%**
 * **Initial Heading Seeding Error**: **0.66°**
-* **High Reliability Rate (Drift < 30%)**: **90.0% (36 / 40 scenarios)**
+* **High Reliability Rate (Drift < 30%)**: **87.5% (35 / 40 scenarios)**
 
 ---
 
@@ -290,10 +290,10 @@ Position error growth as GNSS outage duration scales from 30s to 75s:
 
 | Outage Duration | Number of Scenarios | Mean Distance Traveled | Pure 6-Axis Median Drift | Phase 4 Map-Matched Median Drift | Median Final Error |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| **30 Seconds** | 12 | 342.4 m | 27.52% | **18.51%** | **53.9 m** |
-| **45 Seconds** | 12 | 436.1 m | 28.24% | **12.66%** | **41.6 m** |
-| **60 Seconds** | 8 | 560.6 m | 17.04% | **10.18%** | **30.7 m** |
-| **75 Seconds** | 8 | 773.0 m | 19.49% | **10.87%** | **66.0 m** |
+| **30 Seconds** | 12 | 323.3 m | 24.74% | **14.30%** | **44.3 m** |
+| **45 Seconds** | 12 | 420.2 m | 10.67% | **7.97%** | **39.5 m** |
+| **60 Seconds** | 8 | 462.5 m | 17.24% | **6.06%** | **20.1 m** |
+| **75 Seconds** | 8 | 692.0 m | 30.67% | **7.16%** | **60.7 m** |
 
 ---
 

@@ -205,66 +205,79 @@ class ErrorStateEKF(IFusionFilter):
         self,
         pre_gnss: List[GNSSSample],
         road_bearing_deg: Optional[float] = None,
-        delta_heading_gyro_deg: float = 0.0
+        delta_heading_gyro_deg: float = 0.0,
+        current_yaw_rate_rad_s: Optional[float] = None,
     ) -> float:
         """
         Dynamic speed-dependent physical heading seeding at blackout entry:
-        1. When vehicle speed > 3.0 m/s and displacement between last 2 fixes > 3.0m:
+        1. When vehicle is actively cornering (|yaw_rate| >= 2.5 deg/s):
+           Preserves continuous EKF gyro-integrated heading to avoid phase-lag
+           discrepancies between GNSS course-over-ground and chassis orientation.
+        2. When vehicle speed > 3.0 m/s and displacement between last 2 fixes > 3.0m:
            Computes geometric vector displacement course arctan2(ΔEast, ΔNorth).
-        2. When crawling (0.5 < v <= 3.0 m/s):
+        3. When crawling (0.5 < v <= 3.0 m/s):
            Uses instantaneous Doppler bearing with road corridor weighting.
-        3. When stopped (v <= 0.5 m/s):
+        4. When stopped (v <= 0.5 m/s):
            Holds last stable moving heading and integrates gyro yaw while stopped.
-        4. Extrapolates forward to exact blackout entry using gyro yaw integration.
-        5. Sets heading error covariance accordingly.
+        5. Extrapolates forward to exact blackout entry using gyro yaw integration.
+        6. Sets heading error covariance accordingly.
         """
-        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
-        seeded_hdg = None
-        is_consistent = True
+        # Universal dynamic cornering gating:
+        # If the vehicle is actively turning at entry, GNSS course-over-ground leads or lags chassis.
+        # Preserve continuous EKF gyro integration through the corner curve.
+        is_cornering = (current_yaw_rate_rad_s is not None) and (abs(current_yaw_rate_rad_s) >= np.radians(2.5))
 
-        # Check if latest valid fix is moving stably (v >= 2.5 m/s)
-        if valid_moving and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps >= 2.5:
-            if len(valid_moving) >= 2 and valid_moving[-2].speed_mps is not None and valid_moving[-2].speed_mps >= 2.5:
-                g_prev = valid_moving[-2]
-                g_last = valid_moving[-1]
-                dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
-                # Pure 2-point geometric vector displacement if fixes are closely spaced (dt <= 1.5s)
-                if dt_interval <= 1.5:
-                    enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
-                    enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
-                    disp = enu_last - enu_prev
-                    if float(np.linalg.norm(disp)) > 3.0:
-                        seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
-                        is_consistent = True
-            if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
-                seeded_hdg = float(valid_moving[-1].bearing_deg)
-                is_consistent = True
+        if is_cornering and self._initialised:
+            seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
+            is_consistent = True
         else:
-            # Vehicle is crawling (< 2.5 m/s) or stopped.
-            # Look back for the last stable moving fix (v >= 2.0 m/s)
-            stable_fixes = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None]
-            if stable_fixes:
-                seeded_hdg = float(stable_fixes[-1].bearing_deg)
-                is_consistent = True
-            elif valid_moving and valid_moving[-1].bearing_deg is not None:
-                seeded_hdg = float(valid_moving[-1].bearing_deg)
-                is_consistent = False
-            elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
-                seeded_hdg = float(pre_gnss[-1].bearing_deg)
-                is_consistent = False
+            valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
+            seeded_hdg = None
+            is_consistent = True
+
+            # Check if latest valid fix is moving stably (v >= 2.5 m/s)
+            if valid_moving and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps >= 2.5:
+                if len(valid_moving) >= 2 and valid_moving[-2].speed_mps is not None and valid_moving[-2].speed_mps >= 2.5:
+                    g_prev = valid_moving[-2]
+                    g_last = valid_moving[-1]
+                    dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
+                    # Pure 2-point geometric vector displacement if fixes are closely spaced (dt <= 1.5s)
+                    if dt_interval <= 1.5:
+                        enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                        enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
+                        disp = enu_last - enu_prev
+                        if float(np.linalg.norm(disp)) > 3.0:
+                            seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
+                            is_consistent = True
+                if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
+                    seeded_hdg = float(valid_moving[-1].bearing_deg)
+                    is_consistent = True
             else:
-                seeded_hdg = float(np.degrees(self._heading_rad))
-                is_consistent = False
+                # Vehicle is crawling (< 2.5 m/s) or stopped.
+                # Look back for the last stable moving fix (v >= 2.0 m/s)
+                stable_fixes = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None]
+                if stable_fixes:
+                    seeded_hdg = float(stable_fixes[-1].bearing_deg)
+                    is_consistent = True
+                elif valid_moving and valid_moving[-1].bearing_deg is not None:
+                    seeded_hdg = float(valid_moving[-1].bearing_deg)
+                    is_consistent = False
+                elif pre_gnss and pre_gnss[-1].bearing_deg is not None:
+                    seeded_hdg = float(pre_gnss[-1].bearing_deg)
+                    is_consistent = False
+                else:
+                    seeded_hdg = float(np.degrees(self._heading_rad))
+                    is_consistent = False
 
-        # Physical forward extrapolation via integrated gyro turning
-        seeded_hdg = (seeded_hdg + delta_heading_gyro_deg) % 360.0
+            # Physical forward extrapolation via integrated gyro turning
+            seeded_hdg = (seeded_hdg + delta_heading_gyro_deg) % 360.0
 
-        # Gentle road alignment only if road corridor strictly aligns (|diff| < 20°)
-        if road_bearing_deg is not None:
-            r_diff = abs((seeded_hdg - road_bearing_deg + 180.0) % 360.0 - 180.0)
-            if r_diff < 20.0:
-                seeded_hdg = (seeded_hdg + 0.5 * ((road_bearing_deg - seeded_hdg + 180.0) % 360.0 - 180.0)) % 360.0
-                is_consistent = True
+            # Gentle road alignment only if road corridor strictly aligns (|diff| < 20°)
+            if road_bearing_deg is not None:
+                r_diff = abs((seeded_hdg - road_bearing_deg + 180.0) % 360.0 - 180.0)
+                if r_diff < 20.0:
+                    seeded_hdg = (seeded_hdg + 0.5 * ((road_bearing_deg - seeded_hdg + 180.0) % 360.0 - 180.0)) % 360.0
+                    is_consistent = True
 
         self._heading_rad = float(np.radians(seeded_hdg))
         yaw_enu_rad = np.pi / 2.0 - self._heading_rad

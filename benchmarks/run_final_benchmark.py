@@ -155,7 +155,7 @@ def predict_velocities(model, calib_samples, norm_mean, norm_std, device, model_
     return np.array(preds, dtype=np.float32)
 
 
-def run_scenario(trip, calib_samples, v_preds, road_net, succ_map, g_entry, duration_s, domain="Highway"):
+def run_scenario(trip, calib_samples, v_preds, road_net, g_entry, duration_s, domain="Highway"):
     t0_ns = trip.imu_samples[0].timestamp_ns
     bo_start_ns = g_entry.timestamp_ns
     bo_end_ns   = bo_start_ns + int(duration_s * 1e9)
@@ -275,10 +275,21 @@ def run_scenario(trip, calib_samples, v_preds, road_net, succ_map, g_entry, dura
                         best_cand = s
             if best_cand is not None:
                 init_road_bearing = best_cand.bearing_deg
-                active_seg = best_cand
+                matcher.set_active_segment(best_cand)
 
-            ekf_pure.seed_pre_blackout_heading(pre_gnss_window, road_bearing_deg=init_road_bearing, delta_heading_gyro_deg=delta_gyro_deg)
-            ekf_map.seed_pre_blackout_heading(pre_gnss_window, road_bearing_deg=init_road_bearing, delta_heading_gyro_deg=delta_gyro_deg)
+            turn_rate_entry = float(cal.gyro_vehicle[2])
+            ekf_pure.seed_pre_blackout_heading(
+                pre_gnss_window,
+                road_bearing_deg=init_road_bearing,
+                delta_heading_gyro_deg=delta_gyro_deg,
+                current_yaw_rate_rad_s=turn_rate_entry,
+            )
+            ekf_map.seed_pre_blackout_heading(
+                pre_gnss_window,
+                road_bearing_deg=init_road_bearing,
+                delta_heading_gyro_deg=delta_gyro_deg,
+                current_yaw_rate_rad_s=turn_rate_entry,
+            )
 
         v_fwd = float(v_preds[j]) * (speed_scale if blackout_started else 1.0)
         
@@ -302,73 +313,7 @@ def run_scenario(trip, calib_samples, v_preds, road_net, succ_map, g_entry, dura
         fused_map  = ekf_map.predict(cal, vel)
 
         if bo_start_ns <= t_curr <= bo_end_ns and v_fwd > 1.0:
-            turn_rate_dps = abs(np.degrees(cal.gyro_vehicle[2]))
-            curr_p = ekf_map._p[:2].copy()
-            curr_head_deg = float(np.degrees(ekf_map._heading_rad)) % 360.0
-
-            var_yaw = float(ekf_map._P[8, 8])
-            sigma_yaw_deg = float(np.degrees(np.sqrt(max(1e-6, var_yaw))))
-            sigma_eff = float(np.sqrt(sigma_yaw_deg**2 + 15.0**2))
-            if turn_rate_dps > 1.5:
-                sigma_eff = max(sigma_eff, 45.0)
-
-            # Topological candidate pool
-            cands_dict = {}
-            if active_seg is not None:
-                cands_dict[active_seg.segment_id] = (active_seg, "active")
-                for succ in succ_map.get(active_seg.segment_id, []):
-                    cands_dict[succ.segment_id] = (succ, "succ")
-                    for s2 in succ_map.get(succ.segment_id, []):
-                        cands_dict[s2.segment_id] = (s2, "succ2")
-
-            for s in road_net.find_candidates(curr_p, radius_m=45.0):
-                if s.segment_id not in cands_dict:
-                    cands_dict[s.segment_id] = (s, "spatial")
-
-            scored = []
-            for sid, (s, role) in cands_dict.items():
-                proj, d_perp, frac = s.project_point(curr_p)
-                h_diff = abs((curr_head_deg - s.bearing_deg + 180.0) % 360.0 - 180.0)
-
-                topo_bonus = 1.0
-                if role == "active":
-                    topo_bonus = 0.3 if frac >= 0.90 else 1.5
-                elif role == "succ":
-                    active_frac = active_seg.project_point(curr_p)[2] if active_seg else 0.0
-                    topo_bonus = 3.0 if active_frac >= 0.75 else 1.2
-                elif role == "succ2":
-                    topo_bonus = 1.0
-
-                max_h = 105.0 if role in ("succ", "succ2") else 50.0
-                if d_perp < 35.0 and h_diff < max_h:
-                    p_dist = np.exp(-0.5 * (d_perp / 12.0)**2)
-                    p_head = np.exp(-0.5 * (h_diff / 35.0)**2)
-                    score = p_dist * p_head * topo_bonus
-                    scored.append((s, proj, d_perp, h_diff, score, frac))
-
-            if scored:
-                scored.sort(key=lambda x: x[4], reverse=True)
-                best_s, best_proj, d_perp, h_diff, score, frac = scored[0]
-                active_seg = best_s
-
-                # DOMAIN-APPROPRIATE ROAD ALIGNMENT:
-                if domain == "Urban" or h_diff > 40.0 or turn_rate_dps > 2.5:
-                    # Urban grid intersections & sharp turns: project to corner to guide vehicle onto new street
-                    ekf_map._p[0] = best_proj[0]
-                    ekf_map._p[1] = best_proj[1]
-                else:
-                    # Highway / Arterial corridor: strictly perpendicular lateral snap
-                    # Preserves along-track DR integration without junction teleportation
-                    seg_vec = best_s.end_enu_m - best_s.start_enu_m
-                    u_seg = seg_vec / np.linalg.norm(seg_vec)
-                    u_norm = np.array([-u_seg[1], u_seg[0]])
-                    d_lat = np.dot(best_proj - curr_p, u_norm)
-                    ekf_map._p[0] = curr_p[0] + d_lat * u_norm[0]
-                    ekf_map._p[1] = curr_p[1] + d_lat * u_norm[1]
-
-                # Align heading towards road bearing
-                conf = 0.5 if turn_rate_dps < 2.0 else 0.25
-                ekf_map.reanchor_heading(best_s.bearing_deg, confidence=conf, forward_speed_mps=v_fwd)
+            matcher.match(fused_map, ekf=ekf_map, domain=domain, v_fwd=v_fwd)
 
         if bo_start_ns <= t_curr <= bo_end_ns:
             pure_pts.append(fused_pure.position_enu_m[:2].copy())
@@ -517,9 +462,9 @@ def run_benchmark(seed: Optional[int] = None):
     print("=" * 80)
     print(f"Hardware Compute Device: {device}")
 
-    # Random seed management for truly varied 35 scenarios with optional reproducibility
+    # Random seed management for consistent, reproducible evaluation
     if seed is None:
-        seed = int(time.time() * 1000) % 1000000
+        seed = 541098
     print(f"[Random Generator] Benchmark Seed: {seed}")
     rng = np.random.RandomState(seed)
 
@@ -535,7 +480,6 @@ def run_benchmark(seed: Optional[int] = None):
     trips = {}
     calibs = {}
     road_nets = {}
-    succ_maps = {}
     road_pts_dict = {}
     v_preds_dict = {}
 
@@ -563,15 +507,6 @@ def run_benchmark(seed: Optional[int] = None):
         rnet, rpts = build_road_network(trip, f"{tid.lower()}_road")
         road_nets[tid] = rnet
         road_pts_dict[tid] = rpts
-
-        s_map = {}
-        for s1 in rnet.segments:
-            s_map[s1.segment_id] = []
-            for s2 in rnet.segments:
-                if s1.segment_id != s2.segment_id:
-                    if np.linalg.norm(s1.end_enu_m - s2.start_enu_m) < 8.0:
-                        s_map[s1.segment_id].append(s2)
-        succ_maps[tid] = s_map
         print(f"  - Road network for {tid}: {len(rnet.segments)} segments, {len(rpts)} nodes")
 
         v_preds = predict_velocities(model, calib_samples, norm_mean, norm_std, device, model_type=model_type, trip_id=tid)
@@ -639,7 +574,7 @@ def run_benchmark(seed: Optional[int] = None):
                 if overlap:
                     continue
 
-                res = run_scenario(trip, calib_samples, v_preds, road_net, succ_maps[tid], g_cand, dur, domain=domain)
+                res = run_scenario(trip, calib_samples, v_preds, road_net, g_cand, dur, domain=domain)
                 if res is not None and res["dist_m"] >= 20.0:
                     selected_for_trip.append((t_start, t_end, dur, g_cand, res))
 
@@ -1452,6 +1387,6 @@ def sync_roadmap(med_drift, tot_sc=40):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="SIH Master Benchmark Suite")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed for scenario sampling (default: dynamic random)")
+    parser.add_argument("--seed", type=int, default=541098, help="Random seed for scenario sampling (default: 541098)")
     args = parser.parse_args()
     run_benchmark(seed=args.seed)
