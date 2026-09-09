@@ -307,6 +307,11 @@ class ErrorStateEKF(IFusionFilter):
         Gently pulls heading, realigns velocity vector to prevent false NHC lateral slip,
         and decouples attitude cross-covariances.
         """
+        # Suppress re-anchoring during active cornering
+        w_z = getattr(self, "_last_w_z_corr", 0.0)
+        if abs(w_z) > np.radians(2.0):
+            return
+
         r_rad = float(np.radians(road_bearing_deg))
         diff_rad = (r_rad - self._heading_rad + np.pi) % (2.0 * np.pi) - np.pi
         gain = 0.05 * min(1.0, max(0.0, confidence))

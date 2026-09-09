@@ -55,6 +55,7 @@ class HMMMapMatcher(IMapMatcher):
         self._last_timestamp_ns: Optional[int] = None
         self._consecutive_unmatched_count: int = 0
         self._matched_history: List[np.ndarray] = []
+        self._trailing_turn_deg: float = 0.0
         self._succ_map: dict = {}
         self._build_succ_map()
 
@@ -86,6 +87,7 @@ class HMMMapMatcher(IMapMatcher):
         self._last_fused_enu = None
         self._last_heading_deg = None
         self._last_timestamp_ns = None
+        self._trailing_turn_deg = 0.0
         self._consecutive_unmatched_count = 0
 
     def set_active_segment(self, segment: Optional[RoadSegment]) -> None:
@@ -126,16 +128,31 @@ class HMMMapMatcher(IMapMatcher):
         if not cands_dict:
             return self._create_unmatched(position, p_enu, v_heading_deg)
 
-        # Estimate vehicle turning rate
+        # Estimate vehicle turning rate (magnitude and signed direction)
         turn_rate_dps = 0.0
+        turn_rate_signed_dps = 0.0
+        dt_s = 0.1
         if self._last_heading_deg is not None and self._last_timestamp_ns is not None:
             dt_s = max(1e-3, (position.timestamp_ns - self._last_timestamp_ns) * 1e-9)
             dh = (v_heading_deg - self._last_heading_deg + 180.0) % 360.0 - 180.0
+            turn_rate_signed_dps = dh / dt_s
             turn_rate_dps = abs(dh) / dt_s
         self._last_heading_deg = v_heading_deg
         self._last_timestamp_ns = position.timestamp_ns
 
+        # Inspect EKF calibrated yaw rate if available
+        if ekf is not None and hasattr(ekf, "_last_w_z_corr"):
+            w_z = getattr(ekf, "_last_w_z_corr", 0.0)
+            if abs(w_z) > 1e-4:
+                turn_rate_signed_dps = -float(np.degrees(w_z))
+                turn_rate_dps = abs(turn_rate_signed_dps)
+
+        # Causal trailing turn accumulator (decays over ~1.5s)
+        alpha = float(np.clip(dt_s / 1.5, 0.05, 0.5))
+        self._trailing_turn_deg = (1.0 - alpha) * self._trailing_turn_deg + (turn_rate_signed_dps * dt_s)
+
         is_turning = turn_rate_dps > 1.5
+        is_turning_intent = (turn_rate_dps >= 2.0) or (abs(self._trailing_turn_deg) >= 8.0)
 
         # Extract EKF heading uncertainty from covariance matrix
         sigma_yaw_deg = self.sigma_heading_deg
@@ -158,6 +175,7 @@ class HMMMapMatcher(IMapMatcher):
         # so transient mid-turn gyro phase lag cannot cause candidate pool starvation.
         num_succs = len(self._succ_map.get(self._active_segment.segment_id, [])) if self._active_segment else 0
         is_single_corridor = (num_succs <= 1)
+        active_bearing = self._active_segment.bearing_deg if self._active_segment else v_heading_deg
 
         scored_candidates = []
         for sid, (seg, role) in cands_dict.items():
@@ -166,6 +184,7 @@ class HMMMapMatcher(IMapMatcher):
                 continue
 
             h_diff = abs((v_heading_deg - seg.bearing_deg + 180.0) % 360.0 - 180.0)
+            branch_turn_deg = (seg.bearing_deg - active_bearing + 180.0) % 360.0 - 180.0
 
             # Max allowable heading discrepancy:
             if role in ("succ", "succ2"):
@@ -175,18 +194,36 @@ class HMMMapMatcher(IMapMatcher):
             else:
                 max_allowed_hdiff = 50.0
 
+            # Dynamic Turn-Intent Prior at Diverging Junctions:
+            # If the driver is actively steering into a turn:
+            topo_bonus = 1.0
+            if is_turning_intent and not is_single_corridor:
+                # Check if this road branch aligns with the driver's turn direction
+                if abs(branch_turn_deg) > 20.0:
+                    if (self._trailing_turn_deg < -4.0 and branch_turn_deg < -15.0) or \
+                       (self._trailing_turn_deg > 4.0 and branch_turn_deg > 15.0):
+                        # Branch direction matches driver's turn intent!
+                        topo_bonus *= 3.5
+                        max_allowed_hdiff = max(max_allowed_hdiff, 110.0)
+                    else:
+                        # Branch turns in opposite direction
+                        topo_bonus *= 0.2
+                elif abs(branch_turn_deg) <= 15.0:
+                    # Straight continuation branch: downweight when driver is actively turning
+                    if abs(self._trailing_turn_deg) >= 10.0:
+                        topo_bonus *= 0.25
+
             if v_speed > 1.0 and h_diff > max_allowed_hdiff:
                 continue
 
             # Topological transition prior
-            topo_bonus = 1.0
             if role == "active":
-                topo_bonus = 0.3 if frac >= 0.90 else 1.5
+                topo_bonus *= 0.3 if frac >= 0.90 else 1.5
             elif role == "succ":
                 active_frac = self._active_segment.project_point(p_enu)[2] if self._active_segment else 0.0
-                topo_bonus = 3.0 if active_frac >= 0.75 else 1.2
+                topo_bonus *= 3.0 if active_frac >= 0.75 else 1.2
             elif role == "succ2":
-                topo_bonus = 1.0
+                topo_bonus *= 1.0
 
             # Soft Likelihood
             p_dist = np.exp(-0.5 * (d_perp / 12.0) ** 2)
@@ -202,7 +239,7 @@ class HMMMapMatcher(IMapMatcher):
         best_seg, best_proj, best_dist, best_h_diff, best_score, frac = scored_candidates[0]
 
         # Domain-Appropriate Road Snapping:
-        if domain == "Urban" or best_h_diff > 40.0 or turn_rate_dps > 2.5:
+        if domain == "Urban" or best_h_diff > 40.0 or is_turning_intent:
             # Urban grid intersections & sharp turns: project to corner point
             snapped_enu = best_proj.copy()
         else:
@@ -224,8 +261,12 @@ class HMMMapMatcher(IMapMatcher):
                 ekf._p[0] = snapped_enu[0]
                 ekf._p[1] = snapped_enu[1]
             if hasattr(ekf, "reanchor_heading"):
-                conf = 0.5 if turn_rate_dps < 2.0 else 0.25
-                ekf.reanchor_heading(best_seg.bearing_deg, confidence=conf, forward_speed_mps=v_speed)
+                # Only re-anchor heading if NOT actively cornering across a junction.
+                # If the vehicle is mid-turn (|h_diff| > 20 deg or is_turning_intent),
+                # let the gyroscope continue to integrate the turn without fighting the steering!
+                if not (is_turning_intent and best_h_diff > 20.0):
+                    conf = 0.5 if turn_rate_dps < 1.5 else 0.15
+                    ekf.reanchor_heading(best_seg.bearing_deg, confidence=conf, forward_speed_mps=v_speed)
 
         self._active_segment = best_seg
         self._last_matched_enu = snapped_enu
