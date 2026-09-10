@@ -191,12 +191,14 @@ class IDRPipeline:
         fusion_filter: IFusionFilter,
         map_matcher: IMapMatcher,
         handoff_policy: IGNSSHandoffPolicy,
+        corridor_manager: Optional[Any] = None,
     ) -> None:
         self.calibration = calibration
         self.velocity_estimator = velocity_estimator
         self.fusion_filter = fusion_filter
         self.map_matcher = map_matcher
         self.handoff_policy = handoff_policy
+        self.corridor_manager = corridor_manager
 
     def reset(self, initial_gnss: Optional[GNSSSample] = None) -> None:
         self.calibration.reset()
@@ -253,6 +255,20 @@ class IDRPipeline:
         # Feed calibration stage
         if hasattr(self.calibration, "observe_gnss"):
             self.calibration.observe_gnss(gnss)
+
+        # Notify predictive corridor prefetcher if active
+        if self.corridor_manager is not None and gnss.is_valid:
+            self.corridor_manager.notify_position(
+                lat=gnss.latitude_deg,
+                lon=gnss.longitude_deg,
+                speed_mps=float(gnss.speed_mps) if gnss.speed_mps is not None else 0.0,
+                bearing_deg=gnss.bearing_deg,
+            )
+            # Sync active network to map matcher
+            if hasattr(self.map_matcher, "update_road_network"):
+                active_net = self.corridor_manager.get_active_network()
+                if len(active_net.segments) > 0:
+                    self.map_matcher.update_road_network(active_net)
 
         # Evaluate quality / blackout status
         is_trusted = self.handoff_policy.evaluate_gnss(gnss, current_state)

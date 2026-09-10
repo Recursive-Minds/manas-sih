@@ -10,3 +10,4 @@ __pycache__/
 scratch/
 .gemini/
 data/cache/
+data/maps/cache/*.geojson

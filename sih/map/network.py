@@ -8,8 +8,10 @@ Supports graceful degradation for unmapped rural tracks and farmland.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
 import numpy as np
+
+from sih.data.geo import geodetic_to_enu
 
 
 @dataclass(slots=True, frozen=True)
@@ -159,5 +161,121 @@ class RoadNetwork:
                 road_type=road_type,
             )
             network.add_segment(seg)
+
+        return network
+
+    def merge(self, other: RoadNetwork) -> int:
+        """
+        Merges another RoadNetwork into this instance.
+        Skips duplicate segment IDs. Returns count of newly added segments.
+        """
+        added_count = 0
+        for seg in other.segments:
+            if seg.segment_id not in self.segment_map:
+                self.add_segment(seg)
+                added_count += 1
+        return added_count
+
+    def to_geojson_dict(self) -> Dict[str, Any]:
+        """
+        Serializes the RoadNetwork to a standard GeoJSON FeatureCollection.
+        """
+        features = []
+        for seg in self.segments:
+            feat = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [seg.start_lat_lon[1], seg.start_lat_lon[0]],  # [lon, lat] in GeoJSON
+                        [seg.end_lat_lon[1], seg.end_lat_lon[0]],
+                    ],
+                },
+                "properties": {
+                    "segment_id": seg.segment_id,
+                    "bearing_deg": seg.bearing_deg,
+                    "length_m": seg.length_m,
+                    "road_type": seg.road_type,
+                    "speed_limit_mps": seg.speed_limit_mps,
+                    "is_oneway": seg.is_oneway,
+                },
+            }
+            features.append(feat)
+
+        return {
+            "type": "FeatureCollection",
+            "features": features,
+        }
+
+    @classmethod
+    def from_geojson_dict(
+        cls,
+        data: Dict[str, Any],
+        ref_lat: float,
+        ref_lon: float,
+        ref_alt: float = 0.0,
+        cell_size_m: float = 100.0,
+        road_id_prefix: str = "gis_road",
+    ) -> RoadNetwork:
+        """
+        Constructs a RoadNetwork from a GeoJSON FeatureCollection (OSM, PMGSY, or Bhuvan).
+        """
+        network = cls(cell_size_m=cell_size_m)
+        features = data.get("features", [])
+
+        seg_counter = 0
+        for feat_idx, feat in enumerate(features):
+            geom = feat.get("geometry", {})
+            props = feat.get("properties", {})
+            g_type = geom.get("type", "")
+            raw_coords = geom.get("coordinates", [])
+
+            lines = []
+            if g_type == "LineString":
+                lines = [raw_coords]
+            elif g_type == "MultiLineString":
+                lines = raw_coords
+
+            road_type = props.get("road_type", props.get("highway", "primary"))
+            speed_limit = float(props.get("speed_limit_mps", 25.0))
+            is_oneway = bool(props.get("is_oneway", False))
+
+            for line in lines:
+                if len(line) < 2:
+                    continue
+
+                for i in range(len(line) - 1):
+                    lon1, lat1 = line[i][0], line[i][1]
+                    lon2, lat2 = line[i + 1][0], line[i + 1][1]
+
+                    p1_enu = geodetic_to_enu(lat1, lon1, 0.0, ref_lat, ref_lon, ref_alt)[:2]
+                    p2_enu = geodetic_to_enu(lat2, lon2, 0.0, ref_lat, ref_lon, ref_alt)[:2]
+
+                    diff = p2_enu - p1_enu
+                    length = float(np.linalg.norm(diff))
+                    if length < 0.5:
+                        continue
+
+                    bearing = float(np.degrees(np.arctan2(diff[0], diff[1]))) % 360.0
+                    custom_id = props.get("segment_id")
+                    if custom_id and len(line) == 2:
+                        seg_id = custom_id
+                    else:
+                        seg_id = f"{road_id_prefix}_{feat_idx}_{seg_counter:04d}"
+                    seg_counter += 1
+
+                    seg = RoadSegment(
+                        segment_id=seg_id,
+                        start_enu_m=p1_enu,
+                        end_enu_m=p2_enu,
+                        start_lat_lon=(lat1, lon1),
+                        end_lat_lon=(lat2, lon2),
+                        bearing_deg=bearing,
+                        length_m=length,
+                        road_type=road_type,
+                        speed_limit_mps=speed_limit,
+                        is_oneway=is_oneway,
+                    )
+                    network.add_segment(seg)
 
         return network

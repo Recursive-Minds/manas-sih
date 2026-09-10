@@ -81,6 +81,11 @@ class HMMMapMatcher(IMapMatcher):
         self._build_succ_map()
         self.reset()
 
+    def update_road_network(self, network: RoadNetwork) -> None:
+        """Dynamically updates the road network without clearing current tracking state."""
+        self.road_network = network
+        self._build_succ_map()
+
     def reset(self) -> None:
         self._active_segment = None
         self._last_matched_enu = None

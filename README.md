@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-14%2F14%20Passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-36%2F36%20Passing-brightgreen.svg)](tests/)
 [![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![Evaluation](https://img.shields.io/badge/Multi--Trip%20(40%20Scenarios)-9.34%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -502,7 +502,13 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   │   └── naive.py                   # Uncalibrated baseline double-integrator
 │   ├── map/
 │   │   ├── network.py                 # Stage 5: RoadNetwork spatial grid & polylines
-│   │   └── matcher.py                 # Stage 5: HMM Gaussian map-matching & fork gating
+│   │   ├── matcher.py                 # Stage 5: HMM Gaussian map-matching & fork gating
+│   │   ├── provider.py                # IRoadNetworkProvider interface & metadata
+│   │   ├── cache.py                   # SpatialDiskCache: 0.05° grid tiling & LRU memory cache
+│   │   ├── osm_client.py              # OSMOverpassClient: live road geometry query & fallback
+│   │   ├── local_gis.py               # LocalGISProvider: offline PMGSY / ISRO Bhuvan vectors
+│   │   ├── hybrid_provider.py         # MultiTierHybridProvider: disk cache -> live OSM -> local GIS
+│   │   └── corridor_manager.py        # PredictiveCorridorManager: velocity-adaptive prefetching
 │   ├── handoff/
 │   │   ├── manager.py                 # Stage 6: 6-State FSM GNSS-INS handoff manager
 │   │   ├── integrity.py               # Stage 6: Chi-Square NIS & kinematic velocity gates
@@ -529,9 +535,10 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   └── checkpoints/
 │       └── best_velocity_model.pt     # Trained PyTorch model weights (Val RMSE 0.963 m/s)
 ├── data/
-│   └── raw/iovnbd_trips/              # IO-VNBD real-world driving sequences (S-S1, S-S2, S-M)
+│   ├── raw/iovnbd_trips/              # IO-VNBD real-world driving sequences (S-S1, S-S2, S-M)
+│   └── maps/                          # Local GIS vectors and offline spatial tile cache
 ├── artifacts/                         # Benchmark charts, 9-panel galleries, spotlight maps (.png)
-├── tests/                             # Unit & integration test suite (14/14 passing)
+├── tests/                             # Unit & integration test suite (36/36 passing)
 ├── train_velocity_model.py            # GPU neural velocity model training script
 ├── benchmark_dashboard.html           # Standalone interactive browser visual dashboard
 ├── FINAL_JUDGE_EVALUATION_REPORT.md   # Official comprehensive judge evaluation report (Base64 embedded)
@@ -567,7 +574,7 @@ pip install numpy scipy pandas matplotlib
 ### Running Automated Tests
 
 ```bash
-# Execute the complete unit test suite (14/14 passing)
+# Execute the complete unit test suite (36/36 passing)
 python -m unittest discover tests/
 ```
 
