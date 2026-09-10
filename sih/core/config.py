@@ -37,6 +37,9 @@ class GNSSHandoffConfig:
     params: Dict[str, Any] = field(default_factory=dict)
 
 
+HandoffStageConfig = GNSSHandoffConfig
+
+
 @dataclass
 class PipelineConfig:
     """

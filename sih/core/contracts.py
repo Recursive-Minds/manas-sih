@@ -108,6 +108,18 @@ class FusedPosition:
         if self.velocity_enu_mps.shape != (3,):
             raise ValueError(f"velocity_enu_mps must be shape (3,), got {self.velocity_enu_mps.shape}")
 
+    @property
+    def east_m(self) -> float:
+        return float(self.position_enu_m[0])
+
+    @property
+    def north_m(self) -> float:
+        return float(self.position_enu_m[1])
+
+    @property
+    def up_m(self) -> float:
+        return float(self.position_enu_m[2])
+
 
 @dataclass(slots=True, frozen=True)
 class MatchedPosition:

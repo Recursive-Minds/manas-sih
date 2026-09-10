@@ -143,6 +143,7 @@ VELOCITY_FACTORIES: Dict[str, Callable[..., IVelocityEstimator]] = {
 FUSION_FACTORIES: Dict[str, Callable[..., IFusionFilter]] = {}
 
 from sih.map.matcher import HMMMapMatcher
+from sih.handoff.manager import SeamlessGNSSHandoffManager
 
 MAP_MATCHER_FACTORIES: Dict[str, Callable[..., IMapMatcher]] = {
     "pass_through": lambda **params: PassThroughMapMatcher(**params),
@@ -151,6 +152,7 @@ MAP_MATCHER_FACTORIES: Dict[str, Callable[..., IMapMatcher]] = {
 
 HANDOFF_FACTORIES: Dict[str, Callable[..., IGNSSHandoffPolicy]] = {
     "threshold_policy": lambda **params: ThresholdGNSSHandoffPolicy(**params),
+    "seamless_handoff": lambda **params: SeamlessGNSSHandoffManager(**params),
 }
 
 
@@ -201,7 +203,11 @@ class IDRPipeline:
         self.velocity_estimator.reset()
         self.fusion_filter.reset(initial_gnss)
         self.map_matcher.reset()
-        self.handoff_policy.reset()
+        if hasattr(self.handoff_policy, "reset"):
+            try:
+                self.handoff_policy.reset(initial_gnss)
+            except TypeError:
+                self.handoff_policy.reset()
 
     def process_imu(self, imu: IMUSample) -> Tuple[CalibratedSample, VelocityEstimate, FusedPosition, MatchedPosition]:
         """
@@ -218,8 +224,19 @@ class IDRPipeline:
         # 3. Fusion Prediction Stage (INS mechanization / propagation)
         fused_pos = self.fusion_filter.predict(calib_sample, vel_estimate)
 
+        # 3b. Notify handoff policy of IMU propagation step
+        if hasattr(self.handoff_policy, "notify_imu_step"):
+            p_enu = np.array(fused_pos.position_enu_m, dtype=np.float64)
+            self.handoff_policy.notify_imu_step(fused_pos.timestamp_ns, p_enu, dt_s=0.1)
+
+        # Reconcile display position if handoff policy supports zero-jump smoothstep blend
+        if hasattr(self.handoff_policy, "get_display_position"):
+            display_pos = self.handoff_policy.get_display_position(fused_pos)
+        else:
+            display_pos = fused_pos
+
         # 4. Map Matching Stage
-        matched_pos = self.map_matcher.match(fused_pos)
+        matched_pos = self.map_matcher.match(display_pos)
 
         return calib_sample, vel_estimate, fused_pos, matched_pos
 
@@ -242,6 +259,12 @@ class IDRPipeline:
         if is_trusted:
             return self.fusion_filter.update_gnss(gnss)
         return current_state
+
+    def get_display_position(self, fused_pos: FusedPosition) -> FusedPosition:
+        """Returns visual display-reconciled position to eliminate exit puck jumps."""
+        if hasattr(self.handoff_policy, "get_display_position"):
+            return self.handoff_policy.get_display_position(fused_pos)
+        return fused_pos
 
 
 def assemble_pipeline(config: PipelineConfig) -> IDRPipeline:

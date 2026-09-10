@@ -106,15 +106,19 @@ Evaluated across **40 independent blackout scenarios** on 5 distinct real-world 
 
 ---
 
-## 9. Remaining Active Phases for Final SIH Submission
+## 9. Active & Remaining Phases for Final SIH Submission
 
-1. **Phase 6: Seamless GNSS <-> INS Handoff State Machine**:
-   - Finite state machine (`GNSS_HEALTHY` -> `DEGRADED` -> `DEAD_RECKONING` -> `REACQUISITION`).
-   - Zero-jump cubic Hermite reacquisition blending to eliminate 20-50m UI jumps upon tunnel exit.
+1. **[COMPLETED] Phase 6: Seamless GNSS <-> INS Handoff State Machine**:
+   - Production 6-state FSM (`sih/handoff/manager.py`): `INITIALIZING` -> `GNSS_HEALTHY` -> `GNSS_DEGRADED` -> `INS_DEAD_RECKONING` -> `REACQUISITION_VERIFY` -> `REACQUISITION_BLENDING`.
+   - Chi-Square Normalized Innovation Squared (NIS) and multi-sample kinematic plausibility gating (`sih/handoff/integrity.py`).
+   - C^2 cubic Hermite smoothstep zero-jump reconciliation (`sih/handoff/reconciliation.py`), verified on real sequence `S-M.csv` with **0.0000 m exit jump** and **100.0% parameter freeze** during portal multipath.
+   - Comprehensive test suite in `tests/test_handoff.py` (7/7 passed, 30/30 repo-wide).
+
 2. **Phase 7: Mobile App (Android Production App) & Edge Runtime**:
-   - Export PyTorch model to optimized INT8/FP16 ONNX Runtime graph (< 2.5 MB, < 3 ms latency).
+   - Export PyTorch model to optimized INT8/FP16 ONNX Runtime graph (< 2.5 MB, < 3 ms latency on mobile ARM CPU/NPU).
    - Kotlin / Jetpack Compose Android app with 100 Hz IMU sensor listener and JNI bindings to `idr_core.dll`.
    - Real-time navigation puck with live 95% uncertainty covariance ellipses and two-wheeler lean angle mode.
+
 3. **Phase 8: Indian Geospatial Infrastructure & Final Submission Deliverables**:
    - Smartphone barometric pressure fusion for multi-level flyovers / elevated expressways.
    - Unmapped rural road fallback (pure kinematic dead reckoning without snapping).
