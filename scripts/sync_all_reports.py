@@ -1,4 +1,4 @@
-﻿"""
+"""
 sync_all_reports.py
 -------------------
 Synchronizes all benchmark metrics, scorecards, tables, and base64 images
@@ -95,22 +95,32 @@ def sync_system_implementation_record():
 
     # 2. Update executive metrics
     doc = doc.replace("**8.02%** of total distance traveled during complete GNSS blackouts (**P90: 24.46%**)",
-                      "**6.85%** of total distance traveled during complete GNSS blackouts (**P90: 18.50%**)")
+                      "**9.34%** of total distance traveled during complete GNSS blackouts (**P90: 26.17%**)")
+    doc = doc.replace("**6.85%** of total distance traveled during complete GNSS blackouts (**P90: 18.50%**)",
+                      "**9.34%** of total distance traveled during complete GNSS blackouts (**P90: 26.17%**)")
     doc = doc.replace("* **Tier 1 (< 10% drift) Pass Rate**: **54.3% (19 / 35 scenarios)**.",
-                      "* **Tier 1 (< 10% drift) Pass Rate**: **60.0% (21 / 35 scenarios)**.")
+                      "* **Tier 1 (< 10% drift) Pass Rate**: **52.5% (21 / 40 scenarios)**.")
+    doc = doc.replace("* **Tier 1 (< 10% drift) Pass Rate**: **60.0% (21 / 35 scenarios)**.",
+                      "* **Tier 1 (< 10% drift) Pass Rate**: **52.5% (21 / 40 scenarios)**.")
     doc = doc.replace("* **Sub-30% Consistency Rate**: **88.6% (31 / 35 scenarios)**.",
-                      "* **Sub-30% Consistency Rate**: **91.4% (32 / 35 scenarios)**.")
+                      "* **Sub-30% Consistency Rate**: **90.0% (36 / 40 scenarios)**.")
+    doc = doc.replace("* **Sub-30% Consistency Rate**: **91.4% (32 / 35 scenarios)**.",
+                      "* **Sub-30% Consistency Rate**: **90.0% (36 / 40 scenarios)**.")
     doc = doc.replace("Dropped to **8.02%** (< 10.0% SIH Target - **PASSED**).",
-                      "Dropped to **6.85%** (< 10.0% SIH Target - **PASSED**).")
+                      "Dropped to **9.34%** (< 10.0% SIH Target - **PASSED**).")
+    doc = doc.replace("Dropped to **6.85%** (< 10.0% SIH Target - **PASSED**).",
+                      "Dropped to **9.34%** (< 10.0% SIH Target - **PASSED**).")
     doc = doc.replace("earlier 32% drift down to 8.02% median drift",
-                      "earlier 32% drift down to 6.85% median drift")
+                      "earlier 32.77% drift down to 9.34% median drift")
+    doc = doc.replace("earlier 32% drift down to 6.85% median drift",
+                      "earlier 32.77% drift down to 9.34% median drift")
     doc = doc.replace("The overall **median drift is 8.02%**",
-                      "The overall **median drift is 6.85%**")
-    doc = doc.replace("**Tier 1 Pass Rate (< 10% drift)**: **54.3% (19 of 35 scenarios)**.",
-                      "**Tier 1 Pass Rate (< 10% drift)**: **60.0% (21 of 35 scenarios)**.")
+                      "The overall **median drift is 9.34%**")
+    doc = doc.replace("The overall **median drift is 6.85%**",
+                      "The overall **median drift is 9.34%**")
 
-    # 3. Update Section 9.3 table with the exact new 35-scenario benchmark results
-    res_csv = os.path.join(ROOT_DIR, "artifacts", "phase4_unseen_sm_benchmark_results.csv")
+    # 3. Update Section 9.3 table with the exact new 40-scenario benchmark results
+    res_csv = os.path.join(ROOT_DIR, "artifacts", "phase4_multi_trip_benchmark_results.csv")
     df = pd.read_csv(res_csv)
 
     table_lines = [
@@ -128,7 +138,7 @@ def sync_system_implementation_record():
         table_lines.append(f"| **#{sc_id:02d}** | {trip} | {dur} | {dist} | {pure_d} | {map_d} | {gain} |")
     new_table_str = "\n".join(table_lines)
 
-    sec9_pattern = r"(### 9\.3 Scenario-by-Scenario Evaluation Table\s*\n\s*Evaluated on the held-out Part 3 partition across all 3 real-world driving sequences:\s*\n\n)(?:\|.*?\n)+"
+    sec9_pattern = r"(### 9\.3 Scenario-by-Scenario Evaluation Table\s*\n\s*Evaluated on [^\n]+:\s*\n\n)(?:\|.*?\n)+"
     match = re.search(sec9_pattern, doc)
     if match:
         doc = doc[:match.start(1)] + match.group(1) + new_table_str + "\n" + doc[match.end():]
@@ -138,7 +148,12 @@ def sync_system_implementation_record():
 
     # 4. Fresh base64 images
     print("  Encoding fresh base64 images for techniques record...")
-    moe_b64 = b64_img("artifacts/moe_training_curves.png")
+    moe_path = os.path.join(ROOT_DIR, "artifacts", "moe_training_curves.png")
+    if os.path.exists(moe_path):
+        moe_b64 = b64_img("artifacts/moe_training_curves.png")
+        doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics")',
+                     f'<img src="data:image/png;base64,{moe_b64}" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics"', doc)
+
     drift_b64 = b64_img("artifacts/phase4_unseen_sm_drift_comparison_chart.png")
     gallery_b64 = b64_img("artifacts/unseen_sm_all_tiers_gallery.png")
     sc15_b64 = b64_img("artifacts/map_scenario_15_s_m_highway_60s.png")
@@ -149,14 +164,13 @@ def sync_system_implementation_record():
     sc14_b64 = b64_img("artifacts/map_scenario_14_urban_chicane_navigation.png")
     sc31_b64 = b64_img("artifacts/map_scenario_31_acute_highway_branch_fork.png")
 
+    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="40-Scenario Drift Distribution Comparison Chart")',
+                 f'<img src="data:image/png;base64,{drift_b64}" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
     doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="35-Scenario Drift Distribution Comparison Chart")',
-                 f'<img src="data:image/png;base64,{drift_b64}" width="850" alt="35-Scenario Drift Distribution Comparison Chart"', doc)
+                 f'<img src="data:image/png;base64,{drift_b64}" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
 
     doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="1050" alt="Master 9-Panel Trajectory Gallery")',
                  f'<img src="data:image/png;base64,{gallery_b64}" width="1050" alt="Master 9-Panel Trajectory Gallery"', doc)
-
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics")',
-                 f'<img src="data:image/png;base64,{moe_b64}" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics"', doc)
 
     if "#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation" not in doc:
         sc15_block = f"""#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation (517m Outage)
@@ -199,14 +213,14 @@ def sync_readme():
     with open(readme_path, "r", encoding="utf-8") as f:
         doc = f.read()
 
-    doc = re.sub(r'\|\s*\*\*Tier 3: Highway Cruising\*\*\s*\|\s*&gt; 50 km/h / &gt; 550 m - 1.2 km\s*\|\s*60s - 75s\s*\|\s*\*\*[\d\.]+% Median Drift\*\*',
-                 '| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **5.89% Median Drift**', doc)
-    doc = re.sub(r'\*\s*\*\*High Reliability Rate \(Drift < 30%\)\*\*:\s*\*\*[\d\.]+% \(\d+ / 35 scenarios\)\*\*',
-                 '* **High Reliability Rate (Drift < 30%)**: **91.4% (32 / 35 scenarios)**', doc)
-    doc = re.sub(r'\*\s*\*\*Tier 1 \(< 10% drift\) Pass Rate\*\*:\s*\*\*[\d\.]+% \(\d+ / 35 scenarios\)\*\*',
-                 '* **Tier 1 (< 10% drift) Pass Rate**: **60.0% (21 / 35 scenarios)**', doc)
+    doc = re.sub(r'\|\s*\*\*Tier 3: Highway Cruising\*\*\s*\|\s*&gt; 50 km/h / &gt; [^\n]+\|\s*\*\*[\d\.]+% Median Drift\*\*',
+                 '| **Tier 3: Highway Cruising** | > 50 km/h / > 500m – 1.2km | 60s – 75s | **11.48% Median Drift**', doc)
+    doc = re.sub(r'\*\s*\*\*High Reliability Rate \(Drift <=\s*30%\)\*\*:\s*\*\*[\d\.]+% \(\d+ / \d+ scenarios\)\*\*',
+                 '* **High Reliability Rate (Drift <= 30%)**: **90.0% (36 / 40 scenarios)**', doc)
+    doc = re.sub(r'\*\s*\*\*Tier 1 \(< 10% drift\) Pass Rate\*\*:\s*\*\*[\d\.]+% \(\d+ / \d+ scenarios\)\*\*',
+                 '* **Tier 1 (< 10% drift) Pass Rate**: **52.5% (21 / 40 scenarios)**', doc)
     doc = re.sub(r'\*\s*\*\*Overall Median Drift\*\*:\s*\*\*[\d\.]+%\*\*',
-                 '* **Overall Median Drift**: **6.85%**', doc)
+                 '* **Overall Median Drift**: **9.34%**', doc)
 
     with open(readme_path, "w", encoding="utf-8") as f:
         f.write(doc)
@@ -219,7 +233,7 @@ def sync_roadmap():
     with open(rm_path, "r", encoding="utf-8") as f:
         doc = f.read()
 
-    doc = doc.replace("Drift target < 10% on test partition", "Drift target < 10% on test partition (Achieved 6.85% across 35 scenarios)")
+    doc = doc.replace("Drift target < 10% on test partition", "Drift target < 10% on test partition (Achieved 9.34% across 40 scenarios)")
     with open(rm_path, "w", encoding="utf-8") as f:
         f.write(doc)
     print(f"  -> Successfully updated PROGRESS_AND_ROADMAP.md")

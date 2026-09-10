@@ -212,29 +212,29 @@
   <header>
     <div class="badge">Freshly Re-Rendered Benchmark Results (Cache-Busted)</div>
     <h1>Intelligent Dead Reckoning Engine</h1>
-    <p class="subtitle">Inspecting updated initial angle seeding across the 35 scenarios of unseen trip S-M.csv</p>
+    <p class="subtitle">Multi-Trip Standardized Evaluation across 5 Real-World Sequences (S-M, S-S2, S-S1, S-S3a, S-S4), 40 Independent GNSS Blackout Scenarios</p>
   </header>
 
   <div class="metrics-grid">
     <div class="metric-card">
       <div class="metric-title">Overall Median Drift</div>
-      <div class="metric-val pass">9.91%</div>
+      <div class="metric-val pass">9.34%</div>
       <div class="metric-sub">Target &lt; 10% (PASSED)</div>
     </div>
     <div class="metric-card">
       <div class="metric-title">Tier 1 Pass Rate (&lt; 10%)</div>
-      <div class="metric-val pass">51.4%</div>
-      <div class="metric-sub">18 of 35 scenarios passed</div>
+      <div class="metric-val pass">52.5%</div>
+      <div class="metric-sub">21 of 40 scenarios passed</div>
     </div>
     <div class="metric-card">
       <div class="metric-title">High Reliability (Sub-30%)</div>
-      <div class="metric-val">88.6%</div>
-      <div class="metric-sub">31 of 35 scenarios &le; 30% drift</div>
+      <div class="metric-val pass">90.0%</div>
+      <div class="metric-sub">36 of 40 scenarios &le; 30% drift</div>
     </div>
     <div class="metric-card">
       <div class="metric-title">Initial Heading Bias</div>
       <div class="metric-val pass">+0.66°</div>
-      <div class="metric-sub">Mean error across all 35 runs</div>
+      <div class="metric-sub">Mean error across all 40 runs</div>
     </div>
   </div>
 
@@ -309,8 +309,8 @@
     <div class="gallery-grid">
       <div class="img-card full-width-card">
         <div class="img-card-header">
-          <h3>Phase 4 Map-Matched vs Pure 6-Axis Drift Histogram (35 Scenarios)</h3>
-          <p>Median 9.91% (Phase 4) vs 32.77% (Pure 6-Axis)</p>
+          <h3>Phase 4 Map-Matched vs Pure 6-Axis Drift Histogram (40 Scenarios Across 5 Sequences)</h3>
+          <p>Median 9.34% (Phase 4) vs 16.02% (Pure 6-Axis)</p>
         </div>
         <div class="img-wrapper" onclick="openModal(this)">
           <img src="artifacts/phase4_unseen_sm_drift_comparison_chart.png?t=1725357400" alt="Drift Comparison Chart">

@@ -1,7 +1,7 @@
 # Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
 ## Final Judge Evaluation & Architectural Benchmark Report
 
-**Generated:** 2026-09-09 19:13:59 UTC  
+**Generated:** 2026-09-10 05:33:30 UTC  
 **Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 **Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
 
