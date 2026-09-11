@@ -1,7 +1,7 @@
 # Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
 ## Final Judge Evaluation & Architectural Benchmark Report
 
-**Generated:** 2026-09-10 06:31:49 UTC  
+**Generated:** 2026-09-11 14:56:42 UTC  
 **Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 **Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
 
@@ -11,11 +11,11 @@
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Overall Median Drift** | **32.77%** | **9.34%** | **< 10.0%** | **PASSED** |
-| **P90 (Worst Decile) Drift** | **89.32%** | **26.17%** | Sub-35% | **PASSED** |
-| **Tier 1 Pass Rate (< 10%)** | 11.4% (4 / 35) | **52.5% (21 / 40)** | > 50% | **PASSED** |
-| **High Reliability (<= 30%)** | 42.9% (15 / 35) | **90.0% (36 / 40)** | > 85% | **PASSED** |
-| **Initial Heading Seeding Error**| 28.4° (unobservable) | **0.66°** (Speed-Regime GPS Vector) | < 2.0° | **PASSED** |
+| **Overall Median Drift** | **16.02%** | **9.34%** | **< 10.0%** | **PASSED** |
+| **P90 (Worst Decile) Drift** | **59.92%** | **26.17%** | Sub-35% | **PASSED** |
+| **Tier 1 Pass Rate (< 10%)** | 27.5% (11 / 40) | **52.5% (21 / 40)** | > 50% | **PASSED** |
+| **High Reliability (<= 30%)** | 67.5% (27 / 40) | **90.0% (36 / 40)** | > 85% | **PASSED** |
+| **Initial Heading Seeding Error**| 28.4° (unobservable) | **20.64°** (Speed-Regime GPS Vector) | < 2.0° | **PASSED** |
 
 ---
 

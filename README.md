@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-36%2F36%20Passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-37%2F37%20Passing-brightgreen.svg)](tests/)
 [![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![Evaluation](https://img.shields.io/badge/Multi--Trip%20(40%20Scenarios)-9.34%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -112,8 +112,21 @@ IMUSample -> CalibratedSample -> VelocityEstimate -> FusedPosition -> MatchedPos
  │ Stage 5: Topological Map-Matching Engine                │
  │ - Spatial Hash Grid Index (O(1) Polyline Retrieval)     │
  │ - Multi-Feature Gaussian Likelihood (Perp Dist + Azim)  │
- │ - Dynamic Turn-Inflated Heading Covariance (sigma >= 45°)   │
+ │ - Dynamic Turn-Inflated Heading Covariance (sigma >= 45°)│
  │ - Branch Fork Gating & Graceful Off-Road Fallback       │
+ └───────────┬─────────────────────────────────────────────┘
+             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │ Stage 6: Seamless GNSS <-> INS Handoff State Machine    │
+ │ - 6-State FSM (Quarantine, Blend, Verify, Healthy)      │
+ │ - Statistical Chi-Square NIS & Kinematic Velocity Gate  │
+ │ - Zero-Jump C^2 Hermite Spline Blending (0.0000m Jump)  │
+ └───────────┬─────────────────────────────────────────────┘
+             ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │ Stage 7: Indian Road Vector Ingestion & Spatial Cache   │
+ │ - PMGSY / ISRO Bhuvan / OSM Vector Ingestion            │
+ │ - 0.05° Tiled Spatial Cache with Predictive Prefetch    │
  └───────────┬─────────────────────────────────────────────┘
              ▼
  ┌─────────────────────────────────────────────────────────┐
@@ -174,7 +187,7 @@ Speed Head: Forward Speed v    Variance Head: log(sigma^2)
   ```
   Loss = MSE(v_hat, v_GT) + 2.0 * ((sum(v_hat) / sum(v_GT)) - 1.0)^2 + 0.5 * HighSpeedPenalty
   ```
-* **Speed Scale Ratio**: Achieves an exact **1.00x ratio** on unseen test data with **RMSE = 0.963 m/s**.
+* **Speed Scale Ratio**: Achieves an exact **1.00x ratio** on unseen test data with **Validation RMSE = 3.57 m/s (MoE) / 4.23 m/s (TCN)**, anchored dynamically to pavement texture via pre-blackout scale adaptation.
 
 ---
 
@@ -340,8 +353,8 @@ Progression chart demonstrating error reduction from Naive Baseline to Productio
 
 ![4-Stage Progression](artifacts/comprehensive_4stage_benchmark_chart.png)
 
-#### Unseen S-M Drift Percentage Distribution
-Drift distribution across all 35 evaluated blackout scenarios:
+#### Multi-Trip Drift Percentage Distribution
+Drift distribution across all 40 evaluated blackout scenarios:
 
 ![Drift Comparison Chart](artifacts/phase4_unseen_sm_drift_comparison_chart.png)
 
@@ -494,6 +507,8 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   │   └── mount.py                   # Stage 1: Dynamic 3D Mount Auto-Calibrator
 │   ├── models/
 │   │   ├── tcn_attention.py           # Stage 2: Dilated TCN + Self-Attention Model
+│   │   ├── resnet1d.py                # ResNet1D Feature Extractor
+│   │   ├── moe_fusion.py              # Mixture-of-Experts Dual-Expert Fusion Model
 │   │   └── dataset.py                 # Vectorized window builder + SO(3) data augmentation
 │   ├── velocity/
 │   │   └── ai_estimator.py            # Neural velocity inference wrapper
@@ -503,6 +518,7 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   ├── map/
 │   │   ├── network.py                 # Stage 5: RoadNetwork spatial grid & polylines
 │   │   ├── matcher.py                 # Stage 5: HMM Gaussian map-matching & fork gating
+│   │   ├── governor.py                # Closed-loop road curvature & turn speed governor
 │   │   ├── provider.py                # IRoadNetworkProvider interface & metadata
 │   │   ├── cache.py                   # SpatialDiskCache: 0.05° grid tiling & LRU memory cache
 │   │   ├── osm_client.py              # OSMOverpassClient: live road geometry query & fallback
@@ -522,23 +538,32 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   │   ├── geo.py                     # Geodetic WGS84 <-> ENU <-> ECEF transforms
 │   │   ├── loader.py                  # Robust CSV stream loader & interpolator
 │   │   ├── schema.py                  # IO-VNBD column definitions
+│   │   ├── split.py                   # 3-way purged & embargoed trip partitioning
+│   │   ├── vibration.py               # 6-channel vibration conditioner & bandpass filter
+│   │   ├── spectral.py                # Dual-band FFT spectral feature extractor
 │   │   └── downloader.py              # Automated dataset ingestion
 │   └── eval/
-│       ├── metrics.py                 # RMSE, max error, along/cross-track decomposition
+│       ├── metrics.py                 # Standardized drift, RMSE, MAE & along/cross-track decomposition
 │       └── benchmark.py               # Simulated blackout evaluation harness
+├── engine/
+│   └── cpp/                           # Standalone 200 Hz Embedded C++ Core
+│       ├── idr_core.h                 # Pure C++ 15-state ES-EKF header
+│       ├── idr_core.cpp               # C++ implementation with zero external dependencies
+│       └── idr_core.dll               # Compiled telematics dynamic library
 ├── benchmarks/
-│   ├── run_final_benchmark.py         # Master 35-scenario production benchmark & report generator
+│   ├── run_final_benchmark.py         # Master 40-scenario production benchmark & report generator
 │   ├── run_naive_baseline.py          # Phase 1 baseline runner
 │   ├── run_phase2_es_ekf.py           # Phase 2 kinematic EKF runner
 │   └── run_phase3_ai_fusion.py        # Phase 3 AI velocity runner
 ├── models/
 │   └── checkpoints/
-│       └── best_velocity_model.pt     # Trained PyTorch model weights (Val RMSE 0.963 m/s)
+│       ├── best_moe_velocity_model.pt # Trained MoE model weights (Val RMSE 3.57 m/s)
+│       └── best_velocity_model.pt     # Trained TCN baseline model weights (Val RMSE 4.23 m/s)
 ├── data/
-│   ├── raw/iovnbd_trips/              # IO-VNBD real-world driving sequences (S-S1, S-S2, S-M)
+│   ├── raw/iovnbd_trips/              # IO-VNBD real-world driving sequences (S-S1, S-S2, S-M, S-S3a, S-S4)
 │   └── maps/                          # Local GIS vectors and offline spatial tile cache
 ├── artifacts/                         # Benchmark charts, 9-panel galleries, spotlight maps (.png)
-├── tests/                             # Unit & integration test suite (36/36 passing)
+├── tests/                             # Unit & integration test suite (37/37 passing)
 ├── train_velocity_model.py            # GPU neural velocity model training script
 ├── benchmark_dashboard.html           # Standalone interactive browser visual dashboard
 ├── FINAL_JUDGE_EVALUATION_REPORT.md   # Official comprehensive judge evaluation report (Base64 embedded)
@@ -574,14 +599,14 @@ pip install numpy scipy pandas matplotlib
 ### Running Automated Tests
 
 ```bash
-# Execute the complete unit test suite (36/36 passing)
+# Execute the complete unit test suite (37/37 passing)
 python -m unittest discover tests/
 ```
 
-### Reproducing the Master 35-Scenario Benchmark
+### Reproducing the Master 40-Scenario Benchmark
 
 ```bash
-# Runs production pipeline on unseen held-out drive S-M.csv and regenerates all reports
+# Runs production pipeline across 5 real sequences (40 scenarios) and regenerates all reports
 python benchmarks/run_final_benchmark.py
 ```
 
@@ -595,8 +620,8 @@ Open [`benchmark_dashboard.html`](benchmark_dashboard.html) directly in any web 
 To ensure complete transparency and reproducibility before expert evaluation panels, this repository enforces strict scientific guidelines:
 
 1. **Pure Inertial Hardware Integrity**: Operates strictly on 6-axis IMU (accelerometer + gyroscope) and GNSS. Zero camera video shortcuts (phones in pockets, dashboards, or bags have no line of sight).
-2. **Trip-Level Sequence Partitioning**: **Zero row-level data leakage**. The neural velocity estimator is trained exclusively on `S-S1.csv` and `S-S2.csv`, and evaluated out-of-sample on unseen `S-M.csv`.
-3. **Complete Raw Data Availability**: Full scenario-by-scenario metrics are published in [`artifacts/50_scenarios_raw_results.csv`](artifacts/50_scenarios_raw_results.csv) and [`artifacts/master_phase4_benchmark_summary.csv`](artifacts/master_phase4_benchmark_summary.csv).
+2. **Trip-Level Sequence Partitioning & Purged Embargo Protocol**: **Zero row-level data leakage**. Driving sequences are partitioned strictly by trip or via 3-way purged & embargoed partitions (60% Train, 20% Val, 20% Benchmark) with 15-second boundary purge buffers to prevent leakage across sequence transitions. Completely unseen test drives (`S-S3a.csv`, `S-S4.csv`) are evaluated with zero model fine-tuning.
+3. **Complete Raw Data Availability**: Full scenario-by-scenario metrics are published in [`artifacts/phase4_multi_trip_benchmark_results.csv`](artifacts/phase4_multi_trip_benchmark_results.csv) and [`artifacts/phase4_unseen_sm_benchmark_results.csv`](artifacts/phase4_unseen_sm_benchmark_results.csv).
 4. **Self-Contained Evaluation Artifacts**: Both [`FINAL_JUDGE_EVALUATION_REPORT.md`](FINAL_JUDGE_EVALUATION_REPORT.md) and [`FINAL_JUDGE_EVALUATION_REPORT.html`](FINAL_JUDGE_EVALUATION_REPORT.html) embed base64-encoded visual maps and tables requiring zero external assets or internet connectivity.
 
 ---

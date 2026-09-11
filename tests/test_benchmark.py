@@ -68,6 +68,46 @@ class TestBenchmarkHarness(unittest.TestCase):
         self.assertAlmostEqual(res.blackout_duration_s, 30.0, delta=1.0)
         self.assertAlmostEqual(res.blackout_distance_m, 300.0, delta=10.0)
 
+    def test_metrics_calculations(self):
+        from sih.eval.metrics import (
+            compute_drift_percentage,
+            compute_rmse,
+            compute_mae,
+            decompose_along_cross_track,
+            evaluate_blackout_metrics,
+        )
+
+        # Drift percentage: 10m error over 100m distance = 10%
+        drift = compute_drift_percentage(10.0, 100.0)
+        self.assertAlmostEqual(drift, 10.0, places=4)
+
+        # Zero distance guard
+        self.assertEqual(compute_drift_percentage(10.0, 0.0), 0.0)
+
+        # RMSE and MAE
+        pred = np.array([1.0, 2.0, 3.0])
+        gt = np.array([1.0, 3.0, 5.0])
+        self.assertAlmostEqual(compute_mae(pred, gt), 1.0, places=4)
+        self.assertAlmostEqual(compute_rmse(pred, gt), np.sqrt(5.0 / 3.0), places=4)
+
+        # Along-track and cross-track decomposition
+        # Vehicle drives East from (0, 0) to (100, 0)
+        gt_track = np.column_stack([np.linspace(0, 100, 50), np.zeros(50)])
+        # Estimate leads by 5m (East) and deviates 2m North (Left)
+        est_track = np.column_stack([np.linspace(5, 105, 50), np.full(50, 2.0)])
+
+        along, cross = decompose_along_cross_track(est_track, gt_track)
+        self.assertEqual(len(along), 50)
+        self.assertEqual(len(cross), 50)
+        self.assertAlmostEqual(along[25], 5.0, delta=0.1)
+        self.assertAlmostEqual(cross[25], 2.0, delta=0.1)
+
+        # Full blackout metrics evaluation
+        metrics = evaluate_blackout_metrics(est_track, gt_track, distance_m=100.0)
+        self.assertAlmostEqual(metrics["drift_pct"], np.hypot(5.0, 2.0) / 100.0 * 100.0, delta=0.1)
+        self.assertAlmostEqual(metrics["along_track_rmse_m"], 5.0, delta=0.1)
+        self.assertAlmostEqual(metrics["cross_track_rmse_m"], 2.0, delta=0.1)
+
 
 if __name__ == "__main__":
     unittest.main()

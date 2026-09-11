@@ -294,7 +294,7 @@ To transition from the verified Python algorithm to a production-ready system fo
 | :--- | :--- | :--- | :--- |
 | **Phase 1: Contracts & Loaders** | [`sih/core/contracts.py`](file:///c:/Users/carpe/SIH/sih/core/contracts.py) | Completed | Schema-flexible loading on real IO-VNBD trips |
 | **Phase 2: 15-State ES-EKF + NHC** | [`sih/fusion/es_ekf.py`](file:///c:/Users/carpe/SIH/sih/fusion/es_ekf.py) | Completed | Drift reduced from 424% down to 178% |
-| **Phase 3: AI Velocity Model** | [`sih/models/tcn_attention.py`](file:///c:/Users/carpe/SIH/sih/models/tcn_attention.py) | Completed | Validation Speed RMSE: 0.082 m/s (0.29 km/h) |
+| **Phase 3: AI Velocity Model** | [`sih/models/tcn_attention.py`](file:///c:/Users/carpe/SIH/sih/models/tcn_attention.py) | Completed | Validation Speed RMSE: 3.57 m/s (MoE) / 4.23 m/s (TCN), dynamic scale anchored |
 | **Phase 4: Mount Auto-Calibration** | [`sih/calibration/mount.py`](file:///c:/Users/carpe/SIH/sih/calibration/mount.py) | Completed | Azimuth bias reduced to 0.66 degrees |
 | **Stage 5: Map Matcher & Governor** | [`sih/map/matcher.py`](file:///c:/Users/carpe/SIH/sih/map/matcher.py) | Completed | Median Drift 9.34% across 40 real scenarios |
 | **Phase 6: Seamless GNSS Handoff** | [`sih/handoff/manager.py`](file:///c:/Users/carpe/SIH/sih/handoff/manager.py) | Completed | 0.0000 m exit jump; 100% parameter freeze |

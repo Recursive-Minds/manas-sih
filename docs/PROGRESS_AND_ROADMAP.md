@@ -48,7 +48,7 @@
 - **Architecture**: **TCN-Attention Hybrid (`TCNAttentionVelocityModel`)**
   - Dilated 1D convolutions + Multi-Head Self-Attention + Dual Regression Heads (v_hat and sigma_v^2).
   - Trained on GPU (NVIDIA RTX 4060) using Heteroscedastic Gaussian NLL loss.
-  - Validation Speed RMSE: **0.082 m/s (0.29 km/h)**.
+  - Validation Speed RMSE: **3.57 m/s (MoE) / 4.23 m/s (TCN-Attention baseline)**, with dynamic pre-blackout scaling anchoring predicted forward speed to pavement conditions.
   - Model Size: **1.2 MB** (311,234 parameters), inference time: **< 1.0 ms** on CPU.
 - **Code & Artifacts**:
   - `sih/models/tcn_attention.py`: PyTorch model definition.
