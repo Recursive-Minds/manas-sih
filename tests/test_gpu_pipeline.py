@@ -99,23 +99,5 @@ class TestGPUPipeline(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(feats)))
 
 
-    def test_kinematic_residual_delta_v_loss(self):
-        from sih.models.losses import l_kinematic_residual_delta_v
-
-        # Case 1: Physics consistent (v_pred matches v_start + delta_v_accel)
-        v_pred = torch.tensor([12.0, 15.0], device=self.device)
-        v_start = torch.tensor([10.0, 15.0], device=self.device)
-        dv_accel = torch.tensor([2.0, 0.0], device=self.device)
-        loss_ideal = l_kinematic_residual_delta_v(v_pred, v_start, dv_accel, max_grade_mps=2.5)
-        self.assertAlmostEqual(loss_ideal.item(), 0.0, places=4)
-
-        # Case 2: Unphysical acceleration without inertial force
-        v_unphysical = torch.tensor([25.0], device=self.device)
-        v_start_0 = torch.tensor([10.0], device=self.device)
-        dv_zero = torch.tensor([0.0], device=self.device)
-        loss_bad = l_kinematic_residual_delta_v(v_unphysical, v_start_0, dv_zero, max_grade_mps=2.5)
-        self.assertGreater(loss_bad.item(), 100.0)
-
-
 if __name__ == "__main__":
     unittest.main()

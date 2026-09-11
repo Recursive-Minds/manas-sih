@@ -137,29 +137,6 @@ def balanced_velocity_loss(
     return mse + w_scale * scale_penalty + 0.5 * high_speed_err + w_dyn * dyn_loss + 0.1 * var_loss
 
 
-def l_kinematic_residual_delta_v(
-    v_pred: torch.Tensor,
-    v_start: torch.Tensor,
-    delta_v_accel: torch.Tensor,
-    max_grade_mps: float = 2.5,
-) -> torch.Tensor:
-    """Physics-Informed Kinematic Residual Delta-V Loss.
-
-    Enforces dv/dt = a_fwd over the short window (2.0s). Penalises predictions that
-    contradict specific force integration beyond realistic road pitch bounds.
-    """
-    p = v_pred.view(-1)
-    vs = v_start.view(-1)
-    dv_kin = delta_v_accel.view(-1)
-    if len(p) == 0:
-        return torch.tensor(0.0, device=v_pred.device, dtype=v_pred.dtype)
-
-    pred_delta_v = p - vs
-    residual = pred_delta_v - dv_kin
-    excess = torch.clamp(torch.abs(residual) - max_grade_mps, min=0.0)
-    return torch.mean(excess ** 2) + 0.15 * torch.mean(residual ** 2)
-
-
 def phase55_balanced_loss(
     v_fused: torch.Tensor,
     var_fused: torch.Tensor,
@@ -172,13 +149,10 @@ def phase55_balanced_loss(
     w_yaw: Optional[torch.Tensor] = None,
     class_logits: Optional[torch.Tensor] = None,
     motion_labels: Optional[torch.Tensor] = None,
-    v_start: Optional[torch.Tensor] = None,
-    delta_v_accel: Optional[torch.Tensor] = None,
     w_dyn: float = 2.0,
     w_cls: float = 0.2,
-    w_delta_v: float = 0.25,
 ) -> torch.Tensor:
-    """Multi-objective balanced loss for Dual-Expert MoE Fusion with Physics Delta-V."""
+    """Multi-objective balanced loss for Dual-Expert MoE Fusion."""
     loss_fused = F.smooth_l1_loss(v_fused, v_gt, beta=1.0)
     loss_res = F.smooth_l1_loss(v_res, v_gt, beta=1.0)
     loss_tcn = F.smooth_l1_loss(v_tcn, v_gt, beta=1.0)
@@ -213,14 +187,10 @@ def phase55_balanced_loss(
 
     if a_lat is not None and w_yaw is not None:
         loss_cent = l_centripetal(v_fused, a_lat, w_yaw)
-        loss_total += 0.10 * loss_cent
+        loss_total += 0.05 * loss_cent
 
     if class_logits is not None and motion_labels is not None:
         loss_cls = F.cross_entropy(class_logits, motion_labels)
         loss_total += w_cls * loss_cls
-
-    if v_start is not None and delta_v_accel is not None:
-        loss_dv = l_kinematic_residual_delta_v(v_fused, v_start, delta_v_accel)
-        loss_total += w_delta_v * loss_dv
 
     return loss_total
