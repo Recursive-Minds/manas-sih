@@ -264,6 +264,8 @@ class MultiScaleMoEDataset(Dataset):
                 w_long = feats[i : i + long_len]
                 w_short = feats[i + long_len - short_len : i + long_len]
                 target_v = float(interp_speeds[i + long_len - 1])
+                v_start = float(interp_speeds[i + long_len - short_len])
+                delta_v_accel = float(np.sum(f_accel[i + long_len - short_len : i + long_len, 0]) * 0.1)
                 a_lat = float(f_accel[i + long_len - 1, 1])
                 w_yaw = float(f_gyro[i + long_len - 1, 2])
 
@@ -275,7 +277,7 @@ class MultiScaleMoEDataset(Dataset):
                 else:
                     motion_label = 1
 
-                self.samples.append((w_short, w_long, target_v, a_lat, w_yaw, motion_label))
+                self.samples.append((w_short, w_long, target_v, a_lat, w_yaw, motion_label, v_start, delta_v_accel))
 
         if len(all_features) > 0:
             concat_all = np.vstack(all_features)
@@ -293,7 +295,7 @@ class MultiScaleMoEDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int):
-        w_short, w_long, target_v, a_lat, w_yaw, motion_label = self.samples[idx]
+        w_short, w_long, target_v, a_lat, w_yaw, motion_label, v_start, delta_v_accel = self.samples[idx]
 
         w_s = w_short.copy()  # (short_len, C)
         w_l = w_long.copy()   # (long_len, C)
@@ -329,6 +331,92 @@ class MultiScaleMoEDataset(Dataset):
         alat_tensor = torch.tensor([a_lat], dtype=torch.float32)
         wyaw_tensor = torch.tensor([w_yaw], dtype=torch.float32)
         motion_label_tensor = torch.tensor(motion_label, dtype=torch.long)
+        v_start_tensor = torch.tensor([v_start], dtype=torch.float32)
+        delta_v_accel_tensor = torch.tensor([delta_v_accel], dtype=torch.float32)
 
-        return x_short, x_long, target_v_tensor, alat_tensor, wyaw_tensor, motion_label_tensor
+        return (
+            x_short,
+            x_long,
+            target_v_tensor,
+            alat_tensor,
+            wyaw_tensor,
+            motion_label_tensor,
+            v_start_tensor,
+            delta_v_accel_tensor,
+        )
+
+    def get_gpu_tensors(self, device: torch.device):
+        """Preload all windows directly into contiguous GPU VRAM."""
+        if len(self.samples) == 0:
+            return None
+        w_s = np.array([s[0] for s in self.samples], dtype=np.float32)  # (N, short_len, C)
+        w_l = np.array([s[1] for s in self.samples], dtype=np.float32)  # (N, long_len, C)
+        target_v = np.array([s[2] for s in self.samples], dtype=np.float32).reshape(-1, 1)
+        alat = np.array([s[3] for s in self.samples], dtype=np.float32).reshape(-1, 1)
+        wyaw = np.array([s[4] for s in self.samples], dtype=np.float32).reshape(-1, 1)
+        mlabel = np.array([s[5] for s in self.samples], dtype=np.int64)
+        vstart = np.array([s[6] for s in self.samples], dtype=np.float32).reshape(-1, 1)
+        dvinteg = np.array([s[7] for s in self.samples], dtype=np.float32).reshape(-1, 1)
+
+        t_s = torch.from_numpy(w_s).permute(0, 2, 1).contiguous().float().to(device)  # (N, C, short_len)
+        t_l = torch.from_numpy(w_l).permute(0, 2, 1).contiguous().float().to(device)  # (N, C, long_len)
+        t_v = torch.from_numpy(target_v).float().to(device)
+        t_alat = torch.from_numpy(alat).float().to(device)
+        t_wyaw = torch.from_numpy(wyaw).float().to(device)
+        t_mlabel = torch.from_numpy(mlabel).to(device)
+        t_vstart = torch.from_numpy(vstart).float().to(device)
+        t_dvinteg = torch.from_numpy(dvinteg).float().to(device)
+        mean_t = torch.from_numpy(self.mean.astype(np.float32)).view(1, -1, 1).to(device)
+        std_t = torch.from_numpy(self.std.astype(np.float32)).view(1, -1, 1).to(device)
+
+        return (t_s, t_l, t_v, t_alat, t_wyaw, t_mlabel, t_vstart, t_dvinteg, mean_t, std_t)
+
+
+def batch_so3_augment_cuda(
+    b_s: torch.Tensor,
+    b_l: torch.Tensor,
+    rot_aug_rad: float = 0.2618,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Vectorized 3D SO(3) random rotation perturbation and sensor noise on CUDA."""
+    B = b_s.shape[0]
+    device = b_s.device
+    dtype = b_s.dtype
+
+    angles = (torch.rand(B, 3, device=device, dtype=dtype) * 2.0 - 1.0) * rot_aug_rad
+    cx, cy, cz = torch.cos(angles[:, 0]), torch.cos(angles[:, 1]), torch.cos(angles[:, 2])
+    sx, sy, sz = torch.sin(angles[:, 0]), torch.sin(angles[:, 1]), torch.sin(angles[:, 2])
+
+    R_mat = torch.empty((B, 3, 3), device=device, dtype=dtype)
+    R_mat[:, 0, 0] = cy * cz
+    R_mat[:, 0, 1] = cz * sx * sy - cx * sz
+    R_mat[:, 0, 2] = cx * cz * sy + sx * sz
+    R_mat[:, 1, 0] = cy * sz
+    R_mat[:, 1, 1] = cx * cz + sx * sy * sz
+    R_mat[:, 1, 2] = -cz * sx + cx * sy * sz
+    R_mat[:, 2, 0] = -sy
+    R_mat[:, 2, 1] = cy * sx
+    R_mat[:, 2, 2] = cx * cy
+
+    s_out = b_s.clone()
+    l_out = b_l.clone()
+
+    # Rotate 3-axis accel (0:3) and 3-axis gyro (3:6)
+    s_out[:, :3, :] = torch.bmm(R_mat, s_out[:, :3, :])
+    s_out[:, 3:6, :] = torch.bmm(R_mat, s_out[:, 3:6, :])
+    l_out[:, :3, :] = torch.bmm(R_mat, l_out[:, :3, :])
+    l_out[:, 3:6, :] = torch.bmm(R_mat, l_out[:, 3:6, :])
+
+    # Sensor jitter
+    s_out[:, :3, :] += torch.randn_like(s_out[:, :3, :]) * 0.02
+    s_out[:, 3:6, :] += torch.randn_like(s_out[:, 3:6, :]) * 0.005
+    l_out[:, :3, :] += torch.randn_like(l_out[:, :3, :]) * 0.02
+    l_out[:, 3:6, :] += torch.randn_like(l_out[:, 3:6, :]) * 0.005
+
+    # Recompute magnitudes
+    s_out[:, 6:7, :] = torch.norm(s_out[:, :3, :], dim=1, keepdim=True)
+    s_out[:, 7:8, :] = torch.norm(s_out[:, 3:6, :], dim=1, keepdim=True)
+    l_out[:, 6:7, :] = torch.norm(l_out[:, :3, :], dim=1, keepdim=True)
+    l_out[:, 7:8, :] = torch.norm(l_out[:, 3:6, :], dim=1, keepdim=True)
+
+    return s_out, l_out
 

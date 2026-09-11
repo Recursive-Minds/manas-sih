@@ -294,84 +294,153 @@ def train_moe_pipeline(args, device: torch.device, trips):
 
     ckpt_path = os.path.join(args.checkpoint_dir, "best_moe_velocity_model.pt")
 
+    if device.type == "cuda":
+        print("  [GPU Optimization] Preloading entire dataset directly to GPU VRAM for 100% GPU utilization...")
+        from sih.models.dataset import batch_so3_augment_cuda
+        t_s, t_l, t_v, t_alat, t_wyaw, t_mlabel, t_vstart, t_dvinteg, mean_t, std_t = train_ds.get_gpu_tensors(device)
+        v_s, v_l, v_v, _, _, _, _, _, _, _ = val_ds.get_gpu_tensors(device)
+        v_s_norm = (v_s - mean_t) / std_t
+        v_l_norm = (v_l - mean_t) / std_t
+
+        N_train = t_s.shape[0]
+        batch_size = args.batch_size
+        num_batches = (N_train + batch_size - 1) // batch_size
+        print(f"  [GPU Optimization] Vectorized GPU pipeline active: {N_train:,} samples, {num_batches} batches/epoch (Batch Size: {batch_size}).")
+    else:
+        train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True)
+        val_loader = DataLoader(val_ds, batch_size=args.batch_size * 2, shuffle=False)
+
     for epoch in range(1, args.epochs + 1):
-        moe_model.train()
-        train_loss_sum = 0.0
-        train_count = 0
+        if device.type == "cuda":
+            moe_model.train()
+            train_loss_sum = 0.0
+            perm = torch.randperm(N_train, device=device)
 
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch:02d}/{args.epochs:02d} [Train MoE]", leave=False, dynamic_ncols=True)
-        for b_s, b_l, b_v, b_alat, b_wyaw, b_mlabel in pbar:
-            b_s = b_s.to(device, non_blocking=True)
-            b_l = b_l.to(device, non_blocking=True)
-            b_v = b_v.to(device, non_blocking=True)
-            b_alat = b_alat.to(device, non_blocking=True)
-            b_wyaw = b_wyaw.to(device, non_blocking=True)
-            b_mlabel = b_mlabel.to(device, non_blocking=True)
+            pbar = tqdm(range(num_batches), desc=f"Epoch {epoch:02d}/{args.epochs:02d} [GPU MoE]", leave=False, dynamic_ncols=True)
+            for b_idx in pbar:
+                idx = perm[b_idx * batch_size : (b_idx + 1) * batch_size]
+                b_s_raw = t_s[idx]
+                b_l_raw = t_l[idx]
+                b_v = t_v[idx]
+                b_alat = t_alat[idx]
+                b_wyaw = t_wyaw[idx]
+                b_mlabel = t_mlabel[idx]
+                b_vstart = t_vstart[idx]
+                b_dvinteg = t_dvinteg[idx]
 
-            optimizer.zero_grad()
-            with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
+                # Fast 100% GPU SO(3) rotation augmentation and noise jitter
+                b_s_aug, b_l_aug = batch_so3_augment_cuda(b_s_raw, b_l_raw)
+                b_s = (b_s_aug - mean_t) / std_t
+                b_l = (b_l_aug - mean_t) / std_t
+
+                optimizer.zero_grad()
+                with torch.amp.autocast("cuda"):
+                    v_fused, var_fused, diag = moe_model(b_s, b_l)
+                    loss = phase55_balanced_loss(
+                        v_fused=v_fused,
+                        var_fused=var_fused,
+                        v_res=diag["v_resnet"],
+                        var_res=diag["var_resnet"],
+                        v_tcn=diag["v_tcn"],
+                        var_tcn=diag["var_tcn"],
+                        v_gt=b_v,
+                        a_lat=b_alat,
+                        w_yaw=b_wyaw,
+                        class_logits=diag["class_logits"],
+                        motion_labels=b_mlabel,
+                        v_start=b_vstart,
+                        delta_v_accel=b_dvinteg,
+                        w_dyn=2.0,
+                        w_cls=0.2,
+                        w_delta_v=0.15,
+                    )
+
+                if torch.isnan(loss) or torch.isinf(loss):
+                    optimizer.zero_grad()
+                    continue
+
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                nn.utils.clip_grad_norm_(moe_model.parameters(), max_norm=3.0)
+                scaler.step(optimizer)
+                scaler.update()
+
+                train_loss_sum += loss.item() * len(b_v)
+                pbar.set_postfix({"Loss": f"{loss.item():.4f}", "lr": f"{scheduler.get_last_lr()[0]:.1e}"})
+
+            scheduler.step()
+            train_loss = train_loss_sum / max(N_train, 1)
+
+            # Instantaneous GPU Validation on held-out trip S-M
+            moe_model.eval()
+            with torch.no_grad():
+                val_bs = batch_size * 2
+                N_val = v_s.shape[0]
+                val_num_batches = (N_val + val_bs - 1) // val_bs
+                val_sq_err_sum = 0.0
+                val_abs_err_sum = 0.0
+                total_pred_v = 0.0
+                total_gt_v = float(torch.sum(v_v).item())
+
+                for vb_idx in range(val_num_batches):
+                    v_idx = slice(vb_idx * val_bs, (vb_idx + 1) * val_bs)
+                    with torch.amp.autocast("cuda"):
+                        v_fused_val, _, _ = moe_model(v_s_norm[v_idx], v_l_norm[v_idx])
+                    v_fused_clean = torch.nan_to_num(v_fused_val, nan=0.0, posinf=35.0, neginf=0.0)
+                    diff = v_v[v_idx] - v_fused_clean
+                    val_sq_err_sum += float(torch.sum(diff ** 2).item())
+                    val_abs_err_sum += float(torch.sum(torch.abs(diff)).item())
+                    total_pred_v += float(torch.sum(v_fused_clean).item())
+
+            val_rmse = float(np.sqrt(val_sq_err_sum / max(N_val, 1)))
+            val_mae = float(val_abs_err_sum / max(N_val, 1))
+            speed_scale_ratio = total_pred_v / max(total_gt_v, 1e-4)
+
+        else:
+            # Fallback to CPU DataLoader if CUDA not available
+            moe_model.train()
+            train_loss_sum = 0.0
+            train_count = 0
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch:02d}/{args.epochs:02d} [CPU MoE]", leave=False, dynamic_ncols=True)
+            for batch in pbar:
+                b_s, b_l, b_v, b_alat, b_wyaw, b_mlabel = batch[0], batch[1], batch[2], batch[3], batch[4], batch[5]
+                b_vstart = batch[6] if len(batch) > 6 else None
+                b_dvinteg = batch[7] if len(batch) > 7 else None
+                optimizer.zero_grad()
                 v_fused, var_fused, diag = moe_model(b_s, b_l)
                 loss = phase55_balanced_loss(
-                    v_fused=v_fused,
-                    var_fused=var_fused,
-                    v_res=diag["v_resnet"],
-                    var_res=diag["var_resnet"],
-                    v_tcn=diag["v_tcn"],
-                    var_tcn=diag["var_tcn"],
-                    v_gt=b_v,
-                    a_lat=b_alat,
-                    w_yaw=b_wyaw,
-                    class_logits=diag["class_logits"],
-                    motion_labels=b_mlabel,
-                    w_dyn=2.0,
-                    w_cls=0.2,
+                    v_fused=v_fused, var_fused=var_fused, v_res=diag["v_resnet"], var_res=diag["var_resnet"],
+                    v_tcn=diag["v_tcn"], var_tcn=diag["var_tcn"], v_gt=b_v, a_lat=b_alat, w_yaw=b_wyaw,
+                    class_logits=diag["class_logits"], motion_labels=b_mlabel, v_start=b_vstart, delta_v_accel=b_dvinteg,
+                    w_dyn=2.0, w_cls=0.2, w_delta_v=0.15,
                 )
+                loss.backward()
+                nn.utils.clip_grad_norm_(moe_model.parameters(), max_norm=3.0)
+                optimizer.step()
+                train_loss_sum += loss.item() * len(b_v)
+                train_count += len(b_v)
+            scheduler.step()
+            train_loss = train_loss_sum / max(train_count, 1)
 
-            if torch.isnan(loss) or torch.isinf(loss):
-                optimizer.zero_grad()
-                continue
-
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            nn.utils.clip_grad_norm_(moe_model.parameters(), max_norm=3.0)
-            scaler.step(optimizer)
-            scaler.update()
-
-            train_loss_sum += loss.item() * len(b_v)
-            train_count += len(b_v)
-            pbar.set_postfix({"Loss": f"{loss.item():.4f}", "lr": f"{scheduler.get_last_lr()[0]:.1e}"})
-
-        scheduler.step()
-        train_loss = train_loss_sum / max(train_count, 1)
-
-        # Validation on held-out trip S-M
-        moe_model.eval()
-        val_sq_err_sum = 0.0
-        val_abs_err_sum = 0.0
-        val_count = 0
-        total_pred_v = 0.0
-        total_gt_v = 0.0
-
-        with torch.no_grad():
-            for b_s, b_l, b_v, _, _, _ in val_loader:
-                b_s = b_s.to(device, non_blocking=True)
-                b_l = b_l.to(device, non_blocking=True)
-                b_v = b_v.to(device, non_blocking=True)
-
-                with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
-                    v_fused, var_fused, _ = moe_model(b_s, b_l)
-
-                v_fused_clean = torch.nan_to_num(v_fused, nan=0.0, posinf=35.0, neginf=0.0)
-                diff = (b_v - v_fused_clean).cpu().numpy()
-                val_sq_err_sum += np.sum(diff ** 2)
-                val_abs_err_sum += np.sum(np.abs(diff))
-                val_count += len(b_v)
-                total_pred_v += float(torch.sum(v_fused_clean).cpu().item())
-                total_gt_v += float(torch.sum(b_v).cpu().item())
-
-        val_rmse = float(np.sqrt(val_sq_err_sum / max(val_count, 1)))
-        val_mae = float(val_abs_err_sum / max(val_count, 1))
-        speed_scale_ratio = total_pred_v / max(total_gt_v, 1e-4)
+            moe_model.eval()
+            val_sq_err_sum = 0.0
+            val_abs_err_sum = 0.0
+            val_count = 0
+            total_pred_v = 0.0
+            total_gt_v = 0.0
+            with torch.no_grad():
+                for batch in val_loader:
+                    v_fused, _, _ = moe_model(batch[0], batch[1])
+                    v_fused_clean = torch.nan_to_num(v_fused, nan=0.0, posinf=35.0, neginf=0.0)
+                    diff = (batch[2] - v_fused_clean).numpy()
+                    val_sq_err_sum += np.sum(diff ** 2)
+                    val_abs_err_sum += np.sum(np.abs(diff))
+                    val_count += len(batch[2])
+                    total_pred_v += float(torch.sum(v_fused_clean).item())
+                    total_gt_v += float(torch.sum(batch[2]).item())
+            val_rmse = float(np.sqrt(val_sq_err_sum / max(val_count, 1)))
+            val_mae = float(val_abs_err_sum / max(val_count, 1))
+            speed_scale_ratio = total_pred_v / max(total_gt_v, 1e-4)
 
         history["train_loss"].append(train_loss)
         history["val_rmse"].append(val_rmse)
@@ -415,7 +484,7 @@ def main():
     parser.add_argument("--model", type=str, choices=["tcn", "moe"], default="moe",
                         help="Model architecture: 'moe' (Dual-Expert Bayesian MoE) or 'tcn' (TCN-Attention)")
     parser.add_argument("--epochs", type=int, default=25, help="Number of training epochs")
-    parser.add_argument("--batch_size", type=int, default=64, help="Batch size (safe for 8GB VRAM)")
+    parser.add_argument("--batch_size", type=int, default=256, help="Batch size (256 optimal for RTX 4060 Tensor Cores)")
     parser.add_argument("--lr", type=float, default=1.5e-3, help="Learning rate")
     parser.add_argument("--weight_decay", type=float, default=1e-4, help="AdamW weight decay")
     parser.add_argument("--window_size", type=int, default=100, help="IMU window size for TCN (samples = 10s)")
