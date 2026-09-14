@@ -246,7 +246,7 @@ class ErrorStateEKF(IFusionFilter):
                         enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
                         enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
                         disp = enu_last - enu_prev
-                        if float(np.linalg.norm(disp)) > 3.0:
+                        if float(np.linalg.norm(disp)) > 1.5:
                             seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
                             is_consistent = True
                 if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
