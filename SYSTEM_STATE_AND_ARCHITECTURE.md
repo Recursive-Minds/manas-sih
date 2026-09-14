@@ -17,14 +17,17 @@ Under classical strapdown inertial navigation, integrating raw smartphone MEMS s
 
 ### 1.2 Benchmark Targets & Verified Results
 * **SIH Competition Target**: Dead Reckoning drift **< 10% of total distance travelled** during satellite blackout (< 5m drift over 50m, or < 100m over 1km).
-* **Current Production Performance**: Evaluated across **40 real-world driving scenarios** on 5 out-of-sample sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`):
-  * **Overall Median Drift**: **9.34%** (**PASSED SIH Benchmark Target < 10.0%**).
-  * **Highway Cruising (`S-M.csv`)**: **8.04% Median Drift** (Sub-10% Tier 1 Pass).
-  * **Arterial Corridors (`S-S2.csv`)**: **5.52% Median Drift** (Sub-10% Tier 1 Pass).
-  * **Urban Grid & Crawl (`S-S1.csv`)**: **9.63% Median Drift** (Sub-10% Tier 1 Pass).
-  * **Tier 1 (< 10% drift) Pass Rate**: **52.5% (21 of 40 scenarios)**.
-  * **High Reliability (<= 30% drift)**: **90.0% (36 of 40 scenarios)**.
-  * **Spotlight Scenario #35 (75s / 466m Outage)**: **3.45% drift (16.06m error)**.
+* **Current Production Performance**: Evaluated across **40 real-world driving scenarios** on 5 out-of-sample sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`) with 10 Hz physical vehicle CAN-bus wheel-speed ground truth:
+  * **Overall Median Drift**: **7.77%** (**PASSED SIH Benchmark Target < 10.0%**).
+  * **Highway Cruising (`S-M.csv`)**: **6.89% Median Drift** (Sub-10% Tier 1 Pass).
+  * **Arterial Corridors (`S-S2.csv`)**: **7.30% Median Drift** (Sub-10% Tier 1 Pass).
+  * **Urban Grid & Crawl (`S-S1.csv`)**: **13.58% Median Drift** (Near Target).
+  * **Mixed Arterial (`S-S3a.csv`)**: **11.19% Median Drift** (Near Target).
+  * **Arterial Corridors (`S-S4.csv`)**: **7.34% Median Drift** (Sub-10% Tier 1 Pass).
+  * **Tier 1 (< 10% drift) Pass Rate**: **57.5% (23 of 40 scenarios)**.
+  * **High Reliability (<= 30% drift)**: **87.5% (35 of 40 scenarios)**.
+  * **Initial Heading Seeding Error**: **0.16°** (Speed-Regime GPS Vector).
+
 
 ---
 
@@ -234,7 +237,8 @@ A critical question for real-world deployment is: **Where does self-collection o
 2. **Current Model Has High Zero-Shot Generalization**: Because our neural velocity estimator was trained with 3D SO(3) rotational data augmentation and is coupled with RLS dynamic speed scaling (`s_v`) and Rodrigues leveling, it adapts to unseen mounts out-of-the-box.
 3. **The Gold-Standard Retraining Protocol**:
    - If field evaluation on your bike shows drift > 10%, we do **not** train from scratch.
-   - We load the pre-trained champion weights `best_velocity_model.pt`.
+   - We load the pre-trained champion weights `best_moe_velocity_model.pt` (or baseline `best_velocity_model.pt`).
+
    - We freeze the early TCN convolutional feature extractors and fine-tune the attention and regression heads on 15–20 minutes of your bike's specific engine vibration data using `train_velocity_model.py`.
    - This achieves convergence in under 5 minutes on GPU without overfitting.
 

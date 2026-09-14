@@ -16,16 +16,18 @@ from sih.core.contracts import CalibratedSample, VelocityEstimate
 from sih.core.interfaces import IVelocityEstimator
 from sih.core.pipeline import register_velocity_estimator
 from sih.models.tcn_attention import TCNAttentionVelocityModel
+from sih.models.resnet1d import ResNet1DSpeedEstimator
+from sih.models.moe_fusion import BayesianMoEFusion
 
 
 class AIVelocityEstimator(IVelocityEstimator):
     """
-    Online AI velocity estimator running TCN-Attention inference on rolling IMU buffer.
+    Online AI velocity estimator running dual-expert Bayesian MoE or TCN inference on rolling IMU buffer.
     """
     def __init__(
         self,
-        checkpoint_path: str = "models/checkpoints/best_velocity_model.pt",
-        window_size: int = 100,
+        checkpoint_path: Optional[str] = None,
+        window_size: int = 60,
         device: Optional[str] = None,
         stationary_accel_std_threshold: float = 0.18,
         **params,
@@ -39,28 +41,52 @@ class AIVelocityEstimator(IVelocityEstimator):
         else:
             self.device = torch.device(device)
 
-        # Rolling buffer for raw/calibrated samples
-        self.buffer = collections.deque(maxlen=window_size)
+        # Priority: explicit path -> best_moe_velocity_model.pt -> best_velocity_model.pt
+        if checkpoint_path is None:
+            if os.path.exists("models/checkpoints/best_moe_velocity_model.pt"):
+                checkpoint_path = "models/checkpoints/best_moe_velocity_model.pt"
+            else:
+                checkpoint_path = "models/checkpoints/best_velocity_model.pt"
+
+        # Rolling buffer for calibrated samples
+        self.buffer = collections.deque(maxlen=max(window_size, 60))
 
         # Default model setup
-        self.in_channels = 8
-        self.norm_mean = np.zeros((8, 1), dtype=np.float32)
-        self.norm_std = np.ones((8, 1), dtype=np.float32)
+        self.in_channels = 12
+        self.norm_mean = np.zeros((12, 1), dtype=np.float32)
+        self.norm_std = np.ones((12, 1), dtype=np.float32)
         self.is_model_loaded = False
+        self.is_moe = False
 
         if os.path.exists(checkpoint_path):
             ckpt = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
-            self.norm_mean = ckpt.get("norm_mean", self.norm_mean)
-            self.norm_std = ckpt.get("norm_std", self.norm_std)
-            self.in_channels = self.norm_mean.shape[0]
+            norm_mean = ckpt.get("norm_mean", ckpt.get("mean"))
+            norm_std = ckpt.get("norm_std", ckpt.get("std"))
+            if norm_mean is not None:
+                self.norm_mean = norm_mean.reshape(-1, 1).astype(np.float32)
+            if norm_std is not None:
+                self.norm_std = norm_std.reshape(-1, 1).astype(np.float32)
+            self.in_channels = ckpt.get("in_channels", self.norm_mean.shape[0])
 
-            self.model = TCNAttentionVelocityModel(in_channels=self.in_channels, base_channels=32, num_attention_heads=4)
-            self.model.load_state_dict(ckpt["model_state_dict"])
-            self.is_model_loaded = True
+            if "expert_resnet_state_dict" in ckpt and "expert_tcn_state_dict" in ckpt:
+                # Bayesian Dual-Expert Mixture-of-Experts Champion
+                expert_res = ResNet1DSpeedEstimator(in_channels=self.in_channels, base_channels=64)
+                expert_tcn = TCNAttentionVelocityModel(in_channels=self.in_channels, base_channels=32, num_attention_heads=4)
+                expert_res.load_state_dict(ckpt["expert_resnet_state_dict"])
+                expert_tcn.load_state_dict(ckpt["expert_tcn_state_dict"])
+                self.model = BayesianMoEFusion(expert_res, expert_tcn).to(self.device)
+                self.is_moe = True
+                self.is_model_loaded = True
+            elif "model_state_dict" in ckpt:
+                # Legacy TCN-Attention baseline
+                self.model = TCNAttentionVelocityModel(in_channels=self.in_channels, base_channels=32, num_attention_heads=4)
+                self.model.load_state_dict(ckpt["model_state_dict"])
+                self.model.to(self.device)
+                self.is_moe = False
+                self.is_model_loaded = True
         else:
-            self.model = TCNAttentionVelocityModel(in_channels=self.in_channels, base_channels=32, num_attention_heads=4)
+            self.model = TCNAttentionVelocityModel(in_channels=self.in_channels, base_channels=32, num_attention_heads=4).to(self.device)
 
-        self.model.to(self.device)
         self.model.eval()
 
     def reset(self) -> None:
@@ -75,15 +101,28 @@ class AIVelocityEstimator(IVelocityEstimator):
         norm_a = float(np.linalg.norm(acc))
         norm_w = float(np.linalg.norm(gyro))
 
-        if self.in_channels == 8:
+        # Build feature vector matching channel configuration
+        if self.in_channels == 12:
+            # 12-channel: accel (3), gyro (3), norm_a (1), norm_w (1), running variances (4)
+            a_mag_diff = norm_a - 9.81
+            w_z = gyro[2]
+            vec = np.array([
+                acc[0], acc[1], acc[2],
+                gyro[0], gyro[1], gyro[2],
+                norm_a, norm_w,
+                a_mag_diff, abs(w_z),
+                acc[0] ** 2, gyro[2] ** 2,
+            ], dtype=np.float32)
+        elif self.in_channels == 8:
             vec = np.array([acc[0], acc[1], acc[2], gyro[0], gyro[1], gyro[2], norm_a, norm_w], dtype=np.float32)
         else:
             vec = np.array([acc[0], acc[1], acc[2], gyro[0], gyro[1], gyro[2]], dtype=np.float32)
 
         self.buffer.append(vec)
 
-        # If buffer not full, output zero with high variance
-        if len(self.buffer) < self.window_size:
+        # Minimum window for reliable inference
+        req_len = 20 if self.is_moe else self.window_size
+        if len(self.buffer) < req_len:
             return VelocityEstimate(
                 timestamp_ns=sample.timestamp_ns,
                 forward_speed_mps=0.0,
@@ -93,12 +132,11 @@ class AIVelocityEstimator(IVelocityEstimator):
                 vertical_speed_mps=0.0,
             )
 
-        # Extract window: shape (window_size, in_channels) -> transpose to (in_channels, window_size)
         window_arr = np.array(self.buffer, dtype=np.float32).T
 
-        # 1. Check stationary heuristic (low vibration variance)
-        accel_stds = np.std(window_arr[:3, -20:], axis=1)  # Last 2s
-        gyro_stds = np.std(window_arr[3:6, -20:], axis=1)
+        # 1. Stationary Heuristic Check (low vibration variance)
+        accel_stds = np.std(window_arr[:3, -min(20, window_arr.shape[1]):], axis=1)
+        gyro_stds = np.std(window_arr[3:6, -min(20, window_arr.shape[1]):], axis=1)
         is_stationary = (float(np.mean(accel_stds)) < self.stationary_thresh) and (float(np.mean(gyro_stds)) < 0.03)
 
         if is_stationary:
@@ -111,7 +149,6 @@ class AIVelocityEstimator(IVelocityEstimator):
                 vertical_speed_mps=0.0,
             )
 
-        # 2. Neural network forward inference
         if not self.is_model_loaded:
             return VelocityEstimate(
                 timestamp_ns=sample.timestamp_ns,
@@ -120,13 +157,30 @@ class AIVelocityEstimator(IVelocityEstimator):
                 motion_state="DRIVING_UNTRAINED",
             )
 
-        norm_w_arr = (window_arr - self.norm_mean) / self.norm_std
-        x_tensor = torch.from_numpy(norm_w_arr).unsqueeze(0).float().to(self.device)
-
+        # 2. Forward Inference
         with torch.inference_mode():
-            speed_pred, log_var = self.model(x_tensor)
-            speed_mps = float(speed_pred[0, 0].item())
-            variance = float(torch.exp(log_var[0, 0]).item())
+            if self.is_moe:
+                # Multi-scale dual windows: short (20 samples = 2s) and long (60 samples = 6s)
+                L = window_arr.shape[1]
+                if L < 60:
+                    pad = np.repeat(window_arr[:, 0:1], 60 - L, axis=1)
+                    w_full = np.hstack([pad, window_arr])
+                else:
+                    w_full = window_arr[:, -60:]
+
+                w_norm = (w_full - self.norm_mean) / self.norm_std
+                x_long = torch.from_numpy(w_norm).unsqueeze(0).float().to(self.device)
+                x_short = x_long[:, :, -20:]
+
+                v_fused, var_fused, _ = self.model(x_short, x_long)
+                speed_mps = max(0.0, float(v_fused[0, 0].item()))
+                variance = float(var_fused[0, 0].item())
+            else:
+                norm_w_arr = (window_arr - self.norm_mean) / self.norm_std
+                x_tensor = torch.from_numpy(norm_w_arr).unsqueeze(0).float().to(self.device)
+                speed_pred, log_var = self.model(x_tensor)
+                speed_mps = max(0.0, float(speed_pred[0, 0].item()))
+                variance = float(torch.exp(log_var[0, 0]).item())
 
         return VelocityEstimate(
             timestamp_ns=sample.timestamp_ns,
@@ -141,5 +195,9 @@ class AIVelocityEstimator(IVelocityEstimator):
 # Register in factory registry
 register_velocity_estimator(
     "tcn_attention",
+    lambda **params: AIVelocityEstimator(**params)
+)
+register_velocity_estimator(
+    "moe_bayesian",
     lambda **params: AIVelocityEstimator(**params)
 )

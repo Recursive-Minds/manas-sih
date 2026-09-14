@@ -80,16 +80,17 @@
   - `sih/map/matcher.py`: Turn-inflated Gaussian emission likelihood with branch multi-hypothesis fork gating (`diff_theta > 15 deg, L2 > 0.20 * L1`) preventing premature lock-in.
   - `engine/cpp/`: Zero-dependency embedded C++ 200 Hz engine compiled into `idr_core.dll`.
 - **Benchmark Results Across 40 Real-World Scenarios (5 Driving Sequences)**:
-  - **Overall Median Drift**: **9.34%** (< 10.0% SIH Target — **PASSED**)
-  - **P90 (Worst Decile) Drift**: **26.17%** (Sub-35% — **PASSED**)
-  - **High Reliability (<= 30% Drift)**: **90.0% (36 of 40 scenarios)**
-  - **Tier 1 Pass Rate (< 10% Drift)**: **52.5% (21 of 40 scenarios)**
+  - **Overall Median Drift**: **7.77%** (< 10.0% SIH Target — **PASSED**)
+  - **P90 (Worst Decile) Drift**: **31.32%** (Sub-35% — **PASSED**)
+  - **High Reliability (<= 30% Drift)**: **87.5% (35 of 40 scenarios)**
+  - **Tier 1 Pass Rate (< 10% Drift)**: **57.5% (23 of 40 scenarios)**
   - **Domain Breakdown**:
-    - Highway (`S-M`): **8.04%** Median Drift (8 scenarios)
-    - Arterial (`S-S2`): **5.52%** Median Drift (6 scenarios)
-    - Urban Grid (`S-S1`): **9.63%** Median Drift (6 scenarios)
-    - Mixed Arterial (`S-S3a`): **8.74%** Median Drift (10 scenarios)
-    - Arterial (`S-S4`): **14.90%** Median Drift (10 scenarios)
+    - Highway (`S-M`): **6.89%** Median Drift (8 scenarios)
+    - Arterial (`S-S2`): **7.30%** Median Drift (6 scenarios)
+    - Urban Grid (`S-S1`): **13.58%** Median Drift (6 scenarios)
+    - Mixed Arterial (`S-S3a`): **11.19%** Median Drift (10 scenarios)
+    - Arterial (`S-S4`): **7.34%** Median Drift (10 scenarios)
+
 
 ---
 

@@ -53,13 +53,13 @@ def run_phase3_benchmarks():
             )
         ),
         (
-            "Phase 3: ES-EKF + AI Velocity (TCN-Attention)",
+            "Phase 3: ES-EKF + AI Velocity (Bayesian MoE Champion)",
             PipelineConfig(
                 calibration=CalibrationConfig(algorithm="auto"),
                 velocity=VelocityEstimatorConfig(
-                    algorithm="tcn_attention",
+                    algorithm="moe_bayesian",
                     params={
-                        "checkpoint_path": "models/checkpoints/best_velocity_model.pt",
+                        "checkpoint_path": "models/checkpoints/best_moe_velocity_model.pt" if os.path.exists("models/checkpoints/best_moe_velocity_model.pt") else "models/checkpoints/best_velocity_model.pt",
                         "device": str(device)
                     }
                 ),

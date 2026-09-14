@@ -4,8 +4,11 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-37%2F37%20Passing-brightgreen.svg)](tests/)
 [![SIH Target](https://img.shields.io/badge/SIH%20Target-%3C%2010%25%20Drift-orange.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
-[![Evaluation](https://img.shields.io/badge/Multi--Trip%20(40%20Scenarios)-9.34%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
+[![Evaluation](https://img.shields.io/badge/Multi--Trip%20(40%20Scenarios)-7.77%25%20Median%20Drift-success.svg)](#4-current-phase-benchmarks-and-results-uptil-now)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+
+
 
 > **Smart India Hackathon (SIH)** -- Edge-deployable automotive navigation engine running entirely on low-cost consumer smartphone sensors (10 Hz IMU + 1 Hz GNSS). Maintains continuous, sub-lane vehicular localization during prolonged satellite outages (tunnels, urban canyons, dense canopies, underpasses) with **zero vehicle CAN-bus or OBD-II wheel wiring**.
 
@@ -317,14 +320,15 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Operational Regime | Speed & Distance Scale | Outage Duration | Pipeline Performance (Multi-Trip Benchmark) | SIH Target Benchmark | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Tier 1: Traffic Crawl** | < 20 km/h / < 200 m | 30s – 60s | **25.2 m Median Error** | < 10 m (< 5 m over 50m) | **NEAR TARGET** |
-| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200 – 550 m | 30s – 60s | **4.59% Median Drift** | < 15% (Sub-Lane Accuracy) | **PASSED** |
-| **Tier 3: Highway Cruising** | > 50 km/h / > 500m – 1.2km | 60s – 75s | **11.48% Median Drift** | < 100 m over 1km (< 10%) | **NEAR TARGET** |
+| **Tier 1: Traffic Crawl** | < 20 km/h / < 200 m | 30s – 60s | **32.2 m Median Error** | < 10 m (< 5 m over 50m) | **NEAR TARGET** |
+| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200 – 550 m | 30s – 60s | **6.64% Median Drift** | < 15% (Sub-Lane Accuracy) | **PASSED** |
+| **Tier 3: Highway Cruising** | > 50 km/h / > 500m – 1.2km | 60s – 75s | **7.90% Median Drift** | < 100 m over 1km (< 10%) | **PASSED** |
 
-* **Overall Median Drift**: **9.51%** (< 10.0% Target — **PASSED**)
-* **High Reliability Rate (Drift <= 30%)**: **90.0% (36 / 40 scenarios)**
-* **Tier 1 Pass Rate (< 10% drift)**: **52.5% (21 / 40 scenarios)**
-* **Initial Heading Seeding Error**: **0.66°** (Speed-Regime GPS Vector)
+* **Overall Median Drift**: **7.77%** (< 10.0% Target — **PASSED**)
+* **High Reliability Rate (Drift <= 30%)**: **87.5% (35 / 40 scenarios)**
+* **Tier 1 Pass Rate (< 10% drift)**: **57.5% (23 / 40 scenarios)**
+* **Initial Heading Seeding Error**: **0.16°** (Speed-Regime GPS Vector)
+
 
 ---
 
@@ -334,10 +338,10 @@ Position error growth as GNSS outage duration scales from 30s to 75s:
 
 | Outage Duration | Number of Scenarios | Mean Distance Traveled | Pure 6-Axis Median Drift | Phase 4 Map-Matched Median Drift | Median Final Error |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| **30 Seconds** | 12 | 323.3 m | 25.70% | **14.87%** | **30.2 m** |
-| **45 Seconds** | 12 | 420.2 m | 18.05% | **12.39%** | **50.7 m** |
-| **60 Seconds** | 8 | 462.5 m | 17.21% | **4.05%** | **19.8 m** |
-| **75 Seconds** | 8 | 692.0 m | 39.51% | **7.22%** | **63.0 m** |
+| **30 Seconds** | 12 | 323.3 m | 25.19% | **9.28%** | **25.3 m** |
+| **45 Seconds** | 12 | 420.2 m | 19.76% | **10.44%** | **48.6 m** |
+| **60 Seconds** | 8 | 462.5 m | 15.23% | **5.27%** | **20.5 m** |
+| **75 Seconds** | 8 | 692.0 m | 32.12% | **7.16%** | **36.4 m** |
 
 ---
 
@@ -557,7 +561,8 @@ Our comprehensive diagnostic engineering across 40 real-world driving scenarios 
 │   └── run_phase3_ai_fusion.py        # Phase 3 AI velocity runner
 ├── models/
 │   └── checkpoints/
-│       ├── best_moe_velocity_model.pt # Trained MoE model weights (Val RMSE 3.57 m/s)
+│       ├── best_moe_velocity_model.pt # Trained 10 Hz CAN-supervised MoE model weights (Val RMSE 3.28 m/s)
+│       ├── best_moe_velocity_model_gps_backup.pt # Preserved GPS-supervised champion backup (Val RMSE 3.57 m/s)
 │       └── best_velocity_model.pt     # Trained TCN baseline model weights (Val RMSE 4.23 m/s)
 ├── data/
 │   ├── raw/iovnbd_trips/              # IO-VNBD real-world driving sequences (S-S1, S-S2, S-M, S-S3a, S-S4)

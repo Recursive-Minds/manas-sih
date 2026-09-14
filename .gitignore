@@ -11,3 +11,5 @@ scratch/
 .gemini/
 data/cache/
 data/maps/cache/*.geojson
+data/raw/iovnbd_trips/V-*.csv
+
