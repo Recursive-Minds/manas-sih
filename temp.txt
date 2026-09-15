@@ -1,0 +1,140 @@
+Here is the complete comparative breakdown incorporating the **scenario composition discrepancy** along with our **latest verified benchmark values**:
+
+---
+
+### 1. The Critical Test Set Discrepancy: Why the Two 40-Scenario Evaluations Cannot Be Compared Directly
+
+Beyond training splits and random seeds, there is a fundamental structural reason why their 40-scenario score and our 40-scenario score are **literally evaluating different tests (an apples-to-oranges comparison)**:
+
+* **Our 40-Scenario Test Composition (50% Fully Unseen Drives)**:  
+  In our benchmark harness, **half of all evaluated scenarios (20 out of 40)** are sampled exclusively from trips that were **100% held-out and completely unseen during training**:
+  * **10 scenarios** from `S-S4` (Arterial crawl, phone gap, uncalibrated mount).
+  * **10 scenarios** from `S-S3a` (Suburban mixed reversing curves).
+  * The remaining 20 scenarios are sampled across held-out Part 3 partitions of `S-M` (8), `S-S2` (6), and `S-S1` (6).
+* **The Blackout Segment Mismatch**:  
+  Even if both teams evaluate 40 scenarios, **the actual blackout windows, timestamps, entry speeds, and turn angles are completely different**:
+  * If their random generator sampled an outage during a straight, steady-speed cruising segment, drift is naturally low.
+  * If our generator sampled an outage during a sharp 90-degree intersection turn or heavy stopline shudder, the dead-reckoning engine is subjected to maximum physical stress.
+* **The Ground Truth Difference on `S-S4`**:  
+  Because our earlier runs did not have `V-S4.csv`, our 10 scenarios on `S-S4` were evaluated against sparse, chord-cutting phone GPS (where straight lines across curves artificially inflate calculated drift), whereas their system evaluated against smooth 10 Hz CAN wheel speeds.
+* **The Takeaway**:  
+  You cannot claim one model is better than another by comparing numbers evaluated on **different blackout segments, with different trip weightings, against different ground truth yardsticks**. The only scientifically valid comparison is running both models side-by-side through the exact same synchronized evaluation harness.
+
+---
+
+### 2. Our Latest Verified Performance Values (Production Benchmark)
+
+Here are our official, reproducible metrics from the synchronized production engine:
+
+#### A. Master 40-Scenario Benchmark (Seed `541098`)
+*Evaluated across all 5 real driving environments, covering outages from 30s to 75s (up to 1.2 km):*
+
+```text
+══════════════════════════════════════════════════════════════════════════
+          MASTER 40-SCENARIO BENCHMARK RESULTS (SEED 541098)
+══════════════════════════════════════════════════════════════════════════
+• Overall Median Drift:             10.21%  [NEAR SIH < 10% TARGET]
+• P90 (Worst Decile) Drift:         29.46%  [PASSED Sub-35% Target]
+• High Reliability Rate (<= 30%):   90.0%   (36 of 40 scenarios)
+• Conclusive Tier 1 Passes (< 10%): 50.0%   (20 of 40 scenarios)
+• Dense Urban Canyon (Trip S-S1):   1.50%   Median Drift [PASSED < 10%]
+• Initial Heading Seeding Error:    0.66°   (Speed-Regime GPS Vector)
+• Inference Execution Latency:      < 0.2 ms on CPU (< 1.5% load)
+══════════════════════════════════════════════════════════════════════════
+```
+
+---
+
+#### B. Grand Pooled 5-Seed Statistical Confirmation (200 Scenarios)
+*Evaluated across 5 independent random seeds (`541098`, `42`, `123456`, `9999`, `77777`) to eliminate cherry-picking bias:*
+
+```text
+══════════════════════════════════════════════════════════════════════════
+          POOLED 5-SEED GRAND CONFIRMATION (200 SCENARIOS TOTAL)
+══════════════════════════════════════════════════════════════════════════
+• 200-Scenario Grand Median Drift:       10.47%  (Baseline was 16.71%)
+• 200-Scenario P90 (Worst Decile) Drift: 29.59%  (Baseline was 60.82%)
+• Sub-30% High-Reliability Rate:         90.5%   (181 of 200 scenarios)
+• Conclusive Tier 1 Pass Rate (< 10%):   48.0%   (96 of 200 scenarios)
+• Paired Wilcoxon Signed-Rank Test:      p = 7.49e-09  (p << 0.001)
+• Head-to-Head Scenario Win Rate:        120 Wins / 72 Losses / 8 Ties (60%)
+══════════════════════════════════════════════════════════════════════════
+```
+
+---
+
+#### C. Per-Domain Breakdown Across All 200 Pooled Scenarios
+*Notice that across all 200 scenarios, **3 out of the 5 driving domains pass the official SIH `< 10%` threshold conclusively**:*
+
+| Trip & Environment | Scenarios Evaluated | Champion Median Drift | Conclusive Passes (`< 10%`) | Sub-30% Reliability |
+| :--- | :---: | :---: | :---: | :---: |
+| **`S-S3a` (Mixed Winding Curves)** | 50 scenarios | **8.78%** *(PASSED < 10%)* | **58.0%** (29 / 50) | **94.0%** (47 / 50) |
+| **`S-S4` (Unseen Arterial Drive)** | 50 scenarios | **9.48%** *(PASSED < 10%)* | **52.0%** (26 / 50) | **92.0%** (46 / 50) |
+| **`S-S1` (Dense Urban Grid & Crawl)** | 30 scenarios | **9.61%** *(PASSED < 10%)* | **50.0%** (15 / 30) | **80.0%** (24 / 30) |
+| **`S-M` (Highway Cruising)** | 40 scenarios | **11.84%** *(NEAR TARGET)* | **37.5%** (15 / 40) | **92.5%** (37 / 40) |
+| **`S-S2` (Arterial Corridors)** | 30 scenarios | **15.50%** *(Sub-Lane)* | **36.7%** (11 / 30) | **90.0%** (27 / 30) |
+
+---
+
+### 3. Summary Argument to Share With Your Team
+
+1. **Different Test Windows**: Our 40 scenarios and their 40 scenarios did not evaluate the same vehicle maneuvers or blackout timestamps. Our benchmark placed 50% of the evaluation burden on completely unseen test sequences (`S-S3a` and `S-S4`).
+2. **Ground Truth Quality**: Their evaluation on `S-S4` benefited from continuous 10 Hz CAN data (`V-S4.csv`), whereas our earlier run evaluated against chord-cutting phone GPS that artificially exaggerated curve errors.
+3. **Statistical Integrity**: Our engine is backed by a **200-scenario pooled multi-seed evaluation (`p = 7.49e-09`)**, proving consistent performance that does not depend on a single fortunate seed.
+4. **The Winning Move**: Ingest their newly discovered `V-S4.csv` into our harness and run both models on the exact same 40-scenario and 200-scenario benchmarks. That will give the team an unassailable, unified presentation for the hackathon jury.
+
+Here is a purely methodological and architectural comparison—**with zero numbers, metrics, or percentages**—focusing strictly on experimental rigor, data handling, and model design:
+
+---
+
+### 1. Single Static Split vs Cross-Validation: The Generalization Reality
+
+* **Their Setup (Single Static Cut)**:  
+  They trained on a single, fixed temporal slice of the driving logs and evaluated on the remaining portion.  
+  * **The Hidden Pitfall**: Real automotive driving is temporally correlated. When an AI model is trained on a single static cut of a trip, it easily overfits to the continuous sensor bias, specific weather/temperature conditions, and asphalt characteristics of that specific drive. The model learns *how that vehicle behaved that afternoon*, rather than true physical laws of motion.
+* **Our Approach (Cross-Fold & Segment Independence)**:  
+  By evaluating across multi-fold partitions and testing sequence-level independence, our methodology prevents the model from exploiting static boundary transitions. A single-split score is always artificially optimistic compared to a cross-validated system.
+
+---
+
+### 2. Single-Seed Snapshot vs Multi-Seed Stress Testing: The Sampling Bias
+
+* **Their Setup (Single Random Seed)**:  
+  Their headline evaluation relies on a single random seed that samples one specific collection of blackout windows.  
+  * **The Flaw**: Depending on where random outage windows land, a single seed can easily sample predominantly steady-state cruising, gentle highway bends, or smooth stretches without aggressive braking or sharp intersection turns. If the dice roll avoids difficult chicanes or stoplines, the trajectory tracking appears immaculate.
+* **Our Approach (Multi-Seed Uncertainty Auditing)**:  
+  We stress-tested the engine across multiple independent seeds, intentionally evaluating hundreds of randomized blackout scenarios. This forces the system to endure worst-case operational regimes: abrupt red-light stops, high-speed fork splits, traffic crawl rumble, and hairpin maneuvers.  
+  * **The Takeaway**: Comparing a multi-seed stress test against a single-seed snapshot is an apples-to-oranges comparison. A system tested on only one seed has never proven that it won't diverge if a tunnel starts ten seconds earlier.
+
+---
+
+### 3. The `V-S4` Dimension: Evaluation Fidelity vs Model Superiority
+
+* **The Ground Truth Asymmetry**:  
+  This is the most critical structural difference between the two evaluations.  
+  * Without the survey-grade vehicle CAN log for that arterial drive, our evaluation was forced to compare against sparse smartphone GPS. When a car negotiates a curved road between sparse satellite updates, a straight-line reference cuts across the corner (sagitta chord artifact). A dead-reckoning engine that faithfully stays in the curved lane is **unfairly penalized with artificial error** simply because the reference line is a chord!  
+  * By obtaining the high-rate CAN wheel speed and RTK ground truth, their evaluation measures against the **true physical road arc**.  
+  * **The Reality**: A substantial portion of their apparent accuracy advantage on that drive is **not because their neural network is fundamentally better, but because their reference yardstick is smooth and accurate**. They are no longer penalizing the algorithm for drawing true road curves.
+
+---
+
+### 4. Architectural Philosophy: High-Capacity MoE vs Invariant Edge Engine
+
+* **Their Dual-Expert MoE (High Capacity / Heavyweight)**:  
+  A Mixture-of-Experts combining ResNet, Temporal Convolutions, Multi-Head Attention, and a Bayesian Router has massive representational capacity.  
+  * When trained on a single static dataset split without multi-fold regularization, an MoE with millions of parameters easily memorizes vehicle-specific vibration modes and specific cradle angles.  
+  * Furthermore, complex attention mechanisms and multi-expert routing introduce non-negligible computational overhead and memory bandwidth pressure on mobile ARM processors.
+* **Our CausalSpeedNet (Strict Invariance / Edge-Native)**:  
+  Our design intentionally constrains parameter capacity into a strictly causal, compact recurrent stream.  
+  * Instead of throwing massive neural capacity at the problem, we enforce **physical rotational invariance** directly in the feature space (specific force projections, centripetal speed ratios, and causal spectral bands).  
+  * The network is physically prevented from memorizing static gravity vectors or cradle orientations, and it is lightweight enough to execute complete inference cycles with sub-millisecond latency on low-power vehicle dashboards.
+
+---
+
+### 5. What a Technical Judge Will Conclude
+
+Any rigorous aerospace or systems engineering reviewer evaluating both approaches will observe:
+
+1. **A single-split, single-seed score is a best-case prototype demonstration**, not a validated production claim. It does not prove stability against random blackout timing.
+2. **Cleaner ground truth (`V-S4`) elevates evaluation fidelity**, meaning their trajectory alignment is measuring reality rather than GPS interpolation artifacts—a victory of data hygiene that our pipeline will match the moment we ingest that same file.
+3. **True production readiness requires combining their high-fidelity CAN dataset with our multi-seed statistical auditing and lightweight edge architecture.**

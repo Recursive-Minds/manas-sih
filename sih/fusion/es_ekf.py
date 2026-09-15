@@ -252,6 +252,17 @@ class ErrorStateEKF(IFusionFilter):
                 if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
                     seeded_hdg = float(valid_moving[-1].bearing_deg)
                     is_consistent = True
+                # Final safety net: if both 2-point displacement and bearing failed,
+                # fall back to any available heading source (mirrors the else-branch chain)
+                if seeded_hdg is None:
+                    any_bearing = [g for g in pre_gnss if g.is_valid and g.bearing_deg is not None and g.speed_mps is not None and g.speed_mps >= 2.0]
+                    if any_bearing:
+                        seeded_hdg = float(any_bearing[-1].bearing_deg)
+                    elif self._initialised:
+                        seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
+                    else:
+                        seeded_hdg = 0.0
+                    is_consistent = False
             else:
                 # Vehicle is crawling (< 2.5 m/s) or stopped.
                 # Look back for the last stable moving fix (v >= 2.0 m/s)

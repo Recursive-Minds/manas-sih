@@ -3,7 +3,7 @@
 ## Executive Summary
 This document establishes the comprehensive engineering specification bridging our verified dead-reckoning algorithmic engine (Phases 1 through 6) into a commercially viable, field-testable smartphone navigation solution for Indian transit conditions.
 
-While our 15-state Error-State EKF, AI velocity estimator, topological map-matching governor, and seamless handoff state machine have proven a **9.34% median drift** and **90.0% reliability** on real driving benchmarks, deploying the system onto a rider's smartphone on a motorcycle or car in India requires solving the practical physical and infrastructure challenges of real-world operation.
+While our 15-state Error-State EKF, AI velocity estimator, topological map-matching governor, and seamless handoff state machine have proven a **6.35% median drift**, **24.06% P90 drift**, and **92.5% high reliability** (67.5% Tier 1 pass rate) on real driving benchmarks, deploying the system onto a rider's smartphone on a motorcycle or car in India requires solving the practical physical and infrastructure challenges of real-world operation.
 
 ---
 
@@ -187,6 +187,6 @@ When deploying this system for on-road motorcycle or car testing, follow this ex
 | **AI Speed & Dynamic Scale Adaptation** | Complete | Production Ready |
 | **Topological Map Matcher & Governor** | Complete | Production Ready |
 | **Seamless GNSS Handoff State Machine** | Complete | Production Ready |
-| **Live Indian Road Ingestion & Caching Engine** | Planned (Plan Approved) | In Implementation |
-| **Android Mobile App & 100 Hz Daemon (Phase 7)**| Architecture Defined | Next Milestone |
+| **Live Indian Road Ingestion & Caching Engine** | Complete | Production Ready |
+| **Android Mobile App & 100 Hz Daemon (Phase 7)**| Architecture Defined | Active Milestone |
 | **Motorcycle Lean Adaptation & Barometer Fusion** | Specification Defined | Integration Stage |

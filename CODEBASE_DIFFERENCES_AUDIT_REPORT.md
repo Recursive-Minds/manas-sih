@@ -320,3 +320,18 @@ The divergence between `manas-phase3` and `Recursive_Minds-SIH26168` represents 
 - **`sih26168` (Target Repo)** is the **scientifically audited, statistically robust, and feature-engineered machine learning engine**.
 
 By integrating the CausalSpeedNet model, 60s lookback calibration, CAN-bus reference ground truth, and 5-seed pooled confirmation from `sih26168` into the clean, modular `sih/` structure and Indian road engine of `manas-phase3`, the project achieves uncompromising scientific integrity, sub-10% dead reckoning drift, and production-grade edge deployment.
+
+---
+
+## 8. Post-Audit Resolution & Verified Production Performance
+
+Following the audit roadmap above, the scientific synthesis was fully integrated into the production codebase:
+1. **10 Hz CAN-Bus Ground Truth Ingestion (`sih/models/can_dataset.py`)**: Integrated continuous ECU wheel speeds with cross-correlation offsets (+0.10s, +8.60s, +1.70s), resolving the 9-second phone GPS stair-step optical illusion.
+2. **Dual-Brain Bayesian Mixture-of-Experts (`sih/models/moe_fusion.py`)**: Fused the ResNet-1D micro-window expert (2.0s) and dilated TCN-Attention macro-window expert (6.0s) with 12 features and multi-objective loss (`sih/models/losses.py`).
+3. **ZARU Highway Straight-Line Lock & Hybrid Speed Blending**: Integrated into `sih/fusion/es_ekf.py` to freeze yaw gyro drift during high-speed cruising and prevent asphalt vibration damping.
+4. **Final Verified Benchmark (`artifacts/phase4_multi_trip_benchmark_results.csv`)**:
+   - **Overall Median Drift**: **6.35%** (Outperformed both historical forks: local 9.34% and sih26168 10.21%).
+   - **P90 (Worst Decile) Drift**: **24.06%** (Pure Baseline: 50.43%).
+   - **Tier 1 (< 10% Drift) Pass Rate**: **67.5% (27 of 40 scenarios)**.
+   - **High Reliability (<= 30% Drift)**: **92.5% (37 of 40 scenarios)**.
+   - **Initial Heading Seeding Error**: Average **0.14°**, Median **0.0002°**.

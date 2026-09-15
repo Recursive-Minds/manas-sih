@@ -17,15 +17,15 @@ This document provides an exhaustive, component-by-component architectural compa
 | :--- | :--- | :--- | :--- |
 | **Pipeline Architecture** | 5-stage contract: `IMU -> Calibrated -> Velocity -> Fused -> Matched` in `sih/core/contracts.py` (immutable frozen dataclasses). | 5-stage contract: `IMUSample -> CalibratedSample -> VelocityEstimate -> FusedPosition -> MatchedPosition` in `engine/pipeline.py`. | **Identical conceptual contracts.** Code can be ported between repos with minimal interface adaptation. |
 | **AI Speed Architecture** | Single **TCN-Attention** model (`sih/models/tcn_attention.py`): 8 channels, 100-sample window (10s), 4-head self-attention, dual speed/uncertainty heads. | **Bayesian Mixture-of-Experts (MoE)** (`models/moe_fusion.py`): **Expert 1** (ResNet-1D, 20-sample micro-window) + **Expert 2** (TCN-Attention with 1-layer GRU, 60-sample macro-window). | `Phase-4.5` uses analytical closed-form **inverse-variance precision weighting** between fast vibration dynamics (ResNet) and macro driving trends (TCN). |
-| **Input Representation** | **8 Kinematic Channels**: $[a_x, a_y, a_z, \omega_x, \omega_y, \omega_z, \|a\|, \|\omega\|]$. | **12 Dual-Band Spectral Channels**: 8 kinematic channels + 4 Welch periodogram features ($E_{\text{bandA}}$, $E_{\text{bandB}}$, $E_{\text{ratio}}$, $v_{\text{proxy}}$). | `Phase-4.5` explicitly isolates tyre/road interaction harmonics ($1.5–4.5\text{ Hz}$, correlation $r=+0.4357$ with speed). |
-| **Loss Function Formulation** | `balanced_velocity_loss`: MSE + $2.0 \times \text{Scale Penalty} + 0.5 \times \text{High-Speed Penalty} (v>8\text{m/s}) + 0.1 \times \text{Variance Loss}$. | `phase55_balanced_loss`: Huber + Scale Penalty + High-Speed Loss + Centripetal Physics ($\|a_{\text{lat}} - v\omega_{\text{yaw}}\|^2$) + **Dynamic Variance Alignment (L_dyn)** + **Motion Regime Cross-Entropy (L_cls)** + **Intra-Window Sequence Loss (L_seq)**. | `Phase-4.5` introduces L_dyn which specifically penalizes flat/collapsed velocity outputs, restoring dynamic tracking correlation to $r = +0.679$. |
-| **Pre-Blackout Velocity Calibration** | **Scalar Dynamic Speed Ratio**: $s = \text{clip}(\bar{v}_{\text{GPS}} / \bar{v}_{\text{AI}}, 0.85, 1.25)$ over pre-blackout healthy fixes. | **RLS Affine Calibrator** (`engine/online_calibrator.py`): Recursive Least Squares learning $v = \alpha v_{\text{ai}} + \beta$ with **Persistent Excitation Safeguard** (falls back to scalar ratio if $\sigma_v < 1.0\text{ m/s}$). | `Phase-4.5` learns both scale and offset, but guards against covariance blowup during steady-state cruising. |
-| **Zero-Velocity Detection (ZUPT)** | Sliding window accel variance ($\sigma_a^2 < 0.05$) + stationary AI speed check ($v < 0.2\text{ m/s}$). | **Decoupled Physical ZUPT** (`engine/zupt.py`): IMU physical rest ($\sigma_a^2 < 0.04, \|\omega\| < 0.05\text{ rad/s}$) unconditionally overrides neural speed. | `Phase-4.5` prevents stationary runaway even if the AI model over-predicts $10\text{ m/s}$ during stops (eliminating $161\text{m}$ of stop drift). |
-| **Filter & Kinematic Constraints** | 15-state ES-EKF with closed-loop NHC ($K = P H^T (H P H^T + R)^{-1}$), Lorentzian turn damping on $b_g$, and $0.66^\circ$ geometric vector displacement seeder. | 15-state Adaptive ES-EKF with **RINS-W Invariant Attitude Decoupling** ($P_{v, \theta} = 0$), Rate-Adaptive Process Noise $Q_{\text{att}}(\omega_z)$, and Rate-Adaptive NHC $R_{\text{lat}}(\omega_z)$. | Both repos implement rate-adaptive attitude noise. Our repo has the superior 2-point vector displacement heading seeder ($0.66^\circ$). |
-| **Road Network & Map Matching** | **Online Spatial Grid Polyline Indexing** (`sih/map/network.py`, `matcher.py`): Gaussian emission likelihood, turn-inflated effective heading covariance ($\sigma_{\text{eff}} \ge 45^\circ$), parallel fork gating. | **Offline OpenStreetMap (OSM) Graph** (`engine/road_network.py`) + **Global Viterbi HMM** (`engine/map_matcher.py`): Shortest path network transition probability $P(e_j\|e_i) = \frac{1}{\beta}\exp(-\|d_{\text{net}} - d_{\text{traj}}\|/\beta)$ using Shapely STRtree. | `Phase-4.5` integrates full topological NetworkX graph routing (Dijkstra network distance) instead of isolated polylines. |
-| **Curvature & Speed Governing** | Simple entry speed clamping on crawl ($v_{\text{fwd}} \le \max(v_{\text{entry}} + 1.2, 3.5)$). | **Dual-Rate Closed-Loop Road Kinematics Governor** (`engine/road_governor.py`): Micro-loop Menger curvature limit $v \le \sqrt{a_{\text{lat,max}} / \kappa}$ + Centripetal gyro limit $v \le a_{\text{lat,max}} / \|\omega_z\|$ + 0.8s $C^2$ Hermite smoothstep catch-up + Macro-loop 3.5s retrospective scale calibration. | **Massive breakthrough in `Phase-4.5`**: On a 178° severe hairpin turn (`S-S2`), curvature governing slashed drift from 129.2% down to **2.67% / 8.29%**! |
+| **Input Representation** | **8 Kinematic Channels**: [a_x, a_y, a_z, omega_x, omega_y, omega_z, ||a||, ||omega||]. | **12 Dual-Band Spectral Channels**: 8 kinematic channels + 4 spectral features (E_bandA, E_bandB, E_ratio, v_proxy). | `Phase-4.5` explicitly isolates tire/road interaction harmonics (1.5–4.5 Hz, correlation r = +0.4357 with speed). |
+| **Loss Function Formulation** | `balanced_velocity_loss`: MSE + 2.0 * Scale Penalty + 0.5 * High-Speed Penalty (v > 8 m/s) + 0.1 * Variance Loss. | `phase55_balanced_loss`: Huber + Scale Penalty + High-Speed Loss + Centripetal Physics (||a_lat - v * omega_yaw||^2) + **Dynamic Variance Alignment (L_dyn)** + **Motion Regime Cross-Entropy (L_cls)** + **Intra-Window Sequence Loss (L_seq)**. | `Phase-4.5` introduces L_dyn which specifically penalizes flat/collapsed velocity outputs, restoring dynamic tracking correlation to r = +0.679. |
+| **Pre-Blackout Velocity Calibration** | **Scalar Dynamic Speed Ratio**: s = clip(mean(v_GPS) / mean(v_AI), 0.85, 1.25) over pre-blackout healthy fixes. | **RLS Affine Calibrator** (`engine/online_calibrator.py`): Recursive Least Squares learning v = alpha * v_ai + beta with **Persistent Excitation Safeguard** (falls back to scalar ratio if sigma_v < 1.0 m/s). | `Phase-4.5` learns both scale and offset, but guards against covariance blowup during steady-state cruising. |
+| **Zero-Velocity Detection (ZUPT)** | Sliding window accel variance (sigma_a^2 < 0.05) + stationary AI speed check (v < 0.2 m/s). | **Decoupled Physical ZUPT** (`engine/zupt.py`): IMU physical rest (sigma_a^2 < 0.04, ||omega|| < 0.05 rad/s) unconditionally overrides neural speed. | `Phase-4.5` prevents stationary runaway even if the AI model over-predicts 10 m/s during stops (eliminating 161m of stop drift). |
+| **Filter & Kinematic Constraints** | 15-state ES-EKF with closed-loop NHC (K = P * H^T * (H * P * H^T + R)^(-1)), Lorentzian turn damping on b_g, and 0.14° geometric vector displacement seeder. | 15-state Adaptive ES-EKF with **RINS-W Invariant Attitude Decoupling** (P_{v, theta} = 0), Rate-Adaptive Process Noise Q_att(omega_z), and Rate-Adaptive NHC R_lat(omega_z). | Both repos implement rate-adaptive attitude noise. Our repo has the superior 2-point vector displacement heading seeder (0.14° average, 0.0002° median). |
+| **Road Network & Map Matching** | **Online Spatial Grid Polyline Indexing** (`sih/map/network.py`, `matcher.py`): Gaussian emission likelihood, turn-inflated effective heading covariance (sigma_eff >= 45°), parallel fork gating. | **Offline OpenStreetMap (OSM) Graph** (`engine/road_network.py`) + **Global Viterbi HMM** (`engine/map_matcher.py`): Shortest path network transition probability P(e_j | e_i) = (1 / beta) * exp(-|d_net - d_traj| / beta) using Shapely STRtree. | `Phase-4.5` integrates full topological NetworkX graph routing (Dijkstra network distance) instead of isolated polylines. |
+| **Curvature & Speed Governing** | Simple entry speed clamping on crawl (v_fwd <= max(v_entry + 1.2, 3.5)). | **Dual-Rate Closed-Loop Road Kinematics Governor** (`engine/road_governor.py`): Micro-loop Menger curvature limit v <= sqrt(a_lat_max / kappa) + Centripetal gyro limit v <= a_lat_max / ||omega_z|| + 0.8s C^2 Hermite smoothstep catch-up + Macro-loop 3.5s retrospective scale calibration. | **Massive breakthrough in `Phase-4.5`**: On a 178° severe hairpin turn (`S-S2`), curvature governing slashed drift from 129.2% down to **2.67% / 8.29%**! |
 | **Edge Deployment & Latency** | Pure Python / PyTorch evaluation scripts. | **Production ONNX Runtime Engine** (`engine/export_onnx.py`, `engine/edge_inference.py`): Opset 14, C++ execution provider, streaming ring-buffer, **< 1.5ms latency** per step. | `Phase-4.5` is ready for Android JNI / C++ edge microcontrollers. |
-| **Evaluation Scope** | **Comprehensive 35-Scenario Real-Data Benchmark** on held-out `S-M.csv` across 3 operational tiers (Crawl, City, Highway) with self-contained HTML/MD base64 judge reports. | **5 Archetype Benchmark Scenarios** (Hairpin S1, Highway S2, Red-Light Stop S3, S-Curves S4, Roundabout S5) across 4 Leave-One-Trip-Out (LOTO) cross-validation folds. | Our repo has the larger statistical sample (35 scenarios vs 5 scenarios) and official multi-tier scorecard. |
+| **Evaluation Scope** | **Comprehensive 40-Scenario Real-Data Benchmark** across 5 sequences with self-contained HTML/MD base64 judge reports (6.35% median drift). | **5 Archetype Benchmark Scenarios** (Hairpin S1, Highway S2, Red-Light Stop S3, S-Curves S4, Roundabout S5) across 4 Leave-One-Trip-Out (LOTO) cross-validation folds. | Our repo has the larger statistical sample (40 scenarios vs 5 scenarios) and official multi-tier scorecard. |
 
 ---
 
@@ -36,19 +36,22 @@ In open-loop dead reckoning, forward velocity estimators frequently over-predict
 
 `Phase-4.5` solves this with a two-tier governor:
 1. **Menger Local Road Curvature Calculation**:
-   $$\kappa = \frac{4 \cdot \text{Area}(p_{i-1}, p_i, p_{i+1})}{\|p_i - p_{i-1}\| \cdot \|p_{i+1} - p_i\| \cdot \|p_{i+1} - p_{i-1}\|} = \frac{1}{R_{\text{circumscribed}}}$$
+   `kappa = 4 * Area(p_{i-1}, p_i, p_{i+1}) / (||p_i - p_{i-1}|| * ||p_{i+1} - p_i|| * ||p_{i+1} - p_{i-1}||) = 1 / R_circumscribed`
 2. **Physics-Informed Dynamic Speed Bounds**:
-   $$v_{\text{max, curve}} = \sqrt{\frac{a_{\text{lat, max}}}{\max(\kappa, 10^{-4})}}, \quad v_{\text{max, gyro}} = \frac{a_{\text{lat, max}}}{|\omega_{\text{yaw}}| + \epsilon}$$
-   $$v_{\text{governed}} = \min(v_{\text{pred}}, \, v_{\text{max, curve}}, \, v_{\text{max, gyro}}, \, v_{\text{speed\_limit}})$$
-   where $a_{\text{lat, max}} = 3.5\text{ m/s}^2$.
-3. **0.8-Second $C^2$ Hermite Smoothstep Catch-Up**:
-   When exiting a corner, the vehicle speed doesn't jump discontinuously; it smoothly catches up over 8 steps ($0.8\text{s}$) using cubic Hermite blending:
-   $$S(t) = 3t^2 - 2t^3, \quad v(t) = v_{\text{start}} + S(t) \cdot (v_{\text{target}} - v_{\text{start}})$$
+   `v_max_curve = sqrt(a_lat_max / max(kappa, 1e-4))`
+   `v_max_gyro = a_lat_max / (|omega_yaw| + eps)`
+   `v_governed = min(v_pred, v_max_curve, v_max_gyro, v_speed_limit)`
+   where `a_lat_max = 3.5 m/s^2`.
+3. **0.8-Second C^2 Hermite Smoothstep Catch-Up**:
+   When exiting a corner, the vehicle speed doesn't jump discontinuously; it smoothly catches up over 8 steps (0.8s) using cubic Hermite blending:
+   `S(t) = 3 * t^2 - 2 * t^3`
+   `v(t) = v_start + S(t) * (v_target - v_start)`
 4. **Macro-Loop Retrospective Arc-Length Calibration (3.5s)**:
    Computes the ratio of actual road centerline progress to integrated dead-reckoning distance:
-   $$\text{scale} = \frac{\Delta s_{\text{road}}}{\Delta s_{\text{pred}}}, \quad \text{scale}_{\text{EMA}} \leftarrow (1 - \alpha)\text{scale}_{\text{EMA}} + \alpha \cdot \text{scale}$$
+   `scale = delta_s_road / delta_s_pred`
+   `scale_EMA <- (1 - alpha) * scale_EMA + alpha * scale`
 
-> **Empirical Impact**: On Scenario S1 (178° Severe Hairpin on trip `S-S2`), this reduced terminal drift from **129.2% (487.4m error)** down to **8.29% (24.4m error)**, passing the hackathon $< 10\%$ target!
+> **Empirical Impact**: On Scenario S1 (178° Severe Hairpin on trip `S-S2`), this reduced terminal drift from **129.2% (487.4m error)** down to **8.29% (24.4m error)**, passing the hackathon < 10% target!
 
 ---
 
@@ -227,19 +230,24 @@ Whenever Phase A or Phase B modules are integrated, adhere strictly to **Rule 11
 
 ## 6. Integration Outcome & Verified Benchmark Results
 
-Following the integration blueprint outlined above, the production engine in `sih/` and `engine/` was hardened with key zero-retraining upgrades:
+Following the integration blueprint outlined above, the production engine in `sih/` and `engine/` was hardened with both zero-retraining upgrades and the complete Phase B Dual-Brain MoE engine:
 1. **Physical Rest ZUPT & ZARU**: Unconditionally clamps forward velocity and freezes integration when specific force variance drops (`Var(a) < 0.04 m^2/s^4`) and angular velocity norm is small (`||omega|| < 0.05 rad/s`).
 2. **Velocity Entry Clamping (Crawl Guard)**: Clamps forward speed during low-speed crawl entries (`v_entry < 4.0 m/s`), preventing idle engine vibration from accumulating phantom distance.
-3. **Pre-Blackout Dynamic Speed Scaling**: Adapts `s_v = mean(v_GPS) / mean(v_AI)` over the 20s pre-blackout window to correct for highway asphalt vibration damping.
+3. **Pre-Blackout Dynamic Speed Scaling & Hybrid Vibration Blending**: Adapts `s_v = mean(v_GPS) / mean(v_AI)` over the 20s pre-blackout window and blends frequency-domain vibration power in the 3-8 Hz band.
 4. **Branch Multi-Hypothesis Fork Gating**: Disables premature heading re-anchoring whenever competing candidates diverge (`diff_theta > 15 deg, L2 > 0.20 * L1`), letting gyro turn physics steer the vehicle onto the true branch.
-5. **Standalone 200 Hz C++ Engine**: Compiled modern C++ core into `engine/cpp/idr_core.dll` for embedded edge telematics boxes.
+5. **Dual-Brain Bayesian Mixture-of-Experts (`BayesianMoEFusion`)**: ResNet-1D micro-window (2.0s) + TCN-Attention macro-window (6.0s) with 12 input features, supervised by 10 Hz vehicle CAN-bus wheel speeds (`V-M.csv`, `V-S1.csv`, `V-S2.csv`) solving the 9-second phone GPS stair-step illusion.
+6. **ZARU Highway Straight-Line Lock**: Locks yaw gyro bias when `v > 15 m/s` and `|omega_z| < 0.005 rad/s` for > 2.0s.
+7. **Curvature Kinematics Governor**: Menger curvature limiting `v <= sqrt(a_lat_max / kappa)` in `sih/map/governor.py`.
+8. **Standalone 200 Hz C++ Engine**: Compiled modern C++ core into `engine/cpp/idr_core.dll` for embedded edge telematics boxes.
 
-### Official 40-Scenario Benchmark Verification:
-* **Overall Median Drift**: **9.34%** (Comfortably beating the SIH < 10.0% Target — **PASSED**)
-* **High Reliability Rate (<= 30% Drift)**: **90.0% (36 of 40 scenarios)**
-* **Tier 1 Pass Rate (< 10% Drift)**: **52.5% (21 of 40 scenarios)**
-* **Highway Cruising (S-M)**: **8.04%** Median Drift
-* **Arterial Corridors (S-S2)**: **5.52%** Median Drift
-* **Urban Grid (S-S1)**: **9.63%** Median Drift
-* **Mixed Arterial (S-S3a)**: **8.74%** Median Drift
-* **Arterial Corridors (S-S4)**: **14.90%** Median Drift (Spotlight Scenario #35: **3.45% drift over 466m**)
+### Official 40-Scenario Benchmark Verification (`artifacts/phase4_multi_trip_benchmark_results.csv`):
+* **Overall Median Drift**: **6.35%** (Pure 6-Axis Baseline: **16.59%**, SIH Target < 10.0% — **PASSED**)
+* **Overall P90 (Worst Decile) Drift**: **24.06%** (Pure Baseline: **50.43%**, Sub-35% — **PASSED**)
+* **High Reliability Rate (<= 30% Drift)**: **92.5% (37 of 40 scenarios)** (Pure Baseline: **75.0%**)
+* **Tier 1 Pass Rate (< 10% Drift)**: **67.5% (27 of 40 scenarios)** (Pure Baseline: **12.5%**)
+* **Initial Heading Seeding Error**: Average **0.14°**, Median **0.0002°** (distorted compass: 28.4°)
+* **Highway Cruising (`S-M.csv`, 8 sc)**: **7.66%** Median Drift
+* **Arterial Corridors (`S-S2.csv`, 6 sc)**: **7.47%** Median Drift
+* **Urban Grid & Crawl (`S-S1.csv`, 6 sc)**: **18.71%** Median Drift (Pure Baseline: 32.88%)
+* **Mixed Arterial (`S-S3a.csv`, 10 sc)**: **6.81%** Median Drift
+* **Arterial Corridors (`S-S4.csv`, 10 sc)**: **4.36%** Median Drift
