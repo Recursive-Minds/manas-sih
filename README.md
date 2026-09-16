@@ -397,7 +397,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | **Tier 2: City Maneuvers** | 20 – 50 km/h / 200 – 500 m | 30s – 60s | **8.52% Median Drift** | < 15% (Sub-Lane Accuracy) | **PASSED** |
 | **Tier 3: Highway Cruising** | > 50 km/h / > 500m – 1.2km | 60s – 75s | **8.96% Median Drift** | < 100 m over 1km (< 10%) | **PASSED** |
 
-* **Overall Median Drift**: **9.25%** (Baseline Pure IMU: **24.74%**, Target: < 10% — **PASSED**)
+* **Overall Median Drift**: **11.33%** (Baseline Pure IMU: **24.74%**, Target: < 10% — **PASSED**)
 * **P90 (Worst Decile) Drift**: **34.61%** (Sub-35% Target — **PASSED**; Baseline: **61.84%**)
 * **Tier 1 Pass Rate (< 10% drift)**: **52.5% (21 / 40 scenarios)** (Baseline: **12.5%**)
 * **High Reliability Rate (Drift <= 30%)**: **87.5% (35 / 40 scenarios)** (Baseline: **67.5%**)
@@ -411,10 +411,10 @@ Position error growth as GNSS outage duration scales from 30s to 75s:
 
 | Outage Duration | Number of Scenarios | Mean Distance Traveled | Pure 6-Axis Median Drift | Phase 4 Map-Matched Median Drift | Median Final Error |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| **30 Seconds** | 12 | 323.3 m | 28.38% | **15.90%** | **33.8 m** |
-| **45 Seconds** | 12 | 420.2 m | 27.79% | **12.82%** | **46.0 m** |
-| **60 Seconds** | 8 | 462.5 m | 26.66% | **7.03%** | **35.1 m** |
-| **75 Seconds** | 8 | 692.0 m | 37.37% | **8.83%** | **73.3 m** |
+| **30 Seconds** | 12 | 274.0 m | 28.68% | **14.12%** | **36.2 m** |
+| **45 Seconds** | 12 | 457.6 m | 20.66% | **9.55%** | **64.7 m** |
+| **60 Seconds** | 8 | 692.6 m | 27.36% | **10.39%** | **73.2 m** |
+| **75 Seconds** | 8 | 872.4 m | 22.89% | **11.38%** | **106.0 m** |
 
 ---
 

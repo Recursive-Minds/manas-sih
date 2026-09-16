@@ -1,0 +1,7 @@
+# GitHub Linguist language detection overrides
+# Exclude standalone HTML evaluation reports and dashboards from language statistics
+*.html linguist-documentation
+*.html linguist-generated=true
+FINAL_JUDGE_EVALUATION_REPORT.html linguist-documentation
+FIX_IMU_SENSOR_FUSION_FULL_CHAT_ARCHIVE.html linguist-documentation
+benchmark_dashboard.html linguist-documentation
