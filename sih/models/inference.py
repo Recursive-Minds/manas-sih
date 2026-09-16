@@ -21,20 +21,40 @@ def load_ai_model(
     device: torch.device,
     model_path: Optional[str] = None,
     root_dir: Optional[str] = None,
-) -> Tuple[Any, np.ndarray, np.ndarray, str]:
+) -> Tuple[Any, Optional[np.ndarray], Optional[np.ndarray], str]:
     """
-    Loads unified Dual-Expert Bayesian MoE velocity checkpoint, falling back to baseline TCN.
+    Loads production 5-Fold LOTO MoE Ensemble, falling back to CausalSpeedNet, MoE, or TCN.
     """
     if root_dir is None:
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    from sih.models.ensemble_gating import LOTOEnsembleVelocityEstimator, FOLD_CHECKPOINTS
+    if model_path is None and all(os.path.exists(p) for p in FOLD_CHECKPOINTS.values()):
+        print("[AI Model] Loading Production 5-Fold LOTO MoE Ensemble with In-Distribution Discount (D=0.50)")
+        estimator = LOTOEnsembleVelocityEstimator(discount_d=0.50, device=device)
+        return estimator, None, None, "loto_ensemble"
 
     default_moe_path = os.path.join(root_dir, "models", "checkpoints", "best_moe_velocity_model.pt")
     default_tcn_path = os.path.join(root_dir, "models", "checkpoints", "best_velocity_model.pt")
     target_moe_path = model_path if model_path and os.path.exists(model_path) else default_moe_path
 
     if os.path.exists(target_moe_path):
-        print(f"[AI Model] Loading Unified MoE Checkpoint: {target_moe_path}")
         ckpt = torch.load(target_moe_path, map_location=device, weights_only=False)
+        mtype = ckpt.get("model_type", "moe")
+        if mtype == "causal_speed_net":
+            print(f"[AI Model] Loading CausalSpeedNet Champion Checkpoint: {target_moe_path}")
+            from sih.models.causal_speed_net import CausalSpeedNet
+            in_ch = ckpt.get("in_channels", 14)
+            model = CausalSpeedNet(in_channels=in_ch, hidden=64, levels=5, kernel_size=3, gru_hidden=64).to(device)
+            model.load_state_dict(ckpt["model_state_dict"])
+            model.eval()
+            norm_mean = ckpt.get("norm_mean")
+            norm_std = ckpt.get("norm_std")
+            if norm_mean.ndim == 1: norm_mean = norm_mean.reshape(-1, 1)
+            if norm_std.ndim == 1: norm_std = norm_std.reshape(-1, 1)
+            return model, norm_mean.astype(np.float32), norm_std.astype(np.float32), "causal_speed_net"
+
+        print(f"[AI Model] Loading Unified MoE Checkpoint: {target_moe_path}")
         in_channels = ckpt.get("in_channels", 12)
         expert_res = ResNet1DSpeedEstimator(in_channels=in_channels, base_channels=64)
         expert_tcn = TCNAttentionVelocityModel(in_channels=in_channels, base_channels=32, num_attention_heads=4)
@@ -79,6 +99,38 @@ def predict_velocities(
     """
     if root_dir is None:
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+    if model_type == "loto_ensemble":
+        v_fused, _ = model.predict_trip(trip_id=trip_id, calib_samples=calib_samples)
+        return v_fused.astype(np.float32)
+
+    if model_type in ("causal_speed_net", "causal_moe_net"):
+        from sih.velocity.invariant_features import InvariantFeatureExtractor
+
+        extractor = InvariantFeatureExtractor(sampling_rate=10.0)
+        acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float64)
+        gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float64)
+        feats = extractor.extract(acc, gyr)  # (N, 14)
+        norm_feats = (feats.T - norm_mean) / (norm_std + 1e-6)  # (14, N)
+
+        window_size = 100
+        N = len(feats)
+        pad = np.repeat(norm_feats[:, 0:1], window_size - 1, axis=1)
+        padded_feats = np.hstack([pad, norm_feats]).astype(np.float32)
+
+        from numpy.lib.stride_tricks import sliding_window_view
+        windows = sliding_window_view(padded_feats, window_shape=window_size, axis=1)
+        windows = np.ascontiguousarray(windows.transpose(1, 0, 2)).astype(np.float32)  # (N, 14, 100)
+
+        preds = []
+        batch_size = 2048
+        with torch.no_grad():
+            for b in range(0, N, batch_size):
+                xb = torch.from_numpy(windows[b : b + batch_size]).to(device)
+                with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
+                    s_seq, _ = model(xb)
+                preds.extend(s_seq[:, -1].float().cpu().numpy().flatten())
+        return np.array(preds, dtype=np.float32)
 
     if model_type == "moe":
         cache_file = os.path.join(root_dir, "data", "cache", f"{trip_id}_features_12ch.npz")

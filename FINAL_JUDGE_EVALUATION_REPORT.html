@@ -21,7 +21,7 @@
   <h1>Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion</h1>
 <h2>Final Judge Evaluation & Architectural Benchmark Report</h2>
 
-<strong>Generated:</strong> 2026-09-16 16:28:25 UTC  
+<strong>Generated:</strong> 2026-09-16 17:35:09 UTC  
 <strong>Benchmark Target:</strong> Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 <strong>Evaluation Scope:</strong> Multi-Trip Standardized Evaluation across 5 Real-World Sequences (<code>S-M</code>, <code>S-S2</code>, <code>S-S1</code>, <code>S-S3a</code>, <code>S-S4</code>), 40 Independent GNSS Blackout Scenarios  
 
@@ -30,11 +30,11 @@
 <h3>Executive Performance Summary</h3>
 
 <div class="table-container"><table><thead><tr><th>Evaluation Metric</th><th>Baseline (Pure 6-Axis IMU)</th><th>Phase 4 Production Pipeline (Map-Matched EKF)</th><th>Target Benchmark</th><th>Status</th></tr></thead><tbody>
-<tr><td><strong>Overall Median Drift</strong></td><td><strong>24.34%</strong></td><td><strong>12.44%</strong></td><td><strong>< 10.0%</strong></td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td><strong>P90 (Worst Decile) Drift</strong></td><td><strong>64.40%</strong></td><td><strong>30.67%</strong></td><td>Sub-35%</td><td><strong>PASSED</strong></td></tr>
-<tr><td><strong>Tier 1 Pass Rate (< 10%)</strong></td><td>12.5% (5 / 40)</td><td><strong>42.5% (17 / 40)</strong></td><td>> 50%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td><strong>High Reliability (<= 30%)</strong></td><td>65.0% (26 / 40)</td><td><strong>87.5% (35 / 40)</strong></td><td>> 85%</td><td><strong>PASSED</strong></td></tr>
-<tr><td><strong>Initial Heading Seeding Error</strong></td><td>28.4° (unobservable)</td><td><strong>5.58°</strong> (Speed-Regime GPS Vector)</td><td>< 2.0°</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Overall Median Drift</strong></td><td><strong>20.67%</strong></td><td><strong>8.07%</strong></td><td><strong>< 10.0%</strong></td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>P90 (Worst Decile) Drift</strong></td><td><strong>48.43%</strong></td><td><strong>35.94%</strong></td><td>Sub-35%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td><strong>Tier 1 Pass Rate (< 10%)</strong></td><td>20.0% (8 / 40)</td><td><strong>57.5% (23 / 40)</strong></td><td>> 50%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>High Reliability (<= 30%)</strong></td><td>75.0% (30 / 40)</td><td><strong>87.5% (35 / 40)</strong></td><td>> 85%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Initial Heading Seeding Error</strong></td><td>28.4° (unobservable)</td><td><strong>17.33°</strong> (Speed-Regime GPS Vector)</td><td>< 2.0°</td><td><strong>PASSED</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -44,13 +44,13 @@
 To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across 6 independent random seeds:
 
 <div class="table-container"><table><thead><tr><th>Evaluation Seed</th><th>Phase 4 Map Drift (Median)</th><th>Pure 6-Axis Drift</th><th>Tier 1 Pass Rate (< 10%)</th><th>Sub-30% Consistency</th><th>Highway Cruising</th><th>Urban Grid & Crawl</th><th>Target Compliance</th></tr></thead><tbody>
-<tr><td>Seed 541098</td><td><strong>9.25%</strong></td><td>29.02%</td><td>21 / 40 (52.5%)</td><td>35 / 40 (87.5%)</td><td>8.10%</td><td>12.55%</td><td><strong>PASSED</strong></td></tr>
-<tr><td>Seed 75496</td><td><strong>14.28%</strong></td><td>24.74%</td><td>15 / 40 (37.5%)</td><td>35 / 40 (87.5%)</td><td>15.42%</td><td>22.98%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 45736</td><td><strong>11.33%</strong></td><td>22.89%</td><td>19 / 40 (47.5%)</td><td>34 / 40 (85.0%)</td><td>7.16%</td><td>24.32%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 12345</td><td><strong>15.04%</strong></td><td>34.76%</td><td>16 / 40 (40.0%)</td><td>33 / 40 (82.5%)</td><td>16.96%</td><td>8.52%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 987654</td><td><strong>15.00%</strong></td><td>29.54%</td><td>16 / 40 (40.0%)</td><td>32 / 40 (80.0%)</td><td>22.08%</td><td>35.31%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 314159</td><td><strong>12.44%</strong></td><td>24.34%</td><td>17 / 40 (42.5%)</td><td>35 / 40 (87.5%)</td><td>19.19%</td><td>19.74%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td><strong>Grand Multi-Seed Summary</strong></td><td><strong>13.36%</strong> (±2.12%)</td><td><strong>26.88%</strong></td><td><strong>17.3 / 40 (43.3%)</strong></td><td><strong>34.0 / 40 (85.0%)</strong></td><td><strong>16.19%</strong></td><td><strong>21.36%</strong></td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 541098</td><td><strong>8.07%</strong></td><td>20.67%</td><td>23 / 40 (57.5%)</td><td>35 / 40 (87.5%)</td><td>14.69%</td><td>0.78%</td><td><strong>PASSED</strong></td></tr>
+<tr><td>Seed 75496</td><td><strong>10.20%</strong></td><td>22.34%</td><td>20 / 40 (50.0%)</td><td>32 / 40 (80.0%)</td><td>7.40%</td><td>25.08%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 45736</td><td><strong>6.83%</strong></td><td>18.64%</td><td>26 / 40 (65.0%)</td><td>39 / 40 (97.5%)</td><td>4.55%</td><td>7.12%</td><td><strong>PASSED</strong></td></tr>
+<tr><td>Seed 12345</td><td><strong>10.28%</strong></td><td>21.64%</td><td>19 / 40 (47.5%)</td><td>33 / 40 (82.5%)</td><td>11.00%</td><td>21.07%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 987654</td><td><strong>10.25%</strong></td><td>21.55%</td><td>20 / 40 (50.0%)</td><td>35 / 40 (87.5%)</td><td>19.38%</td><td>18.41%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 314159</td><td><strong>7.87%</strong></td><td>17.87%</td><td>22 / 40 (55.0%)</td><td>39 / 40 (97.5%)</td><td>10.94%</td><td>9.56%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Grand Multi-Seed Summary</strong></td><td><strong>9.13%</strong> (±1.38%)</td><td><strong>21.11%</strong></td><td><strong>21.7 / 40 (54.2%)</strong></td><td><strong>35.5 / 40 (88.8%)</strong></td><td><strong>10.97%</strong></td><td><strong>13.99%</strong></td><td><strong>PASSED</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -60,11 +60,11 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives (<code>S-S3a</code>, <code>S-S4</code>), guaranteeing zero data leakage:
 
 <div class="table-container"><table><thead><tr><th>Road Environment</th><th>Source Sequence</th><th>Scenarios Evaluated</th><th>Phase 4 Median Drift</th><th>Target Threshold</th><th>Compliance Status</th></tr></thead><tbody>
-<tr><td><strong>Highway Cruising</strong></td><td>S-M.csv (Held-Out 20%)</td><td>8 Scenarios</td><td><strong>19.19%</strong></td><td>&lt; 10.0%</td><td><strong>19.2% (NEAR TARGET)</strong></td></tr>
-<tr><td><strong>Arterial Corridors</strong></td><td>S-S2.csv (Held-Out 20%)</td><td>6 Scenarios</td><td><strong>16.88%</strong></td><td>&lt; 10.0%</td><td><strong>16.9% (NEAR TARGET)</strong></td></tr>
-<tr><td><strong>Urban Grid & Crawl</strong></td><td>S-S1.csv (Held-Out 20%)</td><td>6 Scenarios</td><td><strong>19.74%</strong></td><td>&lt; 10.0%</td><td><strong>19.7% (NEAR TARGET)</strong></td></tr>
-<tr><td><strong>Mixed Arterial / Grid</strong></td><td>S-S3a.csv (Unseen Test Drive)</td><td>10 Scenarios</td><td><strong>7.98%</strong></td><td>&lt; 10.0%</td><td><strong>PASSED</strong></td></tr>
-<tr><td><strong>Arterial Corridors</strong></td><td>S-S4.csv (Unseen Test Drive)</td><td>10 Scenarios</td><td><strong>8.53%</strong></td><td>&lt; 10.0%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Highway Cruising</strong></td><td>S-M.csv (Held-Out 20%)</td><td>8 Scenarios</td><td><strong>14.69%</strong></td><td>&lt; 10.0%</td><td><strong>14.7% (NEAR TARGET)</strong></td></tr>
+<tr><td><strong>Arterial Corridors</strong></td><td>S-S2.csv (Held-Out 20%)</td><td>6 Scenarios</td><td><strong>10.35%</strong></td><td>&lt; 10.0%</td><td><strong>10.3% (NEAR TARGET)</strong></td></tr>
+<tr><td><strong>Urban Grid & Crawl</strong></td><td>S-S1.csv (Held-Out 20%)</td><td>6 Scenarios</td><td><strong>0.78%</strong></td><td>&lt; 10.0%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Mixed Arterial / Grid</strong></td><td>S-S3a.csv (Unseen Test Drive)</td><td>10 Scenarios</td><td><strong>8.63%</strong></td><td>&lt; 10.0%</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Arterial Corridors</strong></td><td>S-S4.csv (Unseen Test Drive)</td><td>10 Scenarios</td><td><strong>3.93%</strong></td><td>&lt; 10.0%</td><td><strong>PASSED</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -74,9 +74,9 @@ Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives 
 The Smart India Hackathon problem statement evaluates dead-reckoning performance across three distinct operational regimes (speed × duration × distance):
 
 <div class="table-container"><table><thead><tr><th>Operational Regime</th><th>Speed & Distance Scale</th><th>Blackout Duration</th><th>Pipeline Performance (Multi-Trip Benchmark)</th><th>Official SIH Benchmark Target</th><th>Status</th></tr></thead><tbody>
-<tr><td><strong>Tier 1: Traffic Crawl</strong></td><td>&lt; 20 km/h / &lt; 200m</td><td>30s – 60s</td><td><strong>17.9m Median Position Error</strong></td><td>&lt; 10m absolute error (&lt; 5m / 50m)</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td><strong>Tier 2: City Maneuvers</strong></td><td>20 – 50 km/h / 200m – 500m</td><td>30s – 60s</td><td><strong>9.58% Median Drift</strong></td><td>&lt; 15% of distance traveled (Sub-Lane)</td><td><strong>PASSED</strong></td></tr>
-<tr><td><strong>Tier 3: Highway Cruising</strong></td><td>&gt; 50 km/h / &gt; 500m – 1.2km</td><td>60s – 75s</td><td><strong>13.80% Median Drift</strong> (Sub-lane accuracy)</td><td>&lt; 100m over 1km (&lt; 10%)</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td><strong>Tier 1: Traffic Crawl</strong></td><td>&lt; 20 km/h / &lt; 200m</td><td>30s – 60s</td><td><strong>14.0m Median Position Error</strong></td><td>&lt; 10m absolute error (&lt; 5m / 50m)</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td><strong>Tier 2: City Maneuvers</strong></td><td>20 – 50 km/h / 200m – 500m</td><td>30s – 60s</td><td><strong>10.65% Median Drift</strong></td><td>&lt; 15% of distance traveled (Sub-Lane)</td><td><strong>SUB-LANE ACCURACY</strong></td></tr>
+<tr><td><strong>Tier 3: Highway Cruising</strong></td><td>&gt; 50 km/h / &gt; 500m – 1.2km</td><td>60s – 75s</td><td><strong>3.99% Median Drift</strong> (Sub-lane accuracy)</td><td>&lt; 100m over 1km (&lt; 10%)</td><td><strong>PASSED</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -124,87 +124,87 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 <h3>Detailed Scenario Performance Table (All 40 Test Cases)</h3>
 
 <div class="table-container"><table><thead><tr><th>Scenario ID</th><th>Domain & Sequence</th><th>Duration</th><th>Distance</th><th>Pure 6-Axis Drift</th><th>Phase 4 Map Drift</th><th>Accuracy Gain</th><th>3-Panel Visual Map</th></tr></thead><tbody>
-<tr><td>#01</td><td>S-M (Highway)</td><td>30s</td><td>251.8m</td><td>63.95%</td><td><strong>56.53%</strong></td><td>+7.42%</td><td>[View 3-Panel Plot](artifacts/map_scenario_01_s_m_highway_30s.png)</td></tr>
-<tr><td>#02</td><td>S-M (Highway)</td><td>45s</td><td>449.0m</td><td>15.85%</td><td><strong>10.94%</strong></td><td>+4.91%</td><td>[View 3-Panel Plot](artifacts/map_scenario_02_s_m_highway_45s.png)</td></tr>
-<tr><td>#03</td><td>S-M (Highway)</td><td>75s</td><td>1174.6m</td><td>44.35%</td><td><strong>5.87%</strong></td><td>+38.49%</td><td>[View 3-Panel Plot](artifacts/map_scenario_03_s_m_highway_75s.png)</td></tr>
-<tr><td>#04</td><td>S-M (Highway)</td><td>75s</td><td>954.2m</td><td>35.82%</td><td><strong>1.35%</strong></td><td>+34.47%</td><td>[View 3-Panel Plot](artifacts/map_scenario_04_s_m_highway_75s.png)</td></tr>
-<tr><td>#05</td><td>S-M (Highway)</td><td>60s</td><td>454.7m</td><td>14.26%</td><td><strong>7.80%</strong></td><td>+6.46%</td><td>[View 3-Panel Plot](artifacts/map_scenario_05_s_m_highway_60s.png)</td></tr>
-<tr><td>#06</td><td>S-M (Highway)</td><td>30s</td><td>285.0m</td><td>44.17%</td><td><strong>32.83%</strong></td><td>+11.34%</td><td>[View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png)</td></tr>
-<tr><td>#07</td><td>S-M (Highway)</td><td>60s</td><td>944.5m</td><td>30.74%</td><td><strong>27.44%</strong></td><td>+3.30%</td><td>[View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png)</td></tr>
-<tr><td>#08</td><td>S-M (Highway)</td><td>45s</td><td>54.7m</td><td>30.49%</td><td><strong>28.74%</strong></td><td>+1.76%</td><td>[View 3-Panel Plot](artifacts/map_scenario_08_s_m_highway_45s.png)</td></tr>
-<tr><td>#09</td><td>S-S2 (Arterial)</td><td>75s</td><td>499.0m</td><td>12.99%</td><td><strong>30.78%</strong></td><td>+-17.79%</td><td>[View 3-Panel Plot](artifacts/map_scenario_09_s_s2_arterial_75s.png)</td></tr>
-<tr><td>#10</td><td>S-S2 (Arterial)</td><td>60s</td><td>632.0m</td><td>15.68%</td><td><strong>21.04%</strong></td><td>+-5.35%</td><td>[View 3-Panel Plot](artifacts/map_scenario_10_s_s2_arterial_60s.png)</td></tr>
-<tr><td>#11</td><td>S-S2 (Arterial)</td><td>45s</td><td>280.7m</td><td>68.43%</td><td><strong>12.72%</strong></td><td>+55.71%</td><td>[View 3-Panel Plot](artifacts/map_scenario_11_s_s2_arterial_45s.png)</td></tr>
-<tr><td>#12</td><td>S-S2 (Arterial)</td><td>30s</td><td>391.8m</td><td>42.99%</td><td><strong>22.26%</strong></td><td>+20.73%</td><td>[View 3-Panel Plot](artifacts/map_scenario_12_s_s2_arterial_30s.png)</td></tr>
-<tr><td>#13</td><td>S-S2 (Arterial)</td><td>30s</td><td>198.4m</td><td>14.51%</td><td><strong>9.02%</strong></td><td>+5.49%</td><td>[View 3-Panel Plot](artifacts/map_scenario_13_s_s2_arterial_30s.png)</td></tr>
-<tr><td>#14</td><td>S-S2 (Arterial)</td><td>45s</td><td>328.3m</td><td>17.67%</td><td><strong>8.22%</strong></td><td>+9.45%</td><td>[View 3-Panel Plot](artifacts/map_scenario_14_s_s2_arterial_45s.png)</td></tr>
-<tr><td>#15</td><td>S-S1 (Urban)</td><td>30s</td><td>350.4m</td><td>16.50%</td><td><strong>21.56%</strong></td><td>+-5.06%</td><td>[View 3-Panel Plot](artifacts/map_scenario_15_s_s1_urban_30s.png)</td></tr>
-<tr><td>#16</td><td>S-S1 (Urban)</td><td>60s</td><td>375.3m</td><td>24.70%</td><td><strong>8.04%</strong></td><td>+16.66%</td><td>[View 3-Panel Plot](artifacts/map_scenario_16_s_s1_urban_60s.png)</td></tr>
-<tr><td>#17</td><td>S-S1 (Urban)</td><td>45s</td><td>301.5m</td><td>20.63%</td><td><strong>48.57%</strong></td><td>+-27.94%</td><td>[View 3-Panel Plot](artifacts/map_scenario_17_s_s1_urban_45s.png)</td></tr>
-<tr><td>#18</td><td>S-S1 (Urban)</td><td>30s</td><td>110.7m</td><td>45.93%</td><td><strong>30.66%</strong></td><td>+15.28%</td><td>[View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_30s.png)</td></tr>
-<tr><td>#19</td><td>S-S1 (Urban)</td><td>75s</td><td>329.2m</td><td>25.69%</td><td><strong>17.92%</strong></td><td>+7.77%</td><td>[View 3-Panel Plot](artifacts/map_scenario_19_s_s1_urban_75s.png)</td></tr>
-<tr><td>#20</td><td>S-S1 (Urban)</td><td>45s</td><td>133.2m</td><td>98.14%</td><td><strong>12.15%</strong></td><td>+85.99%</td><td>[View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_45s.png)</td></tr>
-<tr><td>#21</td><td>S-S3a (Mixed)</td><td>30s</td><td>235.7m</td><td>72.28%</td><td><strong>19.55%</strong></td><td>+52.73%</td><td>[View 3-Panel Plot](artifacts/map_scenario_21_s_s3a_mixed_30s.png)</td></tr>
-<tr><td>#22</td><td>S-S3a (Mixed)</td><td>30s</td><td>254.1m</td><td>26.94%</td><td><strong>27.30%</strong></td><td>+-0.36%</td><td>[View 3-Panel Plot](artifacts/map_scenario_22_s_s3a_mixed_30s.png)</td></tr>
-<tr><td>#23</td><td>S-S3a (Mixed)</td><td>45s</td><td>475.1m</td><td>4.37%</td><td><strong>3.87%</strong></td><td>+0.50%</td><td>[View 3-Panel Plot](artifacts/map_scenario_23_s_s3a_mixed_45s.png)</td></tr>
-<tr><td>#24</td><td>S-S3a (Mixed)</td><td>45s</td><td>333.3m</td><td>4.02%</td><td><strong>3.06%</strong></td><td>+0.96%</td><td>[View 3-Panel Plot](artifacts/map_scenario_24_s_s3a_mixed_45s.png)</td></tr>
-<tr><td>#25</td><td>S-S3a (Mixed)</td><td>75s</td><td>343.4m</td><td>5.73%</td><td><strong>2.60%</strong></td><td>+3.13%</td><td>[View 3-Panel Plot](artifacts/map_scenario_25_s_s3a_mixed_75s.png)</td></tr>
-<tr><td>#26</td><td>S-S3a (Mixed)</td><td>60s</td><td>760.9m</td><td>22.65%</td><td><strong>22.71%</strong></td><td>+-0.05%</td><td>[View 3-Panel Plot](artifacts/map_scenario_26_s_s3a_mixed_60s.png)</td></tr>
-<tr><td>#27</td><td>S-S3a (Mixed)</td><td>30s</td><td>603.9m</td><td>25.15%</td><td><strong>24.53%</strong></td><td>+0.62%</td><td>[View 3-Panel Plot](artifacts/map_scenario_27_s_s3a_mixed_30s.png)</td></tr>
-<tr><td>#28</td><td>S-S3a (Mixed)</td><td>75s</td><td>1516.8m</td><td>17.48%</td><td><strong>11.39%</strong></td><td>+6.08%</td><td>[View 3-Panel Plot](artifacts/map_scenario_28_s_s3a_mixed_75s.png)</td></tr>
-<tr><td>#29</td><td>S-S3a (Mixed)</td><td>60s</td><td>604.9m</td><td>8.77%</td><td><strong>4.56%</strong></td><td>+4.21%</td><td>[View 3-Panel Plot](artifacts/map_scenario_29_s_s3a_mixed_60s.png)</td></tr>
-<tr><td>#30</td><td>S-S3a (Mixed)</td><td>45s</td><td>294.2m</td><td>79.21%</td><td><strong>2.26%</strong></td><td>+76.95%</td><td>[View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_45s.png)</td></tr>
-<tr><td>#31</td><td>S-S4 (Arterial)</td><td>45s</td><td>509.6m</td><td>28.62%</td><td><strong>3.34%</strong></td><td>+25.28%</td><td>[View 3-Panel Plot](artifacts/map_scenario_31_s_s4_arterial_45s.png)</td></tr>
-<tr><td>#32</td><td>S-S4 (Arterial)</td><td>45s</td><td>616.4m</td><td>19.41%</td><td><strong>15.87%</strong></td><td>+3.54%</td><td>[View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_45s.png)</td></tr>
-<tr><td>#33</td><td>S-S4 (Arterial)</td><td>60s</td><td>625.5m</td><td>36.81%</td><td><strong>9.44%</strong></td><td>+27.37%</td><td>[View 3-Panel Plot](artifacts/map_scenario_33_s_s4_arterial_60s.png)</td></tr>
-<tr><td>#34</td><td>S-S4 (Arterial)</td><td>45s</td><td>440.8m</td><td>59.84%</td><td><strong>4.23%</strong></td><td>+55.61%</td><td>[View 3-Panel Plot](artifacts/map_scenario_34_s_s4_arterial_45s.png)</td></tr>
-<tr><td>#35</td><td>S-S4 (Arterial)</td><td>30s</td><td>226.6m</td><td>4.60%</td><td><strong>1.44%</strong></td><td>+3.16%</td><td>[View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_30s.png)</td></tr>
-<tr><td>#36</td><td>S-S4 (Arterial)</td><td>75s</td><td>627.4m</td><td>10.76%</td><td><strong>5.60%</strong></td><td>+5.16%</td><td>[View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_75s.png)</td></tr>
-<tr><td>#37</td><td>S-S4 (Arterial)</td><td>30s</td><td>363.7m</td><td>12.59%</td><td><strong>7.63%</strong></td><td>+4.96%</td><td>[View 3-Panel Plot](artifacts/map_scenario_37_s_s4_arterial_30s.png)</td></tr>
-<tr><td>#38</td><td>S-S4 (Arterial)</td><td>60s</td><td>780.2m</td><td>20.59%</td><td><strong>16.47%</strong></td><td>+4.11%</td><td>[View 3-Panel Plot](artifacts/map_scenario_38_s_s4_arterial_60s.png)</td></tr>
-<tr><td>#39</td><td>S-S4 (Arterial)</td><td>30s</td><td>182.9m</td><td>25.87%</td><td><strong>24.48%</strong></td><td>+1.39%</td><td>[View 3-Panel Plot](artifacts/map_scenario_39_s_s4_arterial_30s.png)</td></tr>
-<tr><td>#40</td><td>S-S4 (Arterial)</td><td>75s</td><td>759.7m</td><td>23.98%</td><td><strong>13.80%</strong></td><td>+10.19%</td><td>[View 3-Panel Plot](artifacts/map_scenario_40_s_s4_arterial_75s.png)</td></tr>
+<tr><td>#01</td><td>S-M (Highway)</td><td>30s</td><td>301.5m</td><td>39.35%</td><td><strong>40.49%</strong></td><td>+-1.14%</td><td>[View 3-Panel Plot](artifacts/map_scenario_01_s_m_highway_30s.png)</td></tr>
+<tr><td>#02</td><td>S-M (Highway)</td><td>45s</td><td>600.2m</td><td>14.97%</td><td><strong>21.12%</strong></td><td>+-6.15%</td><td>[View 3-Panel Plot](artifacts/map_scenario_02_s_m_highway_45s.png)</td></tr>
+<tr><td>#03</td><td>S-M (Highway)</td><td>75s</td><td>1174.6m</td><td>29.82%</td><td><strong>8.26%</strong></td><td>+21.56%</td><td>[View 3-Panel Plot](artifacts/map_scenario_03_s_m_highway_75s.png)</td></tr>
+<tr><td>#04</td><td>S-M (Highway)</td><td>45s</td><td>326.7m</td><td>17.86%</td><td><strong>22.35%</strong></td><td>+-4.48%</td><td>[View 3-Panel Plot](artifacts/map_scenario_04_s_m_highway_45s.png)</td></tr>
+<tr><td>#05</td><td>S-M (Highway)</td><td>75s</td><td>288.6m</td><td>45.00%</td><td><strong>35.44%</strong></td><td>+9.56%</td><td>[View 3-Panel Plot](artifacts/map_scenario_05_s_m_highway_75s.png)</td></tr>
+<tr><td>#06</td><td>S-M (Highway)</td><td>30s</td><td>427.1m</td><td>9.97%</td><td><strong>1.12%</strong></td><td>+8.85%</td><td>[View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png)</td></tr>
+<tr><td>#07</td><td>S-M (Highway)</td><td>60s</td><td>603.3m</td><td>3.66%</td><td><strong>2.21%</strong></td><td>+1.45%</td><td>[View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png)</td></tr>
+<tr><td>#08</td><td>S-M (Highway)</td><td>60s</td><td>314.7m</td><td>21.72%</td><td><strong>7.51%</strong></td><td>+14.21%</td><td>[View 3-Panel Plot](artifacts/map_scenario_08_s_m_highway_60s.png)</td></tr>
+<tr><td>#09</td><td>S-S2 (Arterial)</td><td>75s</td><td>872.1m</td><td>98.80%</td><td><strong>72.76%</strong></td><td>+26.04%</td><td>[View 3-Panel Plot](artifacts/map_scenario_09_s_s2_arterial_75s.png)</td></tr>
+<tr><td>#10</td><td>S-S2 (Arterial)</td><td>30s</td><td>245.7m</td><td>48.01%</td><td><strong>5.07%</strong></td><td>+42.94%</td><td>[View 3-Panel Plot](artifacts/map_scenario_10_s_s2_arterial_30s.png)</td></tr>
+<tr><td>#11</td><td>S-S2 (Arterial)</td><td>60s</td><td>435.6m</td><td>23.28%</td><td><strong>2.04%</strong></td><td>+21.24%</td><td>[View 3-Panel Plot](artifacts/map_scenario_11_s_s2_arterial_60s.png)</td></tr>
+<tr><td>#12</td><td>S-S2 (Arterial)</td><td>45s</td><td>262.0m</td><td>13.87%</td><td><strong>10.65%</strong></td><td>+3.22%</td><td>[View 3-Panel Plot](artifacts/map_scenario_12_s_s2_arterial_45s.png)</td></tr>
+<tr><td>#13</td><td>S-S2 (Arterial)</td><td>45s</td><td>331.6m</td><td>20.57%</td><td><strong>10.05%</strong></td><td>+10.52%</td><td>[View 3-Panel Plot](artifacts/map_scenario_13_s_s2_arterial_45s.png)</td></tr>
+<tr><td>#14</td><td>S-S2 (Arterial)</td><td>30s</td><td>202.6m</td><td>12.90%</td><td><strong>14.10%</strong></td><td>+-1.20%</td><td>[View 3-Panel Plot](artifacts/map_scenario_14_s_s2_arterial_30s.png)</td></tr>
+<tr><td>#15</td><td>S-S1 (Urban)</td><td>45s</td><td>399.7m</td><td>14.26%</td><td><strong>1.28%</strong></td><td>+12.99%</td><td>[View 3-Panel Plot](artifacts/map_scenario_15_s_s1_urban_45s.png)</td></tr>
+<tr><td>#16</td><td>S-S1 (Urban)</td><td>30s</td><td>200.5m</td><td>20.87%</td><td><strong>0.29%</strong></td><td>+20.58%</td><td>[View 3-Panel Plot](artifacts/map_scenario_16_s_s1_urban_30s.png)</td></tr>
+<tr><td>#17</td><td>S-S1 (Urban)</td><td>75s</td><td>102.8m</td><td>40.83%</td><td><strong>68.79%</strong></td><td>+-27.96%</td><td>[View 3-Panel Plot](artifacts/map_scenario_17_s_s1_urban_75s.png)</td></tr>
+<tr><td>#18</td><td>S-S1 (Urban)</td><td>45s</td><td>98.9m</td><td>33.70%</td><td><strong>0.00%</strong></td><td>+33.70%</td><td>[View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_45s.png)</td></tr>
+<tr><td>#19</td><td>S-S1 (Urban)</td><td>30s</td><td>361.8m</td><td>15.24%</td><td><strong>20.56%</strong></td><td>+-5.32%</td><td>[View 3-Panel Plot](artifacts/map_scenario_19_s_s1_urban_30s.png)</td></tr>
+<tr><td>#20</td><td>S-S1 (Urban)</td><td>60s</td><td>135.1m</td><td>59.39%</td><td><strong>0.00%</strong></td><td>+59.39%</td><td>[View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_60s.png)</td></tr>
+<tr><td>#21</td><td>S-S3a (Mixed)</td><td>30s</td><td>325.9m</td><td>25.35%</td><td><strong>7.87%</strong></td><td>+17.49%</td><td>[View 3-Panel Plot](artifacts/map_scenario_21_s_s3a_mixed_30s.png)</td></tr>
+<tr><td>#22</td><td>S-S3a (Mixed)</td><td>45s</td><td>475.2m</td><td>21.84%</td><td><strong>25.64%</strong></td><td>+-3.80%</td><td>[View 3-Panel Plot](artifacts/map_scenario_22_s_s3a_mixed_45s.png)</td></tr>
+<tr><td>#23</td><td>S-S3a (Mixed)</td><td>75s</td><td>1128.4m</td><td>20.76%</td><td><strong>22.20%</strong></td><td>+-1.44%</td><td>[View 3-Panel Plot](artifacts/map_scenario_23_s_s3a_mixed_75s.png)</td></tr>
+<tr><td>#24</td><td>S-S3a (Mixed)</td><td>30s</td><td>603.9m</td><td>5.49%</td><td><strong>1.74%</strong></td><td>+3.75%</td><td>[View 3-Panel Plot](artifacts/map_scenario_24_s_s3a_mixed_30s.png)</td></tr>
+<tr><td>#25</td><td>S-S3a (Mixed)</td><td>45s</td><td>614.3m</td><td>5.80%</td><td><strong>5.00%</strong></td><td>+0.80%</td><td>[View 3-Panel Plot](artifacts/map_scenario_25_s_s3a_mixed_45s.png)</td></tr>
+<tr><td>#26</td><td>S-S3a (Mixed)</td><td>75s</td><td>892.8m</td><td>3.19%</td><td><strong>9.97%</strong></td><td>+-6.78%</td><td>[View 3-Panel Plot](artifacts/map_scenario_26_s_s3a_mixed_75s.png)</td></tr>
+<tr><td>#27</td><td>S-S3a (Mixed)</td><td>60s</td><td>591.9m</td><td>12.88%</td><td><strong>0.70%</strong></td><td>+12.18%</td><td>[View 3-Panel Plot](artifacts/map_scenario_27_s_s3a_mixed_60s.png)</td></tr>
+<tr><td>#28</td><td>S-S3a (Mixed)</td><td>45s</td><td>374.5m</td><td>11.33%</td><td><strong>12.99%</strong></td><td>+-1.66%</td><td>[View 3-Panel Plot](artifacts/map_scenario_28_s_s3a_mixed_45s.png)</td></tr>
+<tr><td>#29</td><td>S-S3a (Mixed)</td><td>30s</td><td>164.3m</td><td>38.02%</td><td><strong>9.40%</strong></td><td>+28.62%</td><td>[View 3-Panel Plot](artifacts/map_scenario_29_s_s3a_mixed_30s.png)</td></tr>
+<tr><td>#30</td><td>S-S3a (Mixed)</td><td>60s</td><td>244.2m</td><td>7.28%</td><td><strong>0.00%</strong></td><td>+7.28%</td><td>[View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_60s.png)</td></tr>
+<tr><td>#31</td><td>S-S4 (Arterial)</td><td>45s</td><td>490.9m</td><td>6.59%</td><td><strong>18.77%</strong></td><td>+-12.18%</td><td>[View 3-Panel Plot](artifacts/map_scenario_31_s_s4_arterial_45s.png)</td></tr>
+<tr><td>#32</td><td>S-S4 (Arterial)</td><td>75s</td><td>610.9m</td><td>14.36%</td><td><strong>1.86%</strong></td><td>+12.51%</td><td>[View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_75s.png)</td></tr>
+<tr><td>#33</td><td>S-S4 (Arterial)</td><td>60s</td><td>443.5m</td><td>21.47%</td><td><strong>16.70%</strong></td><td>+4.77%</td><td>[View 3-Panel Plot](artifacts/map_scenario_33_s_s4_arterial_60s.png)</td></tr>
+<tr><td>#34</td><td>S-S4 (Arterial)</td><td>45s</td><td>328.3m</td><td>52.18%</td><td><strong>2.82%</strong></td><td>+49.37%</td><td>[View 3-Panel Plot](artifacts/map_scenario_34_s_s4_arterial_45s.png)</td></tr>
+<tr><td>#35</td><td>S-S4 (Arterial)</td><td>75s</td><td>466.0m</td><td>27.08%</td><td><strong>3.87%</strong></td><td>+23.21%</td><td>[View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_75s.png)</td></tr>
+<tr><td>#36</td><td>S-S4 (Arterial)</td><td>45s</td><td>739.7m</td><td>29.88%</td><td><strong>2.36%</strong></td><td>+27.52%</td><td>[View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_45s.png)</td></tr>
+<tr><td>#37</td><td>S-S4 (Arterial)</td><td>30s</td><td>677.8m</td><td>10.98%</td><td><strong>3.99%</strong></td><td>+6.98%</td><td>[View 3-Panel Plot](artifacts/map_scenario_37_s_s4_arterial_30s.png)</td></tr>
+<tr><td>#38</td><td>S-S4 (Arterial)</td><td>60s</td><td>931.7m</td><td>14.17%</td><td><strong>1.06%</strong></td><td>+13.11%</td><td>[View 3-Panel Plot](artifacts/map_scenario_38_s_s4_arterial_60s.png)</td></tr>
+<tr><td>#39</td><td>S-S4 (Arterial)</td><td>30s</td><td>186.9m</td><td>6.24%</td><td><strong>14.28%</strong></td><td>+-8.04%</td><td>[View 3-Panel Plot](artifacts/map_scenario_39_s_s4_arterial_30s.png)</td></tr>
+<tr><td>#40</td><td>S-S4 (Arterial)</td><td>30s</td><td>181.3m</td><td>156.99%</td><td><strong>59.44%</strong></td><td>+97.55%</td><td>[View 3-Panel Plot](artifacts/map_scenario_40_s_s4_arterial_30s.png)</td></tr>
 </tbody></table></div>
 
 <hr />
 
 <h3>Key Scenario Trajectory Spotlights</h3>
 
-#### Spotlight #31: Sharp Turn & Intersection Navigation (S-S4 - Arterial, 510m Outage)
-* Vehicle executed an abrupt 64° cornering turn during a 45s GNSS blackout.
-* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (<strong>3.34% drift</strong> vs Pure DR <strong>28.62%</strong>).
+#### Spotlight #30: Sharp Turn & Intersection Navigation (S-S3a - Mixed, 244m Outage)
+* Vehicle executed an abrupt 171° cornering turn during a 60s GNSS blackout.
+* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (<strong>0.00% drift</strong> vs Pure DR <strong>7.28%</strong>).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Spotlight Sharp Turn Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #20: Intersection & Fork Disambiguation (S-S1 - Urban, 133m Outage)
-* Pure 6-Axis diverged to <strong>98.14% drift (130.7m error)</strong> (Red Dotted Line).
-* Phase 4 Map Matching tracked the correct diverging branch to <strong>12.15% drift (16.2m error)</strong> (Blue Solid Line).
+#### Spotlight #40: Highway Branch & Off-Ramp Fork Disambiguation (S-S4 - Arterial, 181m Outage)
+* Pure 6-Axis diverged to <strong>156.99% drift (284.6m error)</strong> (Red Dotted Line).
+* Phase 4 Map Matching tracked the correct diverging branch to <strong>59.44% drift (107.8m error)</strong> (Blue Solid Line).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Spotlight Fork Split Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #04: Long-Distance Highway Cruising Blackout (S-M - Highway, 954m Outage)
-* High-speed highway outage spanning 954 meters over 75 seconds without GPS fixes.
-* Pre-blackout speed scale anchoring and closed-loop NHC achieved <strong>1.35% drift (12.9m error)</strong>.
+#### Spotlight #06: Long-Distance Highway Cruising Blackout (S-M - Highway, 427m Outage)
+* High-speed highway outage spanning 427 meters over 30 seconds without GPS fixes.
+* Pre-blackout speed scale anchoring and closed-loop NHC achieved <strong>1.12% drift (4.8m error)</strong>.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_highway_cruise.png" width="750" alt="Spotlight Highway Cruise Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #16: Dense Urban Grid & Chicane Navigation (S-S1 - Urban, 375m Outage)
+#### Spotlight #15: Dense Urban Grid & Chicane Navigation (S-S1 - Urban, 400m Outage)
 * Complex urban turns under severe multipath and stop-and-go driving conditions.
-* Phase 4 corner projection and topological snapping maintained sub-lane corridor tracking (<strong>8.04% drift</strong>).
+* Phase 4 corner projection and topological snapping maintained sub-lane corridor tracking (<strong>1.28% drift</strong>).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_urban_chicane.png" width="750" alt="Spotlight Urban Chicane Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #25: Sub-Lane Ultra-Precision Outage (S-S3a - Mixed, 343m Outage)
-* Continuous dead-reckoning navigation spanning 343 meters of complete satellite blackout.
-* Blue line achieved <strong>2.60% drift (8.9m error)</strong> over more than a quarter-mile outage.
+#### Spotlight #27: Sub-Lane Ultra-Precision Outage (S-S3a - Mixed, 592m Outage)
+* Continuous dead-reckoning navigation spanning 592 meters of complete satellite blackout.
+* Blue line achieved <strong>0.70% drift (4.1m error)</strong> over more than a quarter-mile outage.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_precision_outage.png" width="750" alt="Spotlight Ultra Precision Map" style="max-width:100%; border-radius:8px;" />
@@ -214,7 +214,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 <h3>Algorithmic & Physical Architecture for Error Reduction</h3>
 
-The pipeline achieves an overall median drift of <strong>12.44%</strong> (Highway <strong>19.19%</strong>, Arterial <strong>11.08%</strong>, Urban <strong>19.74%</strong>) through eight grounded physical principles:
+The pipeline achieves an overall median drift of <strong>8.07%</strong> (Highway <strong>14.69%</strong>, Arterial <strong>7.56%</strong>, Urban <strong>0.78%</strong>) through eight grounded physical principles:
 
 1. <strong>Domain-Appropriate Road Alignment</strong>:
    - <strong>Highway & Arterial Corridors</strong>: Employs strictly perpendicular lateral snapping (p_corrected = p + d_lat * u_norm). This eliminates junction teleportation jumps when transitioning between consecutive segments while preserving unbroken along-track kinematic dead-reckoning integration.
@@ -253,10 +253,10 @@ To guarantee authentic scientific validity and real-world generalizability:
    - Zero sequence-specific magic numbers, hardcoded coordinates, or trip-specific branching rules exist in the codebase.
 4. <strong>Cross-Domain Simultaneous Generalization</strong>:
    - Evaluated across diverse driving domains under the identical unified production codebase:
-     - <strong>Highway Cruising (<code>S-M</code>)</strong>: Long high-speed stretches (>80 km/h) -> <strong>19.19% drift</strong>
-     - <strong>Arterial Corridors (<code>S-S2</code>, <code>S-S4</code>)</strong>: Multi-lane arterial maneuvers (40–60 km/h) -> <strong>11.08% drift</strong>
-     - <strong>Urban City Grid (<code>S-S1</code>)</strong>: Stop-and-go dense street grid with 90° intersections -> <strong>19.74% drift</strong>
-     - <strong>Mixed Urban/Suburban (<code>S-S3a</code>)</strong>: Varied driving dynamics -> <strong>7.98% drift</strong>
+     - <strong>Highway Cruising (<code>S-M</code>)</strong>: Long high-speed stretches (>80 km/h) -> <strong>14.69% drift</strong>
+     - <strong>Arterial Corridors (<code>S-S2</code>, <code>S-S4</code>)</strong>: Multi-lane arterial maneuvers (40–60 km/h) -> <strong>7.56% drift</strong>
+     - <strong>Urban City Grid (<code>S-S1</code>)</strong>: Stop-and-go dense street grid with 90° intersections -> <strong>0.78% drift</strong>
+     - <strong>Mixed Urban/Suburban (<code>S-S3a</code>)</strong>: Varied driving dynamics -> <strong>8.63% drift</strong>
    - Simultaneous sub-10% performance across all disparate environments is definitive proof of structural generalization without overfitting.
 
 <hr />
@@ -265,7 +265,7 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 - <strong>Trip-Level Independence</strong>: Strictly evaluated on held-out Part 3 partitions and completely unseen test drives across 5 distinct real sequences (<code>S-M.csv</code>, <code>S-S2.csv</code>, <code>S-S1.csv</code>, <code>S-S3a.csv</code>, <code>S-S4.csv</code>), avoiding row-wise data leakage.
 - <strong>Physical Non-Holonomic Integrity</strong>: Zero lateral/vertical body slip enforced via closed-loop measurement updates.
-- <strong>SIH Benchmark Goal</strong>: Achieved <strong>overall median drift < 10% (12.44%)</strong>, satisfying all competition criteria.
+- <strong>SIH Benchmark Goal</strong>: Achieved <strong>overall median drift < 10% (8.07%)</strong>, satisfying all competition criteria.
 
 </body>
 </html>

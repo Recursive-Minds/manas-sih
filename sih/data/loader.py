@@ -83,6 +83,12 @@ class GenericDataLoader:
         col_gy = find_column(raw_cols, self.mapping.gyro_y)
         col_gz = find_column(raw_cols, self.mapping.gyro_z)
 
+        # Fix 1: Disambiguation for S-S4 where Yaw/Roll column labels contain raw X/Z sensor data
+        if any("gyroscope yaw" in c.lower() for c in raw_cols) and any("gyroscope roll" in c.lower() for c in raw_cols):
+            col_gx = next((c for c in raw_cols if "gyroscope yaw" in c.lower()), col_gx)
+            col_gy = next((c for c in raw_cols if "gyroscope pitch" in c.lower()), col_gy)
+            col_gz = next((c for c in raw_cols if "gyroscope roll" in c.lower()), col_gz)
+
         # Optional Mag
         col_mx = find_column(raw_cols, self.mapping.mag_x)
         col_my = find_column(raw_cols, self.mapping.mag_y)
@@ -307,11 +313,11 @@ class GenericDataLoader:
                 for idx in range(n_g):
                     g = gnss_samples[idx]
                     cog = None
-                    if idx > 0:
-                        de = enu_arr[idx, 0] - enu_arr[idx - 1, 0]
-                        dn = enu_arr[idx, 1] - enu_arr[idx - 1, 1]
+                    if idx < n_g - 1:
+                        de = enu_arr[idx + 1, 0] - enu_arr[idx, 0]
+                        dn = enu_arr[idx + 1, 1] - enu_arr[idx, 1]
                         dist = float(np.sqrt(de**2 + dn**2))
-                        if dist > 1.0:
+                        if dist > 2.0:
                             cog = float((np.degrees(np.arctan2(de, dn)) + 360.0) % 360.0)
                             last_cog = cog
                         elif last_cog is not None and (g.speed_mps is None or g.speed_mps > 1.0):

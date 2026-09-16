@@ -135,11 +135,11 @@ def load_precomputed_benchmark_data(device: torch.device, model_path: Optional[s
     can_speeds_dict = {}
 
     can_time_offsets = {
-        "S-S1": 2,     # +0.20s
-        "S-S2": 86,    # +8.60s
-        "S-M": 23,     # +2.30s
-        "S-S3a": -69,  # -6.90s (sub-second cross-correlation aligned)
-        "S-S4": 0,     # synchronous
+        "S-M": 8,       # +0.80s (cross-correlation aligned)
+        "S-S1": 0,      # 0.00s
+        "S-S2": 86,     # +8.60s
+        "S-S3a": -68,   # -6.80s
+        "S-S4": 3138,   # +313.75s (Table A1-1 author hardware restart clock offset)
     }
 
     model, norm_mean, norm_std, model_type = load_ai_model(device, model_path=model_path)

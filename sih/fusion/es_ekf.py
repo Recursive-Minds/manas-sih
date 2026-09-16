@@ -35,7 +35,6 @@ from sih.core.contracts import (
 from sih.core.interfaces import IFusionFilter
 from sih.core.pipeline import register_fusion_filter
 from sih.data.geo import geodetic_to_enu, enu_to_geodetic
-from sih.fusion.speed_smoother import CausalSpeedSmoother
 
 
 # ---------------------------------------------------------------------------
@@ -74,12 +73,18 @@ class ErrorStateEKF(IFusionFilter):
         gnss_pos_std: float = 1.5,
         gnss_vel_std: float = 0.1,
         gnss_heading_std: float = 0.05,        # ~2.8 deg GNSS bearing std (prevents noise jumps)
-        nhc_lateral_std: float = 0.20,
-        nhc_vertical_std: float = 0.20,
+        nhc_lateral_std: float = 0.20,         # Baseline lateral velocity standard deviation (m/s)
+        nhc_vertical_std: float = 0.20,        # Tight vertical chassis standard deviation (m/s)
         turn_threshold_rad_s: float = 0.02618, # 1.5 deg/s turn threshold
         cooldown_duration_s: float = 0.5,      # 0.5s post-turn cooldown
         max_gyro_bias_rad_s: float = 0.008726, # +/- 0.5 deg/s MEMS bias bound
         initial_speed_scale: float = 1.00,     # Dynamic speed scale pre-blackout factor
+        zupt_accel_var_thresh: float = 0.04,   # Threshold for accel variance during rest (m^2/s^4)
+        zupt_gyro_norm_thresh: float = 0.04,   # Threshold for gyro norm during rest (rad/s)
+        zupt_gnorm_err_thresh: float = 0.60,   # Maximum gravity norm error during rest (m/s^2)
+        nhc_rate_factor: float = 0.0,          # Lateral rate-adaptive scaling factor
+        enable_heading_attenuation: bool = False, # Unmodified H_nhc (attenuation occurs naturally via R_nhc)
+        nhc_mount_lever_arm: float = 1.2,      # Physical mount-to-rear-axle lever arm (m)
         enable_nhc: bool = True,
         enable_zupt: bool = True,
     ):
@@ -92,16 +97,31 @@ class ErrorStateEKF(IFusionFilter):
         self.gnss_heading_std = gnss_heading_std
         self.nhc_lat_std = nhc_lateral_std
         self.nhc_vert_std = nhc_vertical_std
+        self.nhc_rate_factor = nhc_rate_factor
+        self.enable_heading_attenuation = enable_heading_attenuation
+        self.nhc_mount_lever_arm = nhc_mount_lever_arm
         self.turn_thresh = turn_threshold_rad_s
         self.cooldown_dur = cooldown_duration_s
         self.max_bg = max_gyro_bias_rad_s
         self.initial_speed_scale = initial_speed_scale
+        self.zupt_accel_var_thresh = zupt_accel_var_thresh
+        self.zupt_gyro_norm_thresh = zupt_gyro_norm_thresh
+        self.zupt_gnorm_err_thresh = zupt_gnorm_err_thresh
         self.enable_nhc = enable_nhc
         self.enable_zupt = enable_zupt
-        self._speed_smoother = CausalSpeedSmoother(a_max_mps2=3.5, a_min_mps2=-5.0, tau_s=0.25)
 
         self.init_highway_extensions()
         self.reset()
+
+    def calibrate_rest_noise_floor(self, stationary_accel_var: float, stationary_gyro_norm: float):
+        """
+        Adapts ZUPT thresholds at runtime to the specific noise floor of the device and vehicle.
+        Ensures rest detection triggers accurately even with engine idling vibration or noisy sensors.
+        """
+        if stationary_accel_var > 0.001:
+            self.zupt_accel_var_thresh = max(self.zupt_accel_var_thresh, float(3.5 * stationary_accel_var))
+        if stationary_gyro_norm > 0.001:
+            self.zupt_gyro_norm_thresh = max(self.zupt_gyro_norm_thresh, float(3.0 * stationary_gyro_norm))
 
     def init_highway_extensions(self):
         """Initializes highway straight-line lock (ZARU) and hybrid speed state."""
@@ -146,7 +166,8 @@ class ErrorStateEKF(IFusionFilter):
         self._last_ai_speed: Optional[float] = None
         self.last_nhc_dtheta_deg: float = 0.0
         self._accel_buf: list[float] = []
-        self._speed_smoother.reset()
+        self._rest_calibration_buffer: list[tuple[float, float]] = []
+        self._current_kappa: float = 0.0
 
         self.init_highway_extensions()
 
@@ -163,6 +184,12 @@ class ErrorStateEKF(IFusionFilter):
         if initial_gnss is not None:
             self.init_from_gnss(initial_gnss)
 
+    def set_maneuver_curvature(self, kappa: float) -> None:
+        """
+        Sets the instantaneous road curvature kappa = 1/R (1/meters).
+        Enables Tier 1 map-curvature scheduling for Non-Holonomic Constraints.
+        """
+        self._current_kappa = float(max(0.0, kappa))
 
     def init_from_gnss(
         self,
@@ -191,7 +218,6 @@ class ErrorStateEKF(IFusionFilter):
         if g.speed_mps is not None and g.speed_mps > 0.5:
             b = self._heading_rad
             self._v = np.array([g.speed_mps * np.sin(b), g.speed_mps * np.cos(b), 0.0], dtype=np.float64)
-            self._speed_smoother.update(g.speed_mps, 0.1)
         else:
             self._v = np.zeros(3, dtype=np.float64)
 
@@ -231,15 +257,7 @@ class ErrorStateEKF(IFusionFilter):
         # Preserve continuous EKF gyro integration through the corner curve.
         is_cornering = (current_yaw_rate_rad_s is not None) and (abs(current_yaw_rate_rad_s) >= np.radians(2.5))
 
-        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 1.0 and g.bearing_deg is not None]
-        latest_moving_hdg = valid_moving[-1].bearing_deg if valid_moving else None
-
-        ekf_hdg_consistent = False
-        if self._initialised and latest_moving_hdg is not None:
-            diff_to_gnss = abs((np.degrees(self._heading_rad) - latest_moving_hdg + 180.0) % 360.0 - 180.0)
-            ekf_hdg_consistent = (diff_to_gnss < 50.0)
-
-        if is_cornering and self._initialised and ekf_hdg_consistent:
+        if is_cornering and self._initialised:
             seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
             is_consistent = True
         else:
@@ -249,32 +267,22 @@ class ErrorStateEKF(IFusionFilter):
 
             # Check if latest valid fix is moving stably (v >= 2.5 m/s)
             if valid_moving and valid_moving[-1].speed_mps is not None and valid_moving[-1].speed_mps >= 2.5:
-                if len(valid_moving) >= 2 and valid_moving[-2].speed_mps is not None and valid_moving[-2].speed_mps >= 2.5:
+                # Fix 2: Prioritize clean GNSS Doppler bearing (0.0° median noise) over noisy 1Hz 2-point displacement
+                if valid_moving[-1].bearing_deg is not None:
+                    seeded_hdg = float(valid_moving[-1].bearing_deg)
+                    is_consistent = True
+                elif len(valid_moving) >= 2 and valid_moving[-2].speed_mps is not None and valid_moving[-2].speed_mps >= 2.5:
                     g_prev = valid_moving[-2]
                     g_last = valid_moving[-1]
                     dt_interval = (g_last.timestamp_ns - g_prev.timestamp_ns) * 1e-9
-                    # Pure 2-point geometric vector displacement if fixes are closely spaced (dt <= 1.5s)
+                    # Pure 2-point geometric vector displacement fallback if fixes are closely spaced (dt <= 1.5s)
                     if dt_interval <= 1.5:
                         enu_prev = geodetic_to_enu(g_prev.latitude_deg, g_prev.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
                         enu_last = geodetic_to_enu(g_last.latitude_deg, g_last.longitude_deg, 0.0, self._ref[0], self._ref[1], self._ref[2])[:2]
                         disp = enu_last - enu_prev
-                        if float(np.linalg.norm(disp)) > 1.5:
+                        if float(np.linalg.norm(disp)) > 3.0:
                             seeded_hdg = float(np.degrees(np.arctan2(disp[0], disp[1]))) % 360.0
                             is_consistent = True
-                if seeded_hdg is None and valid_moving[-1].bearing_deg is not None:
-                    seeded_hdg = float(valid_moving[-1].bearing_deg)
-                    is_consistent = True
-                # Final safety net: if both 2-point displacement and bearing failed,
-                # fall back to any available heading source (mirrors the else-branch chain)
-                if seeded_hdg is None:
-                    any_bearing = [g for g in pre_gnss if g.is_valid and g.bearing_deg is not None and g.speed_mps is not None and g.speed_mps >= 2.0]
-                    if any_bearing:
-                        seeded_hdg = float(any_bearing[-1].bearing_deg)
-                    elif self._initialised:
-                        seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
-                    else:
-                        seeded_hdg = 0.0
-                    is_consistent = False
             else:
                 # Vehicle is crawling (< 2.5 m/s) or stopped.
                 # Look back for the last stable moving fix (v >= 2.0 m/s)
@@ -291,6 +299,18 @@ class ErrorStateEKF(IFusionFilter):
                 else:
                     seeded_hdg = float(np.degrees(self._heading_rad))
                     is_consistent = False
+
+            if seeded_hdg is None:
+                any_bearing = [g for g in pre_gnss if g.is_valid and g.bearing_deg is not None]
+                if any_bearing:
+                    seeded_hdg = float(any_bearing[-1].bearing_deg)
+                elif self._initialised:
+                    seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
+                elif road_bearing_deg is not None:
+                    seeded_hdg = float(road_bearing_deg) % 360.0
+                else:
+                    seeded_hdg = 0.0
+                is_consistent = False
 
             # Physical forward extrapolation via integrated gyro turning
             seeded_hdg = (seeded_hdg + delta_heading_gyro_deg) % 360.0
@@ -323,6 +343,8 @@ class ErrorStateEKF(IFusionFilter):
             self._P[8, 8] = float(np.radians(8.0))**2
 
         return seeded_hdg
+
+    seed_blackout_entry_heading = seed_pre_blackout_heading
 
     def reanchor_heading(self, road_bearing_deg: float, confidence: float = 1.0, forward_speed_mps: Optional[float] = None):
         """
@@ -414,9 +436,13 @@ class ErrorStateEKF(IFusionFilter):
         a_var = float(np.var(self._accel_buf)) if len(self._accel_buf) >= 10 else 1.0
         g_norm_err = abs(g_norm - 9.80665)
 
-        # Physical Rest ZUPT Decoupling (Phase 4.5 breakthrough):
-        # When IMU variance and angular rate indicate physical rest, clamp unconditionally.
-        is_physical_rest = (a_var < 0.04 and g_norm_err < 0.6 and float(np.linalg.norm(raw_gyro)) < 0.04)
+        # Physical Rest ZUPT Decoupling:
+        # Evaluates physical rest against runtime-calibrated noise floor thresholds.
+        is_physical_rest = (
+            a_var < self.zupt_accel_var_thresh
+            and g_norm_err < self.zupt_gnorm_err_thresh
+            and float(np.linalg.norm(raw_gyro)) < self.zupt_gyro_norm_thresh
+        )
 
         is_stationary = (
             is_physical_rest or
@@ -428,24 +454,21 @@ class ErrorStateEKF(IFusionFilter):
         if is_stationary:
             self._stat_count += 1
             v_fwd = 0.0
-            self._speed_smoother.update(0.0, dt)
             if is_physical_rest:
                 w_z_corr = 0.0
         else:
             self._stat_count = 0
             if passed_v_fwd is not None:
-                v_raw = passed_v_fwd
+                self._last_ai_speed = passed_v_fwd
+                v_fwd = passed_v_fwd
             elif vel is not None and vel.forward_speed_mps is not None:
-                v_raw = float(vel.forward_speed_mps) * self._speed_scale
+                self._last_ai_speed = float(vel.forward_speed_mps)
+                v_fwd = float(vel.forward_speed_mps) * self._speed_scale
                 a_x_fwd = float(raw_acc[0]) - self._ba[0]
                 if a_x_fwd < -0.3:
-                    v_raw = max(0.0, v_raw + a_x_fwd * dt)
+                    v_fwd = max(0.0, v_fwd + a_x_fwd * dt)
             else:
-                v_raw = 0.0
-
-            # Causal kinematic slew-rate limiting and low-pass filtering
-            v_fwd = self._speed_smoother.update(v_raw, dt)
-            self._last_ai_speed = v_fwd
+                v_fwd = 0.0
 
 
         # Propagate nominal heading
@@ -525,12 +548,26 @@ class ErrorStateEKF(IFusionFilter):
 
             H_nhc = np.zeros((2, 15), dtype=np.float64)
             H_nhc[0, 3:6] = C_n_b[1, :]
-            H_nhc[0, 6:9] = -(C_n_b @ skew(self._v))[1, :]
+            # RINS-W Invariant Attitude Decoupling:
+            # Velocity and NHC pseudo-measurements must NOT perturb vehicle attitude / heading.
+            # Lateral cornering acceleration and tire sideslip must never twist vehicle yaw.
+            H_nhc[0, 6:9] = 0.0
             H_nhc[1, 3:6] = C_n_b[2, :]
-            H_nhc[1, 6:9] = -(C_n_b @ skew(self._v))[2, :]
+            H_nhc[1, 6:9] = 0.0
 
             y_nhc = np.array([0.0 - v_b[1], 0.0 - v_b[2]], dtype=np.float64)
-            R_nhc = np.diag([self.nhc_lat_std**2, self.nhc_vert_std**2]).astype(np.float64)
+
+            # Two-Tier Curvature-Adaptive NHC noise scheduling (Rajamani 2012 / Daily & Bevly 2004 / Pacejka 2005)
+            L_arm = self.nhc_mount_lever_arm
+            if abs(self._current_kappa) > 0.001:
+                # Tier 1: Vector map curvature scheduling
+                dyn_sigma_lat = float(np.sqrt(self.nhc_lat_std**2 + (L_arm * v_fwd * abs(self._current_kappa))**2 + (0.5 * v_fwd**2 * abs(self._current_kappa))**2))
+            else:
+                # Tier 2: Kinematic fallback based on yaw rate and tire sideslip acceleration
+                dyn_sigma_lat = float(np.sqrt(self.nhc_lat_std**2 + (L_arm * abs(w_z_corr))**2 + (0.5 * abs(w_z_corr * v_fwd))**2))
+
+            dyn_sigma_lat = float(np.clip(dyn_sigma_lat, self.nhc_lat_std, 5.0))
+            R_nhc = np.diag([dyn_sigma_lat**2, self.nhc_vert_std**2]).astype(np.float64)
 
             S_nhc = H_nhc @ self._P @ H_nhc.T + R_nhc
             K_nhc = self._P @ H_nhc.T @ np.linalg.inv(S_nhc)
@@ -539,12 +576,9 @@ class ErrorStateEKF(IFusionFilter):
 
             self._v += dx[3:6]
 
-            # Apply heading correction
-            dtheta_z = dx[8]
-            self._heading_rad = (self._heading_rad + dtheta_z) % (2.0 * np.pi)
-            yaw_enu_rad = np.pi / 2.0 - self._heading_rad
-            self._q = R.from_euler("z", yaw_enu_rad)
-            self.last_nhc_dtheta_deg = float(np.degrees(abs(dtheta_z)))
+            # RINS-W Invariant Attitude Decoupling:
+            # Do NOT update heading from NHC lateral slip innovation.
+            self.last_nhc_dtheta_deg = 0.0
 
             # Continuous Lorentzian damping of gyro bias updates during turns
             omega_turn_ref = 0.02 # ~1.15 deg/s
@@ -598,15 +632,10 @@ class ErrorStateEKF(IFusionFilter):
         if gnss.speed_mps is not None and gnss.bearing_deg is not None and gnss.speed_mps > 2.5:
             gnss_hdg_rad = float(np.radians(gnss.bearing_deg))
             y_hdg = wrap_pi(gnss_hdg_rad - self._heading_rad)
-            # When driving straight (not in cooldown, |w_z| < 1.5 deg/s), GNSS Doppler bearing is high quality.
-            # Decisive convergence when straight; bounded gentle innovation when turning.
-            is_turning = abs(self._last_w_z_corr) > np.radians(1.5) or in_cooldown
-            if is_turning:
-                max_step_rad = np.radians(15.0)
-                step_rad = 0.15 * np.clip(y_hdg, -max_step_rad, max_step_rad)
-            else:
-                gain = 0.85 if abs(y_hdg) > np.radians(35.0) else 0.40
-                step_rad = gain * y_hdg
+            # Smooth innovation update: never completely ignore valid motion heading,
+            # but bound single-step correction to prevent wild receiver outliers from jerking the filter
+            max_step_rad = np.radians(15.0)
+            step_rad = 0.20 * np.clip(y_hdg, -max_step_rad, max_step_rad)
             self._heading_rad = (self._heading_rad + step_rad) % (2.0 * np.pi)
             yaw_enu_rad = np.pi / 2.0 - self._heading_rad
             self._q = R.from_euler("z", yaw_enu_rad)
@@ -628,6 +657,17 @@ class ErrorStateEKF(IFusionFilter):
                 raw_scale = float(gnss.speed_mps / self._last_ai_speed)
                 clipped_scale = float(np.clip(raw_scale, 0.75, 1.35))
                 self._speed_scale = 0.90 * self._speed_scale + 0.10 * clipped_scale
+
+        # Runtime rest calibration when GNSS indicates vehicle is stopped
+        if gnss.speed_mps is not None and gnss.speed_mps < 0.2:
+            if len(self._accel_buf) >= 10:
+                cur_var = float(np.var(self._accel_buf))
+                cur_gnorm = float(np.linalg.norm(self.latest_calibrated_gyro))
+                self._rest_calibration_buffer.append((cur_var, cur_gnorm))
+                if len(self._rest_calibration_buffer) >= 10:
+                    a_vars = [x[0] for x in self._rest_calibration_buffer[-20:]]
+                    g_norms = [x[1] for x in self._rest_calibration_buffer[-20:]]
+                    self.calibrate_rest_noise_floor(float(np.mean(a_vars)), float(np.mean(g_norms)))
 
         self._last_gnss_ts = gnss.timestamp_ns
         return self.get_state(gnss.timestamp_ns)

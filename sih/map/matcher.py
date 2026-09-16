@@ -68,7 +68,7 @@ class HMMMapMatcher(IMapMatcher):
             self._succ_map[s1.segment_id] = []
             for s2 in self.road_network.segments:
                 if s1.segment_id != s2.segment_id:
-                    if np.linalg.norm(s1.end_enu_m - s2.start_enu_m) < 8.0:
+                    if np.linalg.norm(s1.end_enu_m - s2.start_enu_m) < 15.0:
                         self._succ_map[s1.segment_id].append(s2)
 
     def set_reference(self, lat_deg: float, lon_deg: float, alt_m: float = 0.0) -> None:
@@ -182,16 +182,10 @@ class HMMMapMatcher(IMapMatcher):
         is_single_corridor = (num_succs <= 1)
         active_bearing = self._active_segment.bearing_deg if self._active_segment else v_heading_deg
 
-        has_succs = len(self._succ_map.get(self._active_segment.segment_id, [])) > 0 if self._active_segment else False
-
         scored_candidates = []
         for sid, (seg, role) in cands_dict.items():
             proj_enu, d_perp, frac = seg.project_point(p_enu)
             if d_perp > 35.0:
-                continue
-
-            # Reject terminated spatial candidates behind the vehicle
-            if role == "spatial" and frac >= 0.95:
                 continue
 
             h_diff = abs((v_heading_deg - seg.bearing_deg + 180.0) % 360.0 - 180.0)
@@ -199,40 +193,46 @@ class HMMMapMatcher(IMapMatcher):
 
             # Max allowable heading discrepancy:
             if role in ("succ", "succ2"):
-                max_allowed_hdiff = 110.0
-            elif role == "active":
-                max_allowed_hdiff = 110.0 if frac < 0.35 else 80.0
+                max_allowed_hdiff = 105.0
+            elif is_single_corridor:
+                max_allowed_hdiff = 85.0
             else:
-                max_allowed_hdiff = 50.0
+                max_allowed_hdiff = 70.0 if is_turning_intent else 50.0
 
-            if h_diff > max_allowed_hdiff:
+            # Dynamic Turn-Intent Prior at Diverging Junctions:
+            # If the driver is actively steering into a turn:
+            topo_bonus = 1.0
+            if is_turning_intent and not is_single_corridor:
+                # Check if this road branch aligns with the driver's turn direction
+                if abs(branch_turn_deg) > 20.0:
+                    if (self._trailing_turn_deg < -4.0 and branch_turn_deg < -15.0) or \
+                       (self._trailing_turn_deg > 4.0 and branch_turn_deg > 15.0):
+                        # Branch direction matches driver's turn intent!
+                        topo_bonus *= 3.5
+                        max_allowed_hdiff = max(max_allowed_hdiff, 110.0)
+                    else:
+                        # Branch turns in opposite direction
+                        topo_bonus *= 0.2
+                elif abs(branch_turn_deg) <= 15.0:
+                    # Straight continuation branch: downweight when driver is actively turning
+                    if abs(self._trailing_turn_deg) >= 10.0:
+                        topo_bonus *= 0.25
+
+            if v_speed > 1.0 and h_diff > max_allowed_hdiff:
                 continue
 
-            # Topological transition prior & heading bandwidth
-            sigma_h = 35.0
+            # Topological transition prior
             if role == "active":
-                if frac >= 0.95 and has_succs:
-                    topo_bonus = 0.05  # Deprecate active segment when reached end and successors exist
-                elif frac >= 0.85:
-                    topo_bonus = 0.40
-                else:
-                    topo_bonus = 1.50
-                # Widen heading tolerance if chassis is mid-turn on newly entered segment
-                if frac < 0.35:
-                    sigma_h = 60.0
+                topo_bonus *= 0.3 if frac >= 0.90 else 1.5
             elif role == "succ":
                 active_frac = self._active_segment.project_point(p_enu)[2] if self._active_segment else 0.0
-                sigma_h = 60.0 if active_frac >= 0.70 else 40.0
-                topo_bonus = 6.0 if active_frac >= 0.75 else 2.0
+                topo_bonus *= 3.0 if active_frac >= 0.75 else 1.2
             elif role == "succ2":
-                sigma_h = 55.0
-                topo_bonus = 1.0
-            elif role == "spatial":
-                topo_bonus = 0.02 if self._active_segment is not None else 1.0
+                topo_bonus *= 1.0
 
             # Soft Likelihood
             p_dist = np.exp(-0.5 * (d_perp / 12.0) ** 2)
-            p_head = np.exp(-0.5 * (h_diff / sigma_h) ** 2)
+            p_head = np.exp(-0.5 * (h_diff / 35.0) ** 2)
             score = float(p_dist * p_head * topo_bonus)
 
             scored_candidates.append((seg, proj_enu, d_perp, h_diff, score, frac))
@@ -244,9 +244,12 @@ class HMMMapMatcher(IMapMatcher):
         best_seg, best_proj, best_dist, best_h_diff, best_score, frac = scored_candidates[0]
 
         # Domain-Appropriate Road Snapping:
-        if domain == "Urban" or best_h_diff > 40.0:
+        if domain == "Urban" or best_h_diff > 40.0 or is_turning_intent:
+            # Urban grid intersections & sharp turns: project to corner point
             snapped_enu = best_proj.copy()
         else:
+            # Highway / Arterial corridor: strictly perpendicular lateral snap
+            # Preserves along-track DR integration without coordinate teleportation
             seg_vec = best_seg.end_enu_m - best_seg.start_enu_m
             seg_len = float(np.linalg.norm(seg_vec))
             if seg_len > 1e-3:
@@ -260,25 +263,14 @@ class HMMMapMatcher(IMapMatcher):
         # Closed-Loop EKF Feedback (if EKF instance provided):
         if ekf is not None:
             if hasattr(ekf, "_p"):
-                # Anti-boundary clamping: do not pin EKF to startpoint or endpoint during sharp junction maneuvers
-                is_boundary_clamp = (frac >= 0.98 or frac <= 0.01) and (v_speed > 1.0) and (best_h_diff > 40.0)
-                if not is_boundary_clamp:
-                    ekf._p[0] = snapped_enu[0]
-                    ekf._p[1] = snapped_enu[1]
-
+                ekf._p[0] = snapped_enu[0]
+                ekf._p[1] = snapped_enu[1]
             if hasattr(ekf, "reanchor_heading"):
-                if best_seg != self._active_segment:
-                    # Discrete topological transition onto new road! Promptly steer heading into new road corridor
-                    ekf.reanchor_heading(best_seg.bearing_deg, confidence=0.85, forward_speed_mps=v_speed)
-                    diff_rad = (np.radians(best_seg.bearing_deg) - ekf._heading_rad + np.pi) % (2.0 * np.pi) - np.pi
-                    ekf._heading_rad = (ekf._heading_rad + 0.50 * diff_rad) % (2.0 * np.pi)
-                    yaw_enu = np.pi / 2.0 - ekf._heading_rad
-                    from scipy.spatial.transform import Rotation as R
-                    ekf._q = R.from_euler("z", yaw_enu)
-                    if hasattr(ekf, "_v") and v_speed > 0.5:
-                        ekf._v = ekf._q.as_matrix() @ np.array([v_speed, 0.0, 0.0], dtype=np.float64)
-                else:
-                    conf = 0.40 if best_h_diff < 20.0 else 0.15
+                # Only re-anchor heading if NOT actively cornering across a junction.
+                # If the vehicle is mid-turn (|h_diff| > 20 deg or is_turning_intent),
+                # let the gyroscope continue to integrate the turn without fighting the steering!
+                if not (is_turning_intent and best_h_diff > 20.0):
+                    conf = 0.5 if turn_rate_dps < 1.5 else 0.15
                     ekf.reanchor_heading(best_seg.bearing_deg, confidence=conf, forward_speed_mps=v_speed)
 
         self._active_segment = best_seg
