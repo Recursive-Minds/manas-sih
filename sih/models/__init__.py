@@ -14,6 +14,7 @@ from sih.models.losses import (
 )
 
 from sih.models.export_onnx import export_moe_to_onnx
+from sih.models.inference import load_ai_model, predict_velocities
 
 __all__ = [
     "IMUVelocityDataset",
@@ -30,4 +31,6 @@ __all__ = [
     "l_drift_windowed",
     "l_jerk_hinge",
     "export_moe_to_onnx",
+    "load_ai_model",
+    "predict_velocities",
 ]

@@ -279,3 +279,44 @@ class RoadNetwork:
                     network.add_segment(seg)
 
         return network
+
+
+def build_road_network_from_trip(
+    trip: Any,
+    prefix: str = "sm_road",
+    min_step_m: float = 10.0,
+    cell_size_m: float = 100.0,
+) -> Tuple[RoadNetwork, np.ndarray]:
+    """
+    Constructs a topological RoadNetwork from a recorded trip's valid GNSS trajectory.
+    Decimates vertices to min_step_m to build clean polylines.
+    """
+    from sih.data.geo import geodetic_to_enu
+
+    valid_gnss = [g for g in trip.gnss_samples if g.is_valid]
+    raw_enu = [
+        geodetic_to_enu(
+            g.latitude_deg, g.longitude_deg, 0.0,
+            trip.reference_lat_deg, trip.reference_lon_deg, 0.0
+        )[:2]
+        for g in valid_gnss
+    ]
+    raw_ll = [[g.latitude_deg, g.longitude_deg] for g in valid_gnss]
+
+    filtered_enu = [raw_enu[0]]
+    filtered_ll = [raw_ll[0]]
+    for i in range(1, len(raw_enu)):
+        dist = np.linalg.norm(raw_enu[i] - filtered_enu[-1])
+        if dist >= min_step_m:
+            filtered_enu.append(raw_enu[i])
+            filtered_ll.append(raw_ll[i])
+
+    pts_enu = np.array(filtered_enu)
+    pts_ll = np.array(filtered_ll)
+
+    net = RoadNetwork.from_polyline_coords(pts_enu, pts_ll, prefix, cell_size_m=cell_size_m)
+    return net, pts_enu
+
+
+# Convenient alias
+build_road_network = build_road_network_from_trip

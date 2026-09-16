@@ -31,433 +31,18 @@ os.environ["OMP_NUM_THREADS"] = "8"
 from sih.data.loader import GenericDataLoader
 from sih.calibration.mount import MountCalibrator
 from sih.fusion.es_ekf import ErrorStateEKF
-from sih.models.tcn_attention import TCNAttentionVelocityModel
-from sih.models.resnet1d import ResNet1DSpeedEstimator
-from sih.models.moe_fusion import BayesianMoEFusion
-from sih.map.network import RoadNetwork
-from sih.map.governor import RoadKinematicsGovernor
-from sih.map.matcher import HMMMapMatcher
+from sih.models.inference import load_ai_model, predict_velocities
+from sih.map.network import RoadNetwork, build_road_network_from_trip as build_road_network
 from sih.data.geo import geodetic_to_enu
 from sih.core.contracts import VelocityEstimate, GNSSSample
 from sih.data.split import compute_trip_partition
+from sih.engine.dead_reckoning_engine import run_dead_reckoning_scenario as run_scenario
 
 ARTIFACT_DIR = os.path.join(ROOT_DIR, "artifacts")
 DATA_DIR = os.path.join(ROOT_DIR, "data", "raw", "iovnbd_trips")
 MODEL_MOE_PATH = os.path.join(ROOT_DIR, "models", "checkpoints", "best_moe_velocity_model.pt")
 MODEL_TCN_PATH = os.path.join(ROOT_DIR, "models", "checkpoints", "best_velocity_model.pt")
 REPORT_PATH = os.path.join(ROOT_DIR, "FINAL_JUDGE_EVALUATION_REPORT.md")
-
-
-def build_road_network(trip, prefix="sm_road"):
-    valid_gnss = [g for g in trip.gnss_samples if g.is_valid]
-    raw_enu = [geodetic_to_enu(g.latitude_deg, g.longitude_deg, 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2] for g in valid_gnss]
-    raw_ll  = [[g.latitude_deg, g.longitude_deg] for g in valid_gnss]
-
-    filtered_enu = [raw_enu[0]]
-    filtered_ll  = [raw_ll[0]]
-    for i in range(1, len(raw_enu)):
-        dist = np.linalg.norm(raw_enu[i] - filtered_enu[-1])
-        if dist >= 10.0:
-            filtered_enu.append(raw_enu[i])
-            filtered_ll.append(raw_ll[i])
-
-    pts_enu = np.array(filtered_enu)
-    pts_ll  = np.array(filtered_ll)
-
-    net = RoadNetwork.from_polyline_coords(pts_enu, pts_ll, prefix, cell_size_m=100.0)
-    return net, pts_enu
-
-
-def load_ai_model(device, model_path=None):
-    target_moe_path = model_path if model_path and os.path.exists(model_path) else MODEL_MOE_PATH
-    if os.path.exists(target_moe_path):
-        print(f"[AI Model] Loading Unified MoE Checkpoint: {target_moe_path}")
-        ckpt = torch.load(target_moe_path, map_location=device, weights_only=False)
-        in_channels = ckpt.get("in_channels", 12)
-        expert_res = ResNet1DSpeedEstimator(in_channels=in_channels, base_channels=64)
-        expert_tcn = TCNAttentionVelocityModel(in_channels=in_channels, base_channels=32, num_attention_heads=4)
-        expert_res.load_state_dict(ckpt["expert_resnet_state_dict"])
-        expert_tcn.load_state_dict(ckpt["expert_tcn_state_dict"])
-        model = BayesianMoEFusion(expert_res, expert_tcn).to(device)
-        model.eval()
-
-        norm_mean = ckpt.get("norm_mean", ckpt.get("mean"))
-        norm_std = ckpt.get("norm_std", ckpt.get("std"))
-        if norm_mean.ndim == 1 or norm_mean.shape[0] == 1:
-            norm_mean = norm_mean.reshape(-1, 1)
-        if norm_std.ndim == 1 or norm_std.shape[0] == 1:
-            norm_std = norm_std.reshape(-1, 1)
-        return model, norm_mean.astype(np.float32), norm_std.astype(np.float32), "moe"
-
-    print(f"[AI Model] Loading Baseline Checkpoint: {MODEL_TCN_PATH}")
-    ckpt = torch.load(MODEL_TCN_PATH, map_location=device, weights_only=False)
-    model = TCNAttentionVelocityModel(in_channels=8, base_channels=32, num_attention_heads=4)
-    model.load_state_dict(ckpt["model_state_dict"])
-    model.to(device)
-    model.eval()
-    norm_mean = ckpt.get("norm_mean", np.zeros((8, 1), dtype=np.float32))
-    norm_std = ckpt.get("norm_std", np.ones((8, 1), dtype=np.float32))
-    return model, norm_mean, norm_std, "tcn"
-
-
-def predict_velocities(model, calib_samples, norm_mean, norm_std, device, model_type="moe", trip_id="S-M"):
-    if model_type == "moe":
-        cache_file = os.path.join(ROOT_DIR, "data", "cache", f"{trip_id}_features_12ch.npz")
-        if os.path.exists(cache_file):
-            feats = np.load(cache_file)["feats"].astype(np.float32)
-        else:
-            from sih.data.spectral import DualBandSpectralExtractor
-            from sih.data.vibration import VibrationConditioner
-            cond = VibrationConditioner(sampling_rate=10.0)
-            spec = DualBandSpectralExtractor(sampling_rate=10.0)
-            acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
-            gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
-            f_accel, f_gyro = cond.filter_imu_sequence(acc, gyr)
-            raw_6 = np.hstack([f_accel, f_gyro])
-            norm_a = np.linalg.norm(f_accel, axis=1, keepdims=True)
-            norm_w = np.linalg.norm(f_gyro, axis=1, keepdims=True)
-            spec_feats = spec.extract_sequence_features(raw_6, window_len=60, stride=5)
-            feats = np.hstack([raw_6, norm_a, norm_w, spec_feats]).astype(np.float32)
-
-        N = len(feats)
-        norm_feats = (feats.T - norm_mean) / (norm_std + 1e-6)
-        short_len, long_len = 20, 60
-        pad_l = np.repeat(norm_feats[:, 0:1], long_len - 1, axis=1)
-        padded_feats = np.hstack([pad_l, norm_feats]).astype(np.float32)
-
-        from numpy.lib.stride_tricks import sliding_window_view
-        windows_l = sliding_window_view(padded_feats, window_shape=long_len, axis=1)
-        windows_l = np.ascontiguousarray(windows_l.transpose(1, 0, 2)).astype(np.float32)
-        windows_s = np.ascontiguousarray(windows_l[:, :, -short_len:]).astype(np.float32)
-
-        preds = []
-        batch_size = 4096
-        with torch.no_grad():
-            for b in range(0, N, batch_size):
-                b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(device)
-                b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(device)
-                with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
-                    vf, _, _ = model(b_s, b_l)
-                preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
-        return np.array(preds, dtype=np.float32)
-
-    acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
-    gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
-    feats = np.hstack([acc, gyr, np.linalg.norm(acc, axis=1, keepdims=True), np.linalg.norm(gyr, axis=1, keepdims=True)])
-
-    N = len(feats)
-    window_size = 100
-    windows = []
-    for i in range(N):
-        if i < window_size:
-            pad = np.repeat(feats[0:1], window_size - i - 1, axis=0)
-            w = np.vstack([pad, feats[:i + 1]]).T
-        else:
-            w = feats[i - window_size + 1 : i + 1].T
-        windows.append((w - norm_mean) / norm_std)
-
-    preds = []
-    with torch.no_grad():
-        for b in range(0, N, 2048):
-            x = torch.from_numpy(np.array(windows[b : b + 2048], dtype=np.float32)).to(device)
-            p, _ = model(x)
-            preds.extend(p.cpu().numpy().flatten())
-    return np.array(preds, dtype=np.float32)
-
-
-def run_scenario(trip, calib_samples, v_preds, road_net, g_entry, duration_s, domain="Highway", can_speeds=None):
-    t0_ns = trip.imu_samples[0].timestamp_ns
-    bo_start_ns = g_entry.timestamp_ns
-    bo_end_ns   = bo_start_ns + int(duration_s * 1e9)
-
-    valid_gnss = [g for g in trip.gnss_samples if g.is_valid]
-    bo_gnss = [x for x in valid_gnss if bo_start_ns <= x.timestamp_ns <= bo_end_ns]
-    if len(bo_gnss) < 3:
-        return None
-
-    gt_pts = [geodetic_to_enu(g.latitude_deg, g.longitude_deg, 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2] for g in bo_gnss]
-    gt_pts = np.array(gt_pts)
-    gt_start_enu = gt_pts[0]
-    gt_end_enu   = gt_pts[-1]
-    gt_dist = float(np.sum(np.linalg.norm(np.diff(gt_pts, axis=0), axis=1)))
-
-    if gt_dist < 15.0:
-        return None
-
-    warmup_start_ns = max(t0_ns, bo_start_ns - int(30.0 * 1e9))
-    warmup_gnss = min([g for g in valid_gnss if g.timestamp_ns <= bo_start_ns], key=lambda g: abs(g.timestamp_ns - warmup_start_ns), default=valid_gnss[0])
-
-    ekf_pure = ErrorStateEKF(turn_threshold_rad_s=np.radians(1.5), cooldown_duration_s=0.5, max_gyro_bias_rad_s=np.radians(0.1), initial_speed_scale=1.00)
-    ekf_pure.init_from_gnss(warmup_gnss, reference_lat_deg=trip.reference_lat_deg, reference_lon_deg=trip.reference_lon_deg, reference_alt_m=0.0)
-
-    ekf_map = ErrorStateEKF(turn_threshold_rad_s=np.radians(1.5), cooldown_duration_s=0.5, max_gyro_bias_rad_s=np.radians(0.1), initial_speed_scale=1.00)
-    ekf_map.init_from_gnss(warmup_gnss, reference_lat_deg=trip.reference_lat_deg, reference_lon_deg=trip.reference_lon_deg, reference_alt_m=0.0)
-
-    # Road governor: AASHTO/IRC highway comfort limit (1.2 m/s^2) on highway; intersection limit (3.5 m/s^2) elsewhere
-    governor = RoadKinematicsGovernor(a_lat_max=1.2 if domain == "Highway" else 3.5, speed_limit_mps=33.3)
-    matcher = HMMMapMatcher(
-        road_network=road_net,
-        reference_lat_deg=trip.reference_lat_deg,
-        reference_lon_deg=trip.reference_lon_deg,
-        smoothing_factor=0.35,
-    )
-
-    n_gnss = len(trip.gnss_samples)
-    gnss_idx = 0
-    while gnss_idx < n_gnss and trip.gnss_samples[gnss_idx].timestamp_ns < warmup_start_ns:
-        gnss_idx += 1
-
-    pure_pts = []
-    map_pts  = []
-    map_ts_list = []
-    pure_speeds = []
-    map_speeds  = []
-    blackout_started = False
-    speed_scale = 1.00
-    v_entry = 10.0
-    active_seg = None
-
-    for j, imu in enumerate(trip.imu_samples):
-        t_curr = imu.timestamp_ns
-        if t_curr < warmup_start_ns: continue
-        if t_curr > bo_end_ns + int(1e9): break
-
-        while gnss_idx < n_gnss and trip.gnss_samples[gnss_idx].timestamp_ns <= t_curr:
-            g = trip.gnss_samples[gnss_idx]
-            if g.timestamp_ns <= bo_start_ns:
-                ekf_pure.update_gnss(g)
-                ekf_map.update_gnss(g)
-                if g.speed_mps is not None and g.speed_mps > 3.0 and g.bearing_deg is not None:
-                    b_rad = float(np.radians(g.bearing_deg))
-                    ekf_pure._heading_rad = b_rad
-                    ekf_map._heading_rad = b_rad
-            gnss_idx += 1
-
-        cal = calib_samples[j]
-
-        if not blackout_started and t_curr >= bo_start_ns:
-            blackout_started = True
-            ekf_pure._p[0] = gt_start_enu[0]
-            ekf_pure._p[1] = gt_start_enu[1]
-            ekf_map._p[0]  = gt_start_enu[0]
-            ekf_map._p[1]  = gt_start_enu[1]
-
-            # 1. Synthesize 1.0 Hz historical GNSS stream for testing on sparse IO-VNBD dataset
-            # Emulates real-world Android FusedLocationProvider 1 Hz stream with ZERO future lookahead
-            valid_hist_gnss = [g for g in valid_gnss if g.timestamp_ns <= bo_start_ns]
-            recent_hist = [g for g in valid_hist_gnss if bo_start_ns - int(25.0 * 1e9) <= g.timestamp_ns <= bo_start_ns]
-            if len(recent_hist) < 2 and len(valid_hist_gnss) >= 2:
-                recent_hist = valid_hist_gnss[-2:]
-
-            pre_gnss_window = []
-            if len(recent_hist) >= 2:
-                t_hist = np.array([g.timestamp_ns for g in recent_hist], dtype=np.float64)
-                lat_hist = np.array([g.latitude_deg for g in recent_hist], dtype=np.float64)
-                lon_hist = np.array([g.longitude_deg for g in recent_hist], dtype=np.float64)
-                alt_hist = np.array([g.altitude_m if g.altitude_m is not None else 0.0 for g in recent_hist], dtype=np.float64)
-                spd_hist = np.array([g.speed_mps if g.speed_mps is not None else 0.0 for g in recent_hist], dtype=np.float64)
-
-                t_start_grid = max(t_hist[0], bo_start_ns - int(15.0 * 1e9))
-                t_1hz = np.arange(t_start_grid, t_hist[-1] + int(1e6), int(1e9))
-                if len(t_1hz) >= 2:
-                    lats_1hz = np.interp(t_1hz, t_hist, lat_hist)
-                    lons_1hz = np.interp(t_1hz, t_hist, lon_hist)
-                    alts_1hz = np.interp(t_1hz, t_hist, alt_hist)
-                    spds_1hz = np.interp(t_1hz, t_hist, spd_hist)
-
-                    enu_list = [geodetic_to_enu(lats_1hz[k], lons_1hz[k], 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2] for k in range(len(t_1hz))]
-                    for k in range(len(t_1hz)):
-                        b_k = None
-                        if k > 0:
-                            de = enu_list[k][0] - enu_list[k-1][0]
-                            dn = enu_list[k][1] - enu_list[k-1][1]
-                            dist = float(np.sqrt(de**2 + dn**2))
-                            if dist > 0.5:
-                                b_k = float((np.degrees(np.arctan2(de, dn)) + 360.0) % 360.0)
-                        pre_gnss_window.append(GNSSSample(
-                            timestamp_ns=int(t_1hz[k]),
-                            latitude_deg=float(lats_1hz[k]),
-                            longitude_deg=float(lons_1hz[k]),
-                            altitude_m=float(alts_1hz[k]),
-                            speed_mps=float(spds_1hz[k]),
-                            bearing_deg=b_k,
-                            accuracy_h_m=3.0,
-                            is_valid=True,
-                        ))
-
-            if not pre_gnss_window:
-                pre_gnss_window = recent_hist if recent_hist else [g for g in valid_gnss if bo_start_ns - int(15.0 * 1e9) <= g.timestamp_ns <= bo_start_ns]
-
-            # Dynamic pre-blackout speed scale factor learning from healthy GNSS fixes
-            if pre_gnss_window:
-                v_entry = float(pre_gnss_window[-1].speed_mps) if pre_gnss_window[-1].speed_mps is not None else 8.0
-                g_speeds = [g.speed_mps for g in pre_gnss_window if g.speed_mps is not None and g.speed_mps > 2.0]
-                ai_speeds = [v_preds[k] for k in range(max(0, j - len(g_speeds) * 10), j)]
-                if len(g_speeds) >= 3 and len(ai_speeds) >= 10:
-                    scale = np.mean(g_speeds) / max(0.5, np.mean(ai_speeds))
-                    speed_scale = float(np.clip(scale, 0.85, 1.38 if domain == "Highway" else 1.25))
-
-            # Locate reference fix used for heading seeding and integrate gyro forward from that fix
-            valid_moving = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
-            if valid_moving and valid_moving[-1].speed_mps >= 2.5:
-                ref_fix = valid_moving[-1]
-            else:
-                stable_fixes = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None]
-                ref_fix = stable_fixes[-1] if stable_fixes else (valid_moving[-1] if valid_moving else (pre_gnss_window[-1] if pre_gnss_window else None))
-
-            delta_gyro_deg = 0.0
-            if ref_fix is not None:
-                last_g_ts = ref_fix.timestamp_ns
-                for k_imu in range(len(trip.imu_samples)):
-                    t_k = trip.imu_samples[k_imu].timestamp_ns
-                    if last_g_ts < t_k <= bo_start_ns:
-                        dt_k = (t_k - trip.imu_samples[k_imu-1].timestamp_ns) * 1e-9
-                        delta_gyro_deg += np.degrees(calib_samples[k_imu].gyro_vehicle[2] * dt_k)
-
-            init_road_bearing = None
-            init_cands = road_net.find_candidates(gt_start_enu, radius_m=35.0)
-            curr_est_hdg = float(np.degrees(ekf_map._heading_rad)) % 360.0
-            best_cand = None
-            min_cost = 1e9
-            for s in init_cands:
-                proj, d_p, _ = s.project_point(gt_start_enu)
-                b_diff = abs((s.bearing_deg - curr_est_hdg + 180.0) % 360.0 - 180.0)
-                if d_p < 25.0 and b_diff < 35.0:
-                    cost = d_p + 0.5 * b_diff
-                    if cost < min_cost:
-                        min_cost = cost
-                        best_cand = s
-            if best_cand is not None:
-                init_road_bearing = best_cand.bearing_deg
-                matcher.set_active_segment(best_cand)
-
-            turn_rate_entry = float(cal.gyro_vehicle[2])
-            ekf_pure.seed_pre_blackout_heading(
-                pre_gnss_window,
-                road_bearing_deg=init_road_bearing,
-                delta_heading_gyro_deg=delta_gyro_deg,
-                current_yaw_rate_rad_s=turn_rate_entry,
-            )
-            ekf_map.seed_pre_blackout_heading(
-                pre_gnss_window,
-                road_bearing_deg=init_road_bearing,
-                delta_heading_gyro_deg=delta_gyro_deg,
-                current_yaw_rate_rad_s=turn_rate_entry,
-            )
-            seeded_hdg = float(np.degrees(ekf_pure._heading_rad)) % 360.0
-            if g_entry.bearing_deg is not None:
-                gt_hdg_entry = float(g_entry.bearing_deg)
-            elif len(gt_pts) >= 2:
-                v_gt_start = gt_pts[1] - gt_pts[0]
-                gt_hdg_entry = float(np.degrees(np.arctan2(v_gt_start[0], v_gt_start[1])) % 360.0)
-            else:
-                gt_hdg_entry = seeded_hdg
-            hdg_seed_err = float(abs((seeded_hdg - gt_hdg_entry + 180.0) % 360.0 - 180.0))
-
-        v_fwd = float(v_preds[j]) * (speed_scale if blackout_started else 1.0)
-        
-        # Apply closed-loop Road Kinematics Governor during blackout
-        local_kappa = 0.0
-        if blackout_started:
-            turn_rate_yaw = float(cal.gyro_vehicle[2])
-            nearest_segs = road_net.find_candidates(ekf_map._p[:2], radius_m=35.0)
-            if nearest_segs and len(nearest_segs) >= 2:
-                p1 = nearest_segs[0].start_enu_m
-                p2 = nearest_segs[0].end_enu_m
-                p3 = nearest_segs[1].end_enu_m
-                kappas = governor.compute_curvature(np.array([p1, p2, p3]))
-                local_kappa = float(np.max(kappas))
-            v_fwd, _ = governor.govern_speed(v_fwd, curvature=local_kappa, yaw_rate_rad_s=turn_rate_yaw)
-
-        m_state = "STATIONARY" if v_fwd < 0.2 else "DRIVING"
-        vel = VelocityEstimate(timestamp_ns=t_curr, forward_speed_mps=v_fwd, speed_variance=0.3, motion_state=m_state)
-
-        fused_pure = ekf_pure.predict(cal, vel)
-        fused_map  = ekf_map.predict(cal, vel)
-
-        if bo_start_ns <= t_curr <= bo_end_ns and v_fwd > 1.0:
-            matcher.match(fused_map, ekf=ekf_map, domain=domain, v_fwd=v_fwd)
-
-        if bo_start_ns <= t_curr <= bo_end_ns:
-            pure_pts.append(fused_pure.position_enu_m[:2].copy())
-            map_pts.append(ekf_map._p[:2].copy())
-            map_ts_list.append(t_curr)
-            pure_speeds.append(float(np.linalg.norm(fused_pure.velocity_enu_mps)))
-            map_speeds.append(float(np.linalg.norm(ekf_map._v)))
-
-    pure_pts = np.array(pure_pts)
-    map_pts  = np.array(map_pts)
-
-    if len(pure_pts) < 2 or len(map_pts) < 2:
-        return None
-
-    # Ground truth timestamp synchronization: evaluate at last valid blackout GNSS fix
-    map_ts_arr = np.array(map_ts_list, dtype=np.float64)
-    gt_ts_arr  = np.array([g.timestamp_ns for g in bo_gnss], dtype=np.float64)
-    gt_spd_arr = np.array([g.speed_mps for g in bo_gnss], dtype=np.float64)
-
-    eval_east = float(np.interp(gt_ts_arr[-1], map_ts_arr, map_pts[:, 0]))
-    eval_north = float(np.interp(gt_ts_arr[-1], map_ts_arr, map_pts[:, 1]))
-    eval_pt = np.array([eval_east, eval_north])
-
-    eval_pure_east = float(np.interp(gt_ts_arr[-1], map_ts_arr, pure_pts[:, 0]))
-    eval_pure_north = float(np.interp(gt_ts_arr[-1], map_ts_arr, pure_pts[:, 1]))
-    eval_pure_pt = np.array([eval_pure_east, eval_pure_north])
-
-    final_err_pure = float(np.linalg.norm(eval_pure_pt - gt_end_enu))
-    final_err_map  = float(np.linalg.norm(eval_pt - gt_end_enu))
-    pure_drift_pct = (final_err_pure / gt_dist) * 100.0
-    map_drift_pct  = (final_err_map  / gt_dist) * 100.0
-
-    # Time-series error decomposition along the blackout duration
-    gt_interp_e = np.interp(map_ts_arr, gt_ts_arr, gt_pts[:, 0])
-    gt_interp_n = np.interp(map_ts_arr, gt_ts_arr, gt_pts[:, 1])
-    gt_spd_interp = np.interp(map_ts_arr, gt_ts_arr, gt_spd_arr)
-
-    # Use true 10 Hz continuous vehicle CAN wheel speed as ground truth when available
-    if can_speeds is not None and len(can_speeds) >= len(trip.imu_samples):
-        imu_ts_arr = np.array([imu.timestamp_ns for imu in trip.imu_samples], dtype=np.float64)
-        can_spd_interp = np.interp(map_ts_arr, imu_ts_arr, can_speeds).astype(np.float32)
-    else:
-        can_spd_interp = gt_spd_interp.astype(np.float32)
-
-    err_pure_series = np.hypot(pure_pts[:, 0] - gt_interp_e, pure_pts[:, 1] - gt_interp_n)
-    err_map_series  = np.hypot(map_pts[:, 0] - gt_interp_e, map_pts[:, 1] - gt_interp_n)
-
-    de = np.gradient(gt_interp_e)
-    dn = np.gradient(gt_interp_n)
-    ds = np.hypot(de, dn) + 1e-6
-    te = de / ds
-    tn = dn / ds
-    diff_e = map_pts[:, 0] - gt_interp_e
-    diff_n = map_pts[:, 1] - gt_interp_n
-    along_track_series = diff_e * te + diff_n * tn
-    cross_track_series = diff_e * (-tn) + diff_n * te
-    time_rel_s = (map_ts_arr - bo_start_ns) * 1e-9
-
-    return {
-        "t_start_s": (bo_start_ns - t0_ns) * 1e-9,
-        "duration_s": duration_s,
-        "dist_m": gt_dist,
-        "pure_err_m": final_err_pure,
-        "pure_drift_pct": pure_drift_pct,
-        "map_err_m": final_err_map,
-        "map_drift_pct": map_drift_pct,
-        "pure_pts": pure_pts,
-        "map_pts": map_pts,
-        "gt_pts": gt_pts,
-        "time_rel_s": time_rel_s,
-        "pure_speeds": np.array(pure_speeds),
-        "map_speeds": np.array(map_speeds),
-        "gt_speeds": can_spd_interp,
-        "gt_can_speeds": can_spd_interp,
-        "gt_gps_speeds": gt_spd_interp,
-        "err_pure_series": err_pure_series,
-        "err_map_series": err_map_series,
-        "along_track_series": along_track_series,
-        "cross_track_series": cross_track_series,
-        "hdg_seed_err": hdg_seed_err,
-    }
 
 
 
@@ -558,11 +143,11 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
     can_speeds_dict = {}
 
     can_time_offsets = {
-        "S-S1": 1,    # +0.10s
-        "S-S2": 86,   # +8.60s
-        "S-M": 17,    # +1.70s
-        "S-S3a": 0,   # synchronous
-        "S-S4": 0,    # synchronous
+        "S-S1": 2,     # +0.20s
+        "S-S2": 86,    # +8.60s
+        "S-M": 23,     # +2.30s
+        "S-S3a": -69,  # -6.90s (sub-second cross-correlation aligned)
+        "S-S4": 0,     # synchronous
     }
 
     model, norm_mean, norm_std, model_type = load_ai_model(device, model_path=model_path)
@@ -1029,9 +614,9 @@ def generate_markdown_report(
 ):
     t_now = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
-    # Encode images into base64 data URIs for 100% standalone portability
-    chart_b64 = _file_to_base64(os.path.join(ARTIFACT_DIR, "phase4_unseen_sm_drift_comparison_chart.png"))
-    gallery_b64 = _file_to_base64(os.path.join(ARTIFACT_DIR, "unseen_sm_all_tiers_gallery.png"))
+    # Clean relative image paths so Markdown reports remain lightweight and viewable in Git/IDE preview
+    chart_rel = "artifacts/phase4_unseen_sm_drift_comparison_chart.png"
+    gallery_rel = "artifacts/unseen_sm_all_tiers_gallery.png"
 
     st = spotlights["sharp_turn"]
     fs = spotlights["fork_split"]
@@ -1039,11 +624,11 @@ def generate_markdown_report(
     uc = spotlights["urban_chicane"]
     pr = spotlights["precision"]
 
-    st_b64 = _file_to_base64(st["plot_path"])
-    fs_b64 = _file_to_base64(fs["plot_path"])
-    hc_b64 = _file_to_base64(hc["plot_path"])
-    uc_b64 = _file_to_base64(uc["plot_path"])
-    pr_b64 = _file_to_base64(pr["plot_path"])
+    st_rel = "artifacts/map_scenario_spotlight_sharp_turn.png"
+    fs_rel = "artifacts/map_scenario_spotlight_fork_split.png"
+    hc_rel = "artifacts/map_scenario_spotlight_highway_cruise.png"
+    uc_rel = "artifacts/map_scenario_spotlight_urban_chicane.png"
+    pr_rel = "artifacts/map_scenario_spotlight_precision_outage.png"
 
     status_med = "PASSED" if med_drift <= 10.0 else "NEAR TARGET"
     status_p90 = "PASSED" if p90_drift <= 35.0 else "NEAR TARGET"
@@ -1156,7 +741,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 ### Drift Distribution on Unseen Test Sequences
 
 <p align="center">
-  <img src="data:image/png;base64,{chart_b64}" width="850" alt="Drift Comparison Chart" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="{chart_rel}" width="850" alt="Drift Comparison Chart" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 ---
@@ -1164,7 +749,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 ### Trajectory Visualizations: Master All-Tiers Gallery
 
 <p align="center">
-  <img src="data:image/png;base64,{gallery_b64}" width="1100" alt="Master 9-Panel Trajectory Gallery" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="{gallery_rel}" width="1100" alt="Master 9-Panel Trajectory Gallery" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 ---
@@ -1193,7 +778,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 * With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (**{st['map_drift_pct']:.2f}% drift** vs Pure DR **{st['pure_drift_pct']:.2f}%**).
 
 <p align="center">
-  <img src="data:image/png;base64,{st_b64}" width="750" alt="Spotlight Sharp Turn Map" style="max-width:100%; border-radius:8px;" />
+  <img src="{st_rel}" width="750" alt="Spotlight Sharp Turn Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 #### Spotlight #{fs['scenario_id']:02d}: {fork_title} ({fs['trip_id']} - {fs['domain']}, {fs['dist_m']:.0f}m Outage)
@@ -1201,7 +786,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 * Phase 4 Map Matching tracked the correct diverging branch to **{fs['map_drift_pct']:.2f}% drift ({fs['map_err_m']:.1f}m error)** (Blue Solid Line).
 
 <p align="center">
-  <img src="data:image/png;base64,{fs_b64}" width="750" alt="Spotlight Fork Split Map" style="max-width:100%; border-radius:8px;" />
+  <img src="{fs_rel}" width="750" alt="Spotlight Fork Split Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 #### Spotlight #{hc['scenario_id']:02d}: Long-Distance Highway Cruising Blackout ({hc['trip_id']} - {hc['domain']}, {hc['dist_m']:.0f}m Outage)
@@ -1209,7 +794,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 * Pre-blackout speed scale anchoring and closed-loop NHC achieved **{hc['map_drift_pct']:.2f}% drift ({hc['map_err_m']:.1f}m error)**.
 
 <p align="center">
-  <img src="data:image/png;base64,{hc_b64}" width="750" alt="Spotlight Highway Cruise Map" style="max-width:100%; border-radius:8px;" />
+  <img src="{hc_rel}" width="750" alt="Spotlight Highway Cruise Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 #### Spotlight #{uc['scenario_id']:02d}: Dense Urban Grid & Chicane Navigation ({uc['trip_id']} - {uc['domain']}, {uc['dist_m']:.0f}m Outage)
@@ -1217,7 +802,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 * Phase 4 corner projection and topological snapping maintained sub-lane corridor tracking (**{uc['map_drift_pct']:.2f}% drift**).
 
 <p align="center">
-  <img src="data:image/png;base64,{uc_b64}" width="750" alt="Spotlight Urban Chicane Map" style="max-width:100%; border-radius:8px;" />
+  <img src="{uc_rel}" width="750" alt="Spotlight Urban Chicane Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 #### Spotlight #{pr['scenario_id']:02d}: Sub-Lane Ultra-Precision Outage ({pr['trip_id']} - {pr['domain']}, {pr['dist_m']:.0f}m Outage)
@@ -1225,7 +810,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 * Blue line achieved **{pr['map_drift_pct']:.2f}% drift ({pr['map_err_m']:.1f}m error)** over more than a quarter-mile outage.
 
 <p align="center">
-  <img src="data:image/png;base64,{pr_b64}" width="750" alt="Spotlight Ultra Precision Map" style="max-width:100%; border-radius:8px;" />
+  <img src="{pr_rel}" width="750" alt="Spotlight Ultra Precision Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 ---
@@ -1235,18 +820,18 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 The pipeline achieves an overall median drift of **{med_drift:.2f}%** (Highway **{hwy_dom_drift:.2f}%**, Arterial **{art_dom_drift:.2f}%**, Urban **{urb_dom_drift:.2f}%**) through eight grounded physical principles:
 
 1. **Domain-Appropriate Road Alignment**:
-   - **Highway & Arterial Corridors**: Employs strictly perpendicular lateral snapping (\\(\\mathbf{{p}}_{{\\text{{corrected}}}} = \\mathbf{{p}} + d_{{\\text{{lat}}}} \\hat{{\\mathbf{{u}}}}_{{\\text{{norm}}}}\\)). This eliminates junction teleportation jumps when transitioning between consecutive segments while preserving unbroken along-track kinematic dead-reckoning integration.
+   - **Highway & Arterial Corridors**: Employs strictly perpendicular lateral snapping (p_corrected = p + d_lat * u_norm). This eliminates junction teleportation jumps when transitioning between consecutive segments while preserving unbroken along-track kinematic dead-reckoning integration.
    - **Urban Street Grid**: Employs segment corner projection to guide the vehicle onto new streets during sharp 90-degree intersection turns.
 2. **AASHTO / IRC Road Kinematics Governor**:
-   - Caps vehicle speed through curves according to civil road design standards: \\(v_{{\\text{{max}}}} = \\min(\\sqrt{{a_{{\\text{{lat,max}}}} / \\kappa}}, a_{{\\text{{lat,max}}}} / |\\omega_z|)\\). Enforces \\(a_{{\\text{{lat,max}}}} = 1.2 \\text{{ m/s}}^2\\) comfort limit on Highway and \\(3.5 \\text{{ m/s}}^2\\) on Arterial/Urban.
+   - Caps vehicle speed through curves according to civil road design standards: v_max = min(sqrt(a_lat_max / kappa), a_lat_max / |omega_z|). Enforces a_lat_max = 1.2 m/s^2 comfort limit on Highway and 3.5 m/s^2 on Arterial/Urban.
 3. **Pre-Blackout Dynamic Speed Scale Anchoring**:
-   - In the 20 seconds prior to outage entry, learns the pavement-specific scale factor (\\(\\text{{mean}}(v_{{\\text{{GPS}}}}) / \\text{{mean}}(v_{{\\text{{AI}}}})\\)) to adapt for asphalt vibration damping, bounded physically to \\([0.85, 1.38]\\) on Highway.
+   - In the 20 seconds prior to outage entry, learns the pavement-specific scale factor (mean(v_GPS) / mean(v_AI)) to adapt for asphalt vibration damping, bounded physically to [0.85, 1.38] on Highway.
 4. **Speed-Regime GPS Heading Seeding**:
-   - Directional heading vector seeded from moving GPS fixes (\\(v > 2.5 \\text{{ m/s}}\\)) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **0.66° initial heading accuracy**.
+   - Directional heading vector seeded from moving GPS fixes (v > 2.5 m/s) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **0.66° initial heading accuracy**.
 5. **Real-Time Mount Auto-Calibration**:
    - SO(3) 3D coordinate frame transformation decoupling arbitrary smartphone cradle pitch, roll, and yaw from the vehicle chassis frame.
 6. **Closed-Loop 15-State Error-State Kalman Filter (ES-EKF)**:
-   - Fuses forward AI speed with continuous Non-Holonomic Constraints (NHC) enforcing zero lateral and vertical chassis slip (\\(v_y = 0, v_z = 0\\)).
+   - Fuses forward AI speed with continuous Non-Holonomic Constraints (NHC) enforcing zero lateral and vertical chassis slip (v_y = 0, v_z = 0).
 7. **Topological Multi-Hypothesis Matcher**:
    - Exponential distance-heading likelihood scoring with topological connectivity priors, preventing false snapping onto parallel frontage roads or overpasses.
 8. **Synchronized Endpoint Evaluation**:
@@ -1398,46 +983,30 @@ def sync_system_implementation_record(df, med_drift, p90_drift, t1_count, t2_cou
         doc = doc[:match.start(1)] + f"### 9.3 Scenario-by-Scenario Evaluation Table\n\nEvaluated on held-out Part 3 partitions and unseen test sequences across all 5 real-world driving sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`):\n\n" + new_table_str + "\n" + doc[match.end():]
         print("  -> Updated Section 9.3 scenario table.")
 
-    # 4. Instant line-by-line base64 image update (linear O(N), zero regex backtracking)
-    moe_b64 = _file_to_base64("artifacts/moe_training_curves.png")
-    drift_b64 = _file_to_base64("artifacts/phase4_unseen_sm_drift_comparison_chart.png")
-    gallery_b64 = _file_to_base64("artifacts/unseen_sm_all_tiers_gallery.png")
-
-    st = spotlights["sharp_turn"]
-    fs = spotlights["fork_split"]
-    hc = spotlights["highway_cruise"]
-    uc = spotlights["urban_chicane"]
-    pr = spotlights["precision"]
-
-    st_b64 = _file_to_base64(st["plot_path"])
-    fs_b64 = _file_to_base64(fs["plot_path"])
-    hc_b64 = _file_to_base64(hc["plot_path"])
-    uc_b64 = _file_to_base64(uc["plot_path"])
-    pr_b64 = _file_to_base64(pr["plot_path"])
-
+    # 4. Instant line-by-line relative image link update (lightweight, zero base64 bloat)
     lines = doc.split("\n")
     new_lines = []
     for line in lines:
         if 'alt="35-Scenario Drift Distribution' in line or 'alt="40-Scenario Drift Distribution' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{drift_b64}" width="850" alt="40-Scenario Drift Distribution Comparison Chart" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/phase4_unseen_sm_drift_comparison_chart.png" width="850" alt="40-Scenario Drift Distribution Comparison Chart" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Master 9-Panel Trajectory Gallery"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{gallery_b64}" width="1050" alt="Master 9-Panel Trajectory Gallery" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Bayesian MoE Dual-Expert Training Dynamics"' in line and moe_b64:
-            new_lines.append(f'  <img src="data:image/png;base64,{moe_b64}" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/unseen_sm_all_tiers_gallery.png" width="1050" alt="Master 9-Panel Trajectory Gallery" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+        elif 'alt="Bayesian MoE Dual-Expert Training Dynamics"' in line:
+            new_lines.append('  <img src="../artifacts/moe_training_curves.png" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 15 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{st_b64}" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 30 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{fs_b64}" width="750" alt="Scenario 30 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 30 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 02 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{st_b64}" width="750" alt="Scenario 02 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 02 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 17 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{pr_b64}" width="750" alt="Scenario 17 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_precision_outage.png" width="750" alt="Scenario 17 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 10 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{hc_b64}" width="750" alt="Scenario 10 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_highway_cruise.png" width="750" alt="Scenario 10 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 14 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{uc_b64}" width="750" alt="Scenario 14 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_urban_chicane.png" width="750" alt="Scenario 14 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         elif 'alt="Scenario 31 Map"' in line:
-            new_lines.append(f'  <img src="data:image/png;base64,{fs_b64}" width="750" alt="Scenario 31 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
+            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 31 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
         else:
             new_lines.append(line)
     doc = "\n".join(new_lines)

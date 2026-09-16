@@ -120,6 +120,10 @@ class FusedPosition:
     def up_m(self) -> float:
         return float(self.position_enu_m[2])
 
+    @property
+    def is_dead_reckoning(self) -> bool:
+        return self.mode in ("INS_ONLY_BLACKOUT", "DEGRADED")
+
 
 @dataclass(slots=True, frozen=True)
 class MatchedPosition:

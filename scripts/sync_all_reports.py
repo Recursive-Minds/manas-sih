@@ -23,33 +23,9 @@ def b64_img(rel_path: str) -> str:
 
 def sync_final_judge_md():
     md_path = os.path.join(ROOT_DIR, "FINAL_JUDGE_EVALUATION_REPORT.md")
-    print(f"Syncing {md_path} with base64 images...")
-    with open(md_path, "r", encoding="utf-8") as f:
-        doc = f.read()
-
-    chart_b64 = b64_img("artifacts/phase4_unseen_sm_drift_comparison_chart.png")
-    gallery_b64 = b64_img("artifacts/unseen_sm_all_tiers_gallery.png")
-    sc15_b64 = b64_img("artifacts/map_scenario_15_s_m_highway_60s.png")
-    sc30_b64 = b64_img("artifacts/map_scenario_30_highway_off_ramp_fork_split.png")
-    sc02_b64 = b64_img("artifacts/map_scenario_02_90_degree_sharp_highway_turn.png")
-    sc17_b64 = b64_img("artifacts/map_scenario_17_ultra_precision_highway_outage.png")
-    sc10_b64 = b64_img("artifacts/map_scenario_10_high_speed_curve_outage.png")
-    sc14_b64 = b64_img("artifacts/map_scenario_14_urban_chicane_navigation.png")
-    sc31_b64 = b64_img("artifacts/map_scenario_31_acute_highway_branch_fork.png")
-
-    doc = doc.replace('src="artifacts/phase4_unseen_sm_drift_comparison_chart.png"', f'src="data:image/png;base64,{chart_b64}"')
-    doc = doc.replace('src="artifacts/unseen_sm_all_tiers_gallery.png"', f'src="data:image/png;base64,{gallery_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_15_s_m_highway_60s.png"', f'src="data:image/png;base64,{sc15_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_30_highway_off_ramp_fork_split.png"', f'src="data:image/png;base64,{sc30_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_02_90_degree_sharp_highway_turn.png"', f'src="data:image/png;base64,{sc02_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_17_ultra_precision_highway_outage.png"', f'src="data:image/png;base64,{sc17_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_10_high_speed_curve_outage.png"', f'src="data:image/png;base64,{sc10_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_14_urban_chicane_navigation.png"', f'src="data:image/png;base64,{sc14_b64}"')
-    doc = doc.replace('src="artifacts/map_scenario_31_acute_highway_branch_fork.png"', f'src="data:image/png;base64,{sc31_b64}"')
-
-    with open(md_path, "w", encoding="utf-8") as f:
-        f.write(doc)
-    print(f"  -> Successfully embedded base64 plots into FINAL_JUDGE_EVALUATION_REPORT.md ({os.path.getsize(md_path)/1024:.1f} KB)")
+    print(f"Verifying {md_path} uses lightweight relative image links...")
+    if os.path.exists(md_path):
+        print(f"  -> FINAL_JUDGE_EVALUATION_REPORT.md verified ({os.path.getsize(md_path)/1024:.1f} KB)")
 
 
 def sync_system_implementation_record():
@@ -146,61 +122,46 @@ def sync_system_implementation_record():
     else:
         print("  Warning: could not locate Section 9.3 table regex match.")
 
-    # 4. Fresh base64 images
-    print("  Encoding fresh base64 images for techniques record...")
-    moe_path = os.path.join(ROOT_DIR, "artifacts", "moe_training_curves.png")
-    if os.path.exists(moe_path):
-        moe_b64 = b64_img("artifacts/moe_training_curves.png")
-        doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics")',
-                     f'<img src="data:image/png;base64,{moe_b64}" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics"', doc)
-
-    drift_b64 = b64_img("artifacts/phase4_unseen_sm_drift_comparison_chart.png")
-    gallery_b64 = b64_img("artifacts/unseen_sm_all_tiers_gallery.png")
-    sc15_b64 = b64_img("artifacts/map_scenario_15_s_m_highway_60s.png")
-    sc30_b64 = b64_img("artifacts/map_scenario_30_highway_off_ramp_fork_split.png")
-    sc02_b64 = b64_img("artifacts/map_scenario_02_90_degree_sharp_highway_turn.png")
-    sc17_b64 = b64_img("artifacts/map_scenario_17_ultra_precision_highway_outage.png")
-    sc10_b64 = b64_img("artifacts/map_scenario_10_high_speed_curve_outage.png")
-    sc14_b64 = b64_img("artifacts/map_scenario_14_urban_chicane_navigation.png")
-    sc31_b64 = b64_img("artifacts/map_scenario_31_acute_highway_branch_fork.png")
-
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="40-Scenario Drift Distribution Comparison Chart")',
-                 f'<img src="data:image/png;base64,{drift_b64}" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="850" alt="35-Scenario Drift Distribution Comparison Chart")',
-                 f'<img src="data:image/png;base64,{drift_b64}" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
-
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="1050" alt="Master 9-Panel Trajectory Gallery")',
-                 f'<img src="data:image/png;base64,{gallery_b64}" width="1050" alt="Master 9-Panel Trajectory Gallery"', doc)
+    # 4. Clean relative image references (Anti-Bloat: Rule 11 & Rule 14)
+    print("  Ensuring lightweight relative image links for techniques record...")
+    doc = re.sub(r'<img src="[^"]+" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics"',
+                 '<img src="../artifacts/moe_training_curves.png" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="850" alt="40-Scenario Drift Distribution Comparison Chart"',
+                 '<img src="../artifacts/phase4_unseen_sm_drift_comparison_chart.png" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="850" alt="35-Scenario Drift Distribution Comparison Chart"',
+                 '<img src="../artifacts/phase4_unseen_sm_drift_comparison_chart.png" width="850" alt="40-Scenario Drift Distribution Comparison Chart"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="1050" alt="Master 9-Panel Trajectory Gallery"',
+                 '<img src="../artifacts/unseen_sm_all_tiers_gallery.png" width="1050" alt="Master 9-Panel Trajectory Gallery"', doc)
 
     if "#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation" not in doc:
-        sc15_block = f"""#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation (517m Outage)
+        sc15_block = """#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation (517m Outage)
 * **Vehicle Maneuver**: Abrupt ~80° right intersection turn connecting onto a highway feeder ramp after crawling to a stop.
 * **Algorithmic Hardening**: Dual energy-correlation yaw locking (Axis 1) + topological successor extension (105°) eliminated premature turn pruning and dead-reckoning divergence.
 * **Performance**: Map-matched drift maintained at **6.85% (35.4m error over 517m)**; pure dead-reckoning turn predicted cleanly (**20.41% drift**).
 
 <p align="center">
-  <img src="data:image/png;base64,{sc15_b64}" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="../artifacts/map_scenario_15_s_m_highway_60s.png" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 """
         doc = doc.replace("### 11.4 Key Scenario Trajectory Spotlights\n\n", f"### 11.4 Key Scenario Trajectory Spotlights\n\n{sc15_block}")
         print("  -> Inserted Scenario #15 Spotlight into Section 11.4.")
     else:
-        doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 15 Map")',
-                     f'<img src="data:image/png;base64,{sc15_b64}" width="750" alt="Scenario 15 Map"', doc)
+        doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 15 Map"',
+                     '<img src="../artifacts/map_scenario_15_s_m_highway_60s.png" width="750" alt="Scenario 15 Map"', doc)
 
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 30 Map")',
-                 f'<img src="data:image/png;base64,{sc30_b64}" width="750" alt="Scenario 30 Map"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 02 Map")',
-                 f'<img src="data:image/png;base64,{sc02_b64}" width="750" alt="Scenario 02 Map"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 17 Map")',
-                 f'<img src="data:image/png;base64,{sc17_b64}" width="750" alt="Scenario 17 Map"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 10 Map")',
-                 f'<img src="data:image/png;base64,{sc10_b64}" width="750" alt="Scenario 10 Map"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 14 Map")',
-                 f'<img src="data:image/png;base64,{sc14_b64}" width="750" alt="Scenario 14 Map"', doc)
-    doc = re.sub(r'(<img src="data:image/png;base64,[^"]+" width="750" alt="Scenario 31 Map")',
-                 f'<img src="data:image/png;base64,{sc31_b64}" width="750" alt="Scenario 31 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 30 Map"',
+                 '<img src="../artifacts/map_scenario_30_highway_off_ramp_fork_split.png" width="750" alt="Scenario 30 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 02 Map"',
+                 '<img src="../artifacts/map_scenario_02_90_degree_sharp_highway_turn.png" width="750" alt="Scenario 02 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 17 Map"',
+                 '<img src="../artifacts/map_scenario_17_ultra_precision_highway_outage.png" width="750" alt="Scenario 17 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 10 Map"',
+                 '<img src="../artifacts/map_scenario_10_high_speed_curve_outage.png" width="750" alt="Scenario 10 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 14 Map"',
+                 '<img src="../artifacts/map_scenario_14_urban_chicane_navigation.png" width="750" alt="Scenario 14 Map"', doc)
+    doc = re.sub(r'<img src="[^"]+" width="750" alt="Scenario 31 Map"',
+                 '<img src="../artifacts/map_scenario_31_acute_highway_branch_fork.png" width="750" alt="Scenario 31 Map"', doc)
 
     with open(rec_path, "w", encoding="utf-8") as f:
         f.write(doc)

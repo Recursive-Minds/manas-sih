@@ -35,6 +35,7 @@ from sih.core.contracts import (
 from sih.core.interfaces import IFusionFilter
 from sih.core.pipeline import register_fusion_filter
 from sih.data.geo import geodetic_to_enu, enu_to_geodetic
+from sih.fusion.speed_smoother import CausalSpeedSmoother
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +98,7 @@ class ErrorStateEKF(IFusionFilter):
         self.initial_speed_scale = initial_speed_scale
         self.enable_nhc = enable_nhc
         self.enable_zupt = enable_zupt
+        self._speed_smoother = CausalSpeedSmoother(a_max_mps2=3.5, a_min_mps2=-5.0, tau_s=0.25)
 
         self.init_highway_extensions()
         self.reset()
@@ -144,6 +146,7 @@ class ErrorStateEKF(IFusionFilter):
         self._last_ai_speed: Optional[float] = None
         self.last_nhc_dtheta_deg: float = 0.0
         self._accel_buf: list[float] = []
+        self._speed_smoother.reset()
 
         self.init_highway_extensions()
 
@@ -188,6 +191,7 @@ class ErrorStateEKF(IFusionFilter):
         if g.speed_mps is not None and g.speed_mps > 0.5:
             b = self._heading_rad
             self._v = np.array([g.speed_mps * np.sin(b), g.speed_mps * np.cos(b), 0.0], dtype=np.float64)
+            self._speed_smoother.update(g.speed_mps, 0.1)
         else:
             self._v = np.zeros(3, dtype=np.float64)
 
@@ -227,7 +231,15 @@ class ErrorStateEKF(IFusionFilter):
         # Preserve continuous EKF gyro integration through the corner curve.
         is_cornering = (current_yaw_rate_rad_s is not None) and (abs(current_yaw_rate_rad_s) >= np.radians(2.5))
 
-        if is_cornering and self._initialised:
+        valid_moving = [g for g in pre_gnss if g.is_valid and g.speed_mps is not None and g.speed_mps > 1.0 and g.bearing_deg is not None]
+        latest_moving_hdg = valid_moving[-1].bearing_deg if valid_moving else None
+
+        ekf_hdg_consistent = False
+        if self._initialised and latest_moving_hdg is not None:
+            diff_to_gnss = abs((np.degrees(self._heading_rad) - latest_moving_hdg + 180.0) % 360.0 - 180.0)
+            ekf_hdg_consistent = (diff_to_gnss < 50.0)
+
+        if is_cornering and self._initialised and ekf_hdg_consistent:
             seeded_hdg = float(np.degrees(self._heading_rad)) % 360.0
             is_consistent = True
         else:
@@ -416,21 +428,24 @@ class ErrorStateEKF(IFusionFilter):
         if is_stationary:
             self._stat_count += 1
             v_fwd = 0.0
+            self._speed_smoother.update(0.0, dt)
             if is_physical_rest:
                 w_z_corr = 0.0
         else:
             self._stat_count = 0
             if passed_v_fwd is not None:
-                self._last_ai_speed = passed_v_fwd
-                v_fwd = passed_v_fwd
+                v_raw = passed_v_fwd
             elif vel is not None and vel.forward_speed_mps is not None:
-                self._last_ai_speed = float(vel.forward_speed_mps)
-                v_fwd = float(vel.forward_speed_mps) * self._speed_scale
+                v_raw = float(vel.forward_speed_mps) * self._speed_scale
                 a_x_fwd = float(raw_acc[0]) - self._ba[0]
                 if a_x_fwd < -0.3:
-                    v_fwd = max(0.0, v_fwd + a_x_fwd * dt)
+                    v_raw = max(0.0, v_raw + a_x_fwd * dt)
             else:
-                v_fwd = 0.0
+                v_raw = 0.0
+
+            # Causal kinematic slew-rate limiting and low-pass filtering
+            v_fwd = self._speed_smoother.update(v_raw, dt)
+            self._last_ai_speed = v_fwd
 
 
         # Propagate nominal heading
@@ -583,10 +598,15 @@ class ErrorStateEKF(IFusionFilter):
         if gnss.speed_mps is not None and gnss.bearing_deg is not None and gnss.speed_mps > 2.5:
             gnss_hdg_rad = float(np.radians(gnss.bearing_deg))
             y_hdg = wrap_pi(gnss_hdg_rad - self._heading_rad)
-            # Smooth innovation update: never completely ignore valid motion heading,
-            # but bound single-step correction to prevent wild receiver outliers from jerking the filter
-            max_step_rad = np.radians(15.0)
-            step_rad = 0.20 * np.clip(y_hdg, -max_step_rad, max_step_rad)
+            # When driving straight (not in cooldown, |w_z| < 1.5 deg/s), GNSS Doppler bearing is high quality.
+            # Decisive convergence when straight; bounded gentle innovation when turning.
+            is_turning = abs(self._last_w_z_corr) > np.radians(1.5) or in_cooldown
+            if is_turning:
+                max_step_rad = np.radians(15.0)
+                step_rad = 0.15 * np.clip(y_hdg, -max_step_rad, max_step_rad)
+            else:
+                gain = 0.85 if abs(y_hdg) > np.radians(35.0) else 0.40
+                step_rad = gain * y_hdg
             self._heading_rad = (self._heading_rad + step_rad) % (2.0 * np.pi)
             yaw_enu_rad = np.pi / 2.0 - self._heading_rad
             self._q = R.from_euler("z", yaw_enu_rad)
