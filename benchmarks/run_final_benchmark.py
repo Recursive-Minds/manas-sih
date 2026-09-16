@@ -111,20 +111,12 @@ def detect_dynamic_spotlights(detailed_results):
     }
 
 
-def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
-    os.makedirs(ARTIFACT_DIR, exist_ok=True)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_precomputed_benchmark_data(device: torch.device, model_path: Optional[str] = None) -> Dict[str, Any]:
     print("=" * 80)
     print("    SMARTPHONE INTELLIGENT DEAD RECKONING (SIH) - MASTER BENCHMARK SUITE")
-    print("    Multi-Trip Standardized Evaluation: Part 3 Held-Out Benchmark Partition")
+    print("    Pre-Computing Trip Geometry, Calibrations & AI Speed Estimates")
     print("=" * 80)
     print(f"Hardware Compute Device: {device}")
-
-    # Random seed management for consistent, reproducible evaluation
-    if seed is None:
-        seed = 541098
-    print(f"[Random Generator] Benchmark Seed: {seed}")
-    rng = np.random.RandomState(seed)
 
     loader = GenericDataLoader()
     trip_configs = [
@@ -203,7 +195,27 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
         v_preds = predict_velocities(model, calib_samples, norm_mean, norm_std, device, model_type=model_type, trip_id=tid)
         v_preds_dict[tid] = v_preds
 
-    # Select exactly 40 scenarios across 5 trips with TRUE random non-overlapping sampling
+    return {
+        "trip_configs": trip_configs,
+        "trips": trips,
+        "calibs": calibs,
+        "road_nets": road_nets,
+        "road_pts_dict": road_pts_dict,
+        "v_preds_dict": v_preds_dict,
+        "can_speeds_dict": can_speeds_dict,
+    }
+
+
+def evaluate_seed_scenarios(seed: int, pre: Dict[str, Any]) -> Tuple[pd.DataFrame, List[Dict[str, Any]], Dict[str, Any]]:
+    rng = np.random.RandomState(seed)
+    trip_configs = pre["trip_configs"]
+    trips = pre["trips"]
+    calibs = pre["calibs"]
+    road_nets = pre["road_nets"]
+    road_pts_dict = pre["road_pts_dict"]
+    v_preds_dict = pre["v_preds_dict"]
+    can_speeds_dict = pre["can_speeds_dict"]
+
     benchmark_rows = []
     detailed_results = []
     dur_cycle = [30.0, 45.0, 60.0, 75.0]
@@ -211,11 +223,9 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
     for tid, target_count, domain in trip_configs:
         trip = trips[tid]
         if tid in ("S-S3a", "S-S4"):
-            # 100% unseen test sequences - full drive is valid test data
             min_start_ns = trip.imu_samples[0].timestamp_ns + int(30.0 * 1e9)
             max_end_ns = trip.imu_samples[-1].timestamp_ns
         else:
-            # Strictly held-out Part 3 (last 20%) partition
             part = compute_trip_partition(tid, len(trip.imu_samples))
             b_start_ns = trip.imu_samples[part.bench_range[0]].timestamp_ns
             b_end_ns = trip.imu_samples[part.bench_range[1] - 1].timestamp_ns
@@ -272,7 +282,6 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
             if len(selected_for_trip) >= target_count:
                 break
 
-        # Sort selected scenarios chronologically for clean progression
         selected_for_trip.sort(key=lambda x: x[0])
 
         for t_start, t_end, dur, g_cand, res in selected_for_trip:
@@ -296,22 +305,15 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
                 "hdg_seed_err": res.get("hdg_seed_err", 0.0),
             })
 
-    print(f"\nSuccessfully evaluated {len(benchmark_rows)} benchmark scenarios across 5 trips.")
-
     df = pd.DataFrame(benchmark_rows)
-    csv_out = os.path.join(ARTIFACT_DIR, "phase4_unseen_sm_benchmark_results.csv")
-    df.to_csv(csv_out, index=False)
-    df.to_csv(os.path.join(ARTIFACT_DIR, "phase4_multi_trip_benchmark_results.csv"), index=False)
-    print(f"\nSaved raw benchmark CSV to: {csv_out}")
-
+    tot_sc = len(df)
     t1_count = len(df[df["map_drift_pct"] < 10.0])
     t2_count = len(df[(df["map_drift_pct"] >= 10.0) & (df["map_drift_pct"] <= 30.0)])
     t3_count = len(df[df["map_drift_pct"] > 30.0])
-    tot_sc = len(df)
     med_drift = float(df["map_drift_pct"].median())
+    pure_med_drift = float(df["pure_drift_pct"].median())
     p90_drift = float(df["map_drift_pct"].quantile(0.90))
 
-    # Per-domain metrics
     hwy_sub = df[df["domain"] == "Highway"]
     art_sub = df[df["domain"] == "Arterial"]
     urb_sub = df[df["domain"] == "Urban"]
@@ -321,7 +323,13 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
     urb_dom_drift = float(urb_sub["map_drift_pct"].median()) if len(urb_sub) > 0 else 0.0
     mix_dom_drift = float(mix_sub["map_drift_pct"].median()) if len(mix_sub) > 0 else 0.0
 
-    # Per-trip metrics
+    crawl_df = df[df["distance_m"] < 250.0]
+    city_df  = df[(df["distance_m"] >= 250.0) & (df["distance_m"] <= 550.0)]
+    hwy_df   = df[df["distance_m"] > 550.0]
+    crawl_err_m = float(crawl_df["map_err_m"].median()) if len(crawl_df) > 0 else 0.0
+    city_drift  = float(city_df["map_drift_pct"].median()) if len(city_df) > 0 else 0.0
+    hwy_drift   = float(hwy_df["map_drift_pct"].median()) if len(hwy_df) > 0 else 0.0
+
     trip_stats = {}
     for tid, count, dom in trip_configs:
         sub = df[df["trip"].str.startswith(tid)]
@@ -334,16 +342,146 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
                 "mean_dist": float(sub["distance_m"].mean()),
             }
 
-    # Operational distance tiers
-    crawl_df = df[df["distance_m"] < 250.0]
-    city_df  = df[(df["distance_m"] >= 250.0) & (df["distance_m"] <= 550.0)]
-    hwy_df   = df[df["distance_m"] > 550.0]
-    crawl_err_m = float(crawl_df["map_err_m"].median()) if len(crawl_df) > 0 else 0.0
-    city_drift  = float(city_df["map_drift_pct"].median()) if len(city_df) > 0 else 0.0
-    hwy_drift   = float(hwy_df["map_drift_pct"].median()) if len(hwy_df) > 0 else 0.0
+    metrics = {
+        "seed": seed,
+        "tot_sc": tot_sc,
+        "med_drift": med_drift,
+        "pure_med_drift": pure_med_drift,
+        "p90_drift": p90_drift,
+        "t1_count": t1_count,
+        "t2_count": t2_count,
+        "t3_count": t3_count,
+        "hwy_dom_drift": hwy_dom_drift,
+        "art_dom_drift": art_dom_drift,
+        "urb_dom_drift": urb_dom_drift,
+        "mix_dom_drift": mix_dom_drift,
+        "crawl_err_m": crawl_err_m,
+        "city_drift": city_drift,
+        "hwy_drift": hwy_drift,
+        "trip_stats": trip_stats,
+    }
+    return df, detailed_results, metrics
+
+
+def run_benchmark(
+    seed: Optional[int] = None,
+    seeds: Optional[List[int]] = None,
+    single: bool = False,
+    model_path: Optional[str] = None,
+):
+    os.makedirs(ARTIFACT_DIR, exist_ok=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    pre = load_precomputed_benchmark_data(device, model_path=model_path)
+    trip_configs = pre["trip_configs"]
+
+    multi_seed_results: List[Dict[str, Any]] = []
+
+    if single:
+        if seed is None:
+            import random
+            seed = int(random.randint(10000, 999999))
+        print("\n" + "=" * 80)
+        print(f"    [SINGLE SEED BENCHMARK MODE] Running on Seed: {seed}")
+        print("=" * 80)
+
+        df, detailed_results, metrics = evaluate_seed_scenarios(seed, pre)
+        rep_df = df
+        rep_detailed = detailed_results
+        rep_metrics = metrics
+        rep_seed = seed
+        multi_seed_results.append(metrics)
+    else:
+        if seeds is None or len(seeds) == 0:
+            seeds = [541098, 75496, 45736, 12345, 987654, 314159]
+
+        print("\n" + "=" * 80)
+        print(f"    [MULTI-SEED BENCHMARK SUITE] Evaluating {len(seeds)} Diverse Seeds: {seeds}")
+        print("=" * 80)
+
+        all_seed_runs = []
+        for s_idx, s_val in enumerate(seeds, 1):
+            t_s = time.time()
+            df_s, det_s, met_s = evaluate_seed_scenarios(s_val, pre)
+            elapsed = time.time() - t_s
+            all_seed_runs.append({
+                "seed": s_val,
+                "df": df_s,
+                "detailed_results": det_s,
+                "metrics": met_s,
+            })
+            multi_seed_results.append(met_s)
+            print(f"  [{s_idx}/{len(seeds)}] Seed {s_val:6d} -> Map Drift: {met_s['med_drift']:5.2f}% | Pure: {met_s['pure_med_drift']:5.2f}% | Tier 1: {met_s['t1_count']:2d}/40 | Sub-30%: {met_s['t1_count']+met_s['t2_count']:2d}/40 ({elapsed:.1f}s)")
+
+        med_drifts = [r["metrics"]["med_drift"] for r in all_seed_runs]
+        grand_median_drift = float(np.median(med_drifts))
+        mean_drift = float(np.mean(med_drifts))
+        std_drift = float(np.std(med_drifts))
+
+        print("\n" + "=" * 90)
+        print(f"     MULTI-SEED BENCHMARK EVALUATION MATRIX ({len(seeds)} SEEDS EVALUATED)        ")
+        print("=" * 90)
+        print(f"{'Seed':<10} {'Map Drift (Median)':<20} {'Pure EKF Drift':<16} {'Tier 1 (<10%)':<16} {'Sub-30% Rate':<16} {'Status'}")
+        print("-" * 90)
+        for r in all_seed_runs:
+            m = r["metrics"]
+            t1_str = f"{m['t1_count']}/40 ({m['t1_count']/40*100:.1f}%)"
+            sub30_str = f"{m['t1_count']+m['t2_count']}/40 ({(m['t1_count']+m['t2_count'])/40*100:.1f}%)"
+            map_str = f"{m['med_drift']:.2f}%"
+            pure_str = f"{m['pure_med_drift']:.2f}%"
+            st_text = "PASS" if m['med_drift'] <= 10.0 else "NEAR"
+            print(f"{m['seed']:<10d} {map_str:<20} {pure_str:<16} {t1_str:<16} {sub30_str:<16} {st_text}")
+        print("=" * 90)
+        print(f"GRAND MULTI-SEED MEDIAN DRIFT : {grand_median_drift:.2f}%")
+        print(f"Cross-Seed Mean +- Std         : {mean_drift:.2f}% +- {std_drift:.2f}% (Min: {min(med_drifts):.2f}%, Max: {max(med_drifts):.2f}%)")
+        print(f"Overall SIH Drift Benchmark   : {'PASSED (< 10% target)' if grand_median_drift <= 10.0 else 'NEAR TARGET'}")
+        print("=" * 90)
+
+        # Select representative run closest to grand median drift
+        best_run = min(all_seed_runs, key=lambda r: abs(r["metrics"]["med_drift"] - grand_median_drift))
+        rep_df = best_run["df"]
+        rep_detailed = best_run["detailed_results"]
+        rep_metrics = best_run["metrics"]
+        rep_seed = best_run["seed"]
+        print(f"\nSelected Representative Seed for Visualization & Detailed Artifacts: Seed {rep_seed} ({rep_metrics['med_drift']:.2f}% drift)")
+
+        # Save multi-seed summary CSV
+        ms_summary_df = pd.DataFrame([{
+            "seed": m["seed"],
+            "map_drift_pct": m["med_drift"],
+            "pure_drift_pct": m["pure_med_drift"],
+            "tier1_count": m["t1_count"],
+            "sub30_count": m["t1_count"] + m["t2_count"],
+            "highway_drift": m["hwy_dom_drift"],
+            "arterial_drift": m["art_dom_drift"],
+            "urban_drift": m["urb_dom_drift"],
+        } for m in multi_seed_results])
+        ms_summary_df.to_csv(os.path.join(ARTIFACT_DIR, "multi_seed_evaluation_summary.csv"), index=False)
+
+    df = rep_df
+    detailed_results = rep_detailed
+    tot_sc = rep_metrics["tot_sc"]
+    med_drift = rep_metrics["med_drift"]
+    p90_drift = rep_metrics["p90_drift"]
+    t1_count = rep_metrics["t1_count"]
+    t2_count = rep_metrics["t2_count"]
+    t3_count = rep_metrics["t3_count"]
+    crawl_err_m = rep_metrics["crawl_err_m"]
+    city_drift = rep_metrics["city_drift"]
+    hwy_drift = rep_metrics["hwy_drift"]
+    hwy_dom_drift = rep_metrics["hwy_dom_drift"]
+    art_dom_drift = rep_metrics["art_dom_drift"]
+    urb_dom_drift = rep_metrics["urb_dom_drift"]
+    mix_dom_drift = rep_metrics["mix_dom_drift"]
+    trip_stats = rep_metrics["trip_stats"]
+
+    csv_out = os.path.join(ARTIFACT_DIR, "phase4_unseen_sm_benchmark_results.csv")
+    df.to_csv(csv_out, index=False)
+    df.to_csv(os.path.join(ARTIFACT_DIR, "phase4_multi_trip_benchmark_results.csv"), index=False)
+    print(f"\nSaved raw benchmark CSV to: {csv_out}")
 
     print("\n" + "=" * 70)
-    print(f"     MULTI-TRIP STANDARDIZED BENCHMARK RESULTS ({tot_sc} SCENARIOS)        ")
+    print(f"     REPRESENTATIVE BENCHMARK RUN (SEED {rep_metrics['seed']}: {tot_sc} SCENARIOS)        ")
     print("=" * 70)
     print(f"Total Scenarios Evaluated: {tot_sc} (8 Highway, 16 Arterial, 6 Urban, 10 Mixed)")
     print(f"Overall Median Drift: {med_drift:.2f}% (Target < 10% - {'PASSED' if med_drift <= 10.0 else 'NEAR TARGET'})")
@@ -373,7 +511,8 @@ def run_benchmark(seed: Optional[int] = None, model_path: Optional[str] = None):
     generate_markdown_report(
         df, detailed_results, spotlights, med_drift, p90_drift, t1_count, t2_count, t3_count, tot_sc,
         crawl_err_m, city_drift, hwy_drift, hwy_dom_drift, art_dom_drift, urb_dom_drift, mix_dom_drift=mix_dom_drift,
-        trip_stats=trip_stats, trip_configs=trip_configs, mean_hdg_seed_err=mean_hdg_seed_err
+        trip_stats=trip_stats, trip_configs=trip_configs, mean_hdg_seed_err=mean_hdg_seed_err,
+        multi_seed_results=multi_seed_results if len(multi_seed_results) > 1 else None,
     )
     sync_system_implementation_record(df, med_drift, p90_drift, t1_count, t2_count, tot_sc, hwy_dom_drift, art_dom_drift, urb_dom_drift, spotlights)
     sync_readme(df, med_drift, crawl_err_m, city_drift, hwy_drift, t1_count, t2_count, tot_sc)
@@ -610,7 +749,8 @@ def _file_to_base64(filepath):
 def generate_markdown_report(
     df, detailed_results, spotlights, med_drift, p90_drift, t1_count, t2_count, t3_count, tot_sc,
     crawl_err_m, city_drift, hwy_drift, hwy_dom_drift, art_dom_drift, urb_dom_drift,
-    mix_dom_drift=0.0, trip_stats=None, trip_configs=None, mean_hdg_seed_err=0.0
+    mix_dom_drift=0.0, trip_stats=None, trip_configs=None, mean_hdg_seed_err=0.0,
+    multi_seed_results=None,
 ):
     t_now = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
@@ -689,7 +829,45 @@ def generate_markdown_report(
 | **Tier 1 Pass Rate (< 10%)** | {base_t1_count/tot_sc*100:.1f}% ({base_t1_count} / {tot_sc}) | **{t1_count/tot_sc*100:.1f}% ({t1_count} / {tot_sc})** | > 50% | **{status_t1}** |
 | **High Reliability (<= 30%)** | {(base_t1_count+base_t2_count)/tot_sc*100:.1f}% ({base_t1_count+base_t2_count} / {tot_sc}) | **{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc})** | > 85% | **{status_sub30}** |
 | **Initial Heading Seeding Error**| 28.4° (unobservable) | **{mean_hdg_seed_err:.2f}°** (Speed-Regime GPS Vector) | < 2.0° | **PASSED** |
+"""
 
+    if multi_seed_results and len(multi_seed_results) > 1:
+        ms_rows = []
+        for ms in multi_seed_results:
+            s_val = ms["seed"]
+            s_med = ms["med_drift"]
+            s_pure = ms["pure_med_drift"]
+            s_t1 = f"{ms['t1_count']} / {ms['tot_sc']} ({ms['t1_count']/ms['tot_sc']*100:.1f}%)"
+            s_sub30 = f"{ms['t1_count']+ms['t2_count']} / {ms['tot_sc']} ({(ms['t1_count']+ms['t2_count'])/ms['tot_sc']*100:.1f}%)"
+            s_hwy = f"{ms['hwy_dom_drift']:.2f}%"
+            s_urb = f"{ms['urb_dom_drift']:.2f}%"
+            s_pass = "PASSED" if s_med <= 10.0 else "NEAR TARGET"
+            ms_rows.append(f"| Seed {s_val} | **{s_med:.2f}%** | {s_pure:.2f}% | {s_t1} | {s_sub30} | {s_hwy} | {s_urb} | **{s_pass}** |")
+
+        ms_all_drifts = [ms["med_drift"] for ms in multi_seed_results]
+        g_med = float(np.median(ms_all_drifts))
+        g_pure = float(np.median([ms["pure_med_drift"] for ms in multi_seed_results]))
+        g_t1 = float(np.mean([ms["t1_count"] for ms in multi_seed_results]))
+        g_sub30 = float(np.mean([ms["t1_count"] + ms["t2_count"] for ms in multi_seed_results]))
+        g_hwy = float(np.median([ms["hwy_dom_drift"] for ms in multi_seed_results]))
+        g_urb = float(np.median([ms["urb_dom_drift"] for ms in multi_seed_results]))
+        g_status = "PASSED" if g_med <= 10.0 else "NEAR TARGET"
+        summary_row = f"| **Grand Multi-Seed Summary** | **{g_med:.2f}%** (±{np.std(ms_all_drifts):.2f}%) | **{g_pure:.2f}%** | **{g_t1:.1f} / 40 ({g_t1/40*100:.1f}%)** | **{g_sub30:.1f} / 40 ({g_sub30/40*100:.1f}%)** | **{g_hwy:.2f}%** | **{g_urb:.2f}%** | **{g_status}** |"
+
+        md_content += f"""
+---
+
+### Multi-Seed Statistical Validation ({len(multi_seed_results)} Diverse Random Seeds)
+
+To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across {len(multi_seed_results)} independent random seeds:
+
+| Evaluation Seed | Phase 4 Map Drift (Median) | Pure 6-Axis Drift | Tier 1 Pass Rate (< 10%) | Sub-30% Consistency | Highway Cruising | Urban Grid & Crawl | Target Compliance |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+{"\n".join(ms_rows)}
+{summary_row}
+"""
+
+    md_content += f"""
 ---
 
 ### Multi-Trip Domain Generalization Scorecard (5 Real-World Sequences)
@@ -1078,7 +1256,9 @@ def sync_roadmap(med_drift, tot_sc=40):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="SIH Master Benchmark Suite")
-    parser.add_argument("--seed", type=int, default=541098, help="Random seed for scenario sampling (default: 541098)")
+    parser.add_argument("--single", action="store_true", help="Run benchmark on a single random or specified seed")
+    parser.add_argument("--seed", type=int, default=None, help="Specific random seed (default: random when --single is set, or 541098)")
+    parser.add_argument("--seeds", type=int, nargs="+", default=None, help="List of custom random seeds for multi-seed mode")
     parser.add_argument("--model-path", type=str, default=None, help="Path to custom model checkpoint to benchmark")
     args = parser.parse_args()
-    run_benchmark(seed=args.seed, model_path=args.model_path)
+    run_benchmark(seed=args.seed, seeds=args.seeds, single=args.single, model_path=args.model_path)
