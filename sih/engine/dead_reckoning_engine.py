@@ -17,6 +17,7 @@ from sih.map.governor import RoadKinematicsGovernor
 from sih.map.matcher import HMMMapMatcher
 from sih.data.geo import geodetic_to_enu
 from sih.core.contracts import VelocityEstimate, GNSSSample
+from sih.engine.speed_observer import KinematicSpeedObserver
 
 
 class DeadReckoningEngine:
@@ -133,9 +134,9 @@ class DeadReckoningEngine:
             reference_alt_m=0.0,
         )
 
-        # Road governor: AASHTO/IRC highway comfort limit (1.2 m/s^2) on highway; intersection limit (3.5 m/s^2) elsewhere
+        # Road governor: AASHTO/IRC highway comfort limit (2.2 m/s^2 with superelevation) on highway; intersection limit (3.5 m/s^2) elsewhere
         governor = RoadKinematicsGovernor(
-            a_lat_max=1.2 if domain == "Highway" else 3.5,
+            a_lat_max=2.2 if domain == "Highway" else 3.5,
             speed_limit_mps=33.3,
         )
         matcher = HMMMapMatcher(
@@ -144,6 +145,10 @@ class DeadReckoningEngine:
             reference_lon_deg=trip.reference_lon_deg,
             smoothing_factor=self.smoothing_factor,
         )
+
+        # High-fidelity Kinematic Delta-v speed observers
+        speed_obs_pure = KinematicSpeedObserver()
+        speed_obs_map = KinematicSpeedObserver()
 
         n_gnss = len(trip.gnss_samples)
         gnss_idx = 0
@@ -245,7 +250,11 @@ class DeadReckoningEngine:
                     ai_speeds = [v_preds[k] for k in range(max(0, j - len(g_speeds) * 10), j)]
                     if len(g_speeds) >= 3 and len(ai_speeds) >= 10:
                         scale = np.mean(g_speeds) / max(0.5, np.mean(ai_speeds))
-                        speed_scale = float(np.clip(scale, 0.85, 1.38 if domain == "Highway" else 1.25))
+                        speed_scale = float(np.clip(scale, 0.85, 1.35 if domain == "Highway" else 1.25))
+
+                # Initialize kinematic speed observers anchored at true entry velocity
+                speed_obs_pure.reset(initial_speed_mps=v_entry, initial_ts_ns=t_curr)
+                speed_obs_map.reset(initial_speed_mps=v_entry, initial_ts_ns=t_curr)
 
                 # Locate reference fix used for heading seeding and integrate gyro forward from that fix
                 valid_moving = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
@@ -314,34 +323,51 @@ class DeadReckoningEngine:
                     gt_hdg_entry = seeded_hdg
                 hdg_seed_err = float(abs((seeded_hdg - gt_hdg_entry + 180.0) % 360.0 - 180.0))
 
-            v_fwd = float(v_preds[j]) * (speed_scale if blackout_started else 1.0)
+            v_ai_cal = float(v_preds[j]) * (speed_scale if blackout_started else 1.0)
 
-            # Apply closed-loop Road Kinematics Governor during blackout
-            local_kappa = 0.0
+            if blackout_started:
+                v_pure_fwd, is_stat_pure = speed_obs_pure.update(cal, v_ai_cal)
+            else:
+                v_pure_fwd = v_ai_cal
+                is_stat_pure = (v_ai_cal < 0.2)
+
+            # Apply Road Kinematics Governor ONLY to the map-matched stream
+            v_map_fwd = v_pure_fwd
+            is_stat_map = is_stat_pure
             if blackout_started:
                 turn_rate_yaw = float(cal.gyro_vehicle[2])
+                local_kappa = 0.0
                 nearest_segs = road_net.find_candidates(ekf_map._p[:2], radius_m=35.0)
                 if nearest_segs and len(nearest_segs) >= 2:
                     p1 = nearest_segs[0].start_enu_m
                     p2 = nearest_segs[0].end_enu_m
                     p3 = nearest_segs[1].end_enu_m
-                    kappas = governor.compute_curvature(np.array([p1, p2, p3]))
-                    local_kappa = float(np.max(kappas))
-                v_fwd, _ = governor.govern_speed(v_fwd, curvature=local_kappa, yaw_rate_rad_s=turn_rate_yaw)
+                    # Verify spatial continuity between segments before computing curvature
+                    if np.linalg.norm(p2 - nearest_segs[1].start_enu_m) < 8.0:
+                        kappas = governor.compute_curvature(np.array([p1, p2, p3]))
+                        local_kappa = float(np.max(kappas))
+                v_map_fwd, _ = governor.govern_speed(v_pure_fwd, curvature=local_kappa, yaw_rate_rad_s=turn_rate_yaw)
+                if v_map_fwd < 0.2:
+                    is_stat_map = True
 
-            m_state = "STATIONARY" if v_fwd < 0.2 else "DRIVING"
-            vel = VelocityEstimate(
+            vel_pure = VelocityEstimate(
                 timestamp_ns=t_curr,
-                forward_speed_mps=v_fwd,
+                forward_speed_mps=v_pure_fwd,
                 speed_variance=0.3,
-                motion_state=m_state,
+                motion_state="STATIONARY" if is_stat_pure or v_pure_fwd < 0.2 else "DRIVING",
+            )
+            vel_map = VelocityEstimate(
+                timestamp_ns=t_curr,
+                forward_speed_mps=v_map_fwd,
+                speed_variance=0.3,
+                motion_state="STATIONARY" if is_stat_map or v_map_fwd < 0.2 else "DRIVING",
             )
 
-            fused_pure = ekf_pure.predict(cal, vel)
-            fused_map = ekf_map.predict(cal, vel)
+            fused_pure = ekf_pure.predict(cal, vel_pure)
+            fused_map = ekf_map.predict(cal, vel_map)
 
-            if bo_start_ns <= t_curr <= bo_end_ns and v_fwd > 1.0:
-                matcher.match(fused_map, ekf=ekf_map, domain=domain, v_fwd=v_fwd)
+            if bo_start_ns <= t_curr <= bo_end_ns and v_map_fwd > 1.0:
+                matcher.match(fused_map, ekf=ekf_map, domain=domain, v_fwd=v_map_fwd)
 
             if bo_start_ns <= t_curr <= bo_end_ns:
                 pure_pts.append(fused_pure.position_enu_m[:2].copy())

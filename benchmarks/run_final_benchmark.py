@@ -693,8 +693,8 @@ def plot_all_scenario_maps(df, detailed_results, spotlights):
                 ax_spd.plot(t_rel, spd_gps, color="#94a3b8", linestyle="--", linewidth=1.5, alpha=0.75, label="Sparse GPS Speed (9s fix)")
         else:
             ax_spd.plot(t_rel, spd_gt, "k--", linewidth=2.0, alpha=0.85, label="Ground Truth GPS Speed")
-        ax_spd.plot(t_rel, spd_pure, color="#ef4444", linestyle=":", linewidth=2.2, label="Pure AI Speed (CAN-Trained)")
-        ax_spd.plot(t_rel, spd_map, color="#0284c7", linestyle="-", linewidth=2.5, label="Governed Matched Speed")
+        ax_spd.plot(t_rel, spd_pure, color="#ef4444", linestyle=":", linewidth=2.2, label="Pure Kinematic AI Speed")
+        ax_spd.plot(t_rel, spd_map, color="#0284c7", linestyle="-", linewidth=2.5, label="Road-Governed Matched Speed")
         ax_spd.fill_between(t_rel, 0, spd_map, color="#0284c7", alpha=0.10)
         ax_spd.set_title("Speed Profile Along Blackout Duration", fontsize=11, fontweight="bold", pad=8)
         ax_spd.set_xlabel("Blackout Elapsed Time (s)", fontsize=9)

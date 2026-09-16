@@ -83,12 +83,20 @@ class RoadKinematicsGovernor:
         """
         v_nonneg = max(0.0, float(v_pred))
 
-        if curvature > 1e-4:
-            v_max_curve = float(np.sqrt(self.a_lat_max / curvature))
+        # Filter geometric curvature by actual vehicle turn activity to reject map digitization kinks:
+        # If IMU gyro confirms vehicle is traveling straight (|yaw_rate| < 0.02 rad/s), geometric kinks are noise.
+        eff_kappa = curvature
+        if yaw_rate_rad_s is not None:
+            kinematic_kappa = abs(yaw_rate_rad_s) / max(v_nonneg, 1.0)
+            if abs(yaw_rate_rad_s) < 0.02:
+                eff_kappa = min(eff_kappa, kinematic_kappa)
+
+        if eff_kappa > 1e-4:
+            v_max_curve = float(np.sqrt(self.a_lat_max / eff_kappa))
         else:
             v_max_curve = self.speed_limit_mps
 
-        if yaw_rate_rad_s is not None and abs(yaw_rate_rad_s) > 0.02:
+        if yaw_rate_rad_s is not None and abs(yaw_rate_rad_s) > 0.035:
             v_max_gyro = float(self.a_lat_max / (abs(yaw_rate_rad_s) + 1e-4))
         else:
             v_max_gyro = self.speed_limit_mps
@@ -106,7 +114,7 @@ class RoadKinematicsGovernor:
             "v_max_gyro": float(v_max_gyro),
             "effective_cap": float(effective_max),
             "is_governed": float(v_nonneg > effective_max),
-            "curvature": float(curvature),
+            "curvature": float(eff_kappa),
         }
         return float(v_governed), diag
 
