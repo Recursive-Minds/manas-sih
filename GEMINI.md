@@ -28,4 +28,11 @@ To prevent conversation token exhaustion, infinite polling loops, and remote API
 - **Concise Command Outputs**: Always pipe, filter, or truncate terminal commands (e.g. `Select-Object -First 20`, `head -n 20`, `--quiet`). Never allow long dumps or recursive scans to flood the tool response buffer.
 - **Zero Raw Media/Archive Inspection**: Never call `view_file`, `grep_search`, or unfiltered git diff on massive offline archives (e.g. `FIX_IMU_SENSOR_FUSION_FULL_CHAT_ARCHIVE.html`), video files, or large data arrays.
 - **Strict Prohibition of Polling Loops**: Never call `manage_task("list")` or status check in a rapid loop. Rely entirely on the reactive wakeup system.
-
+15. **The 3 Authoritative Master Documentation Files (Single Source of Truth)**:
+The entire project documentation is strictly consolidated into **3 authoritative master files** at the root of the repository:
+- **`SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`**: The living record of the current system implementation, physical models, math formulas, algorithms, module code inventory, and parameters. **MUST be updated ANYTIME parameters are tweaked or new features/algorithms are added.**
+- **`PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`**: The definitive record of the SIH 26168 Problem Statement, initial ideas, initial planned roadmap, phase-by-phase evolution, key scientific discoveries (why neural heading failed, 9s GPS illusion), and the 20 physical failure modes.
+- **`FINAL_JUDGE_EVALUATION_REPORT.md` (and `.html`)**: The single source of truth for empirical benchmark results, multi-seed statistical validation (6 seeds x 40 scenarios), domain scorecards, error decompositions, and trajectory plots. **MUST be updated whenever benchmarks are run.**
+16. **No Divergent Metrics or Duplicate Files Protocol**:
+- NEVER duplicate or hardcode benchmark numbers across other files. `FINAL_JUDGE_EVALUATION_REPORT.md` is the SINGLE SOURCE OF TRUTH for all empirical figures. Any other file (including `README.md` and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`) MUST refer to `FINAL_JUDGE_EVALUATION_REPORT.md` rather than repeating static numbers that become stale or contradictory.
+- NEVER create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate system architecture, roadmaps, or metrics. Any new technical detail belongs in `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`.
