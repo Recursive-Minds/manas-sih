@@ -130,14 +130,22 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
 
 ---
 
-## 10. The 3 Authoritative Documentation Files (Single Source of Truth)
+## 10. The Master README.md Document (Single Source of Truth & Full Context Union)
 
-To eliminate contradictory metrics across disparate files, all project documentation is strictly consolidated into **3 authoritative master files** at the root of the repository:
+To eliminate fragmented documentation and contradictory metrics, the entire project specification is strictly consolidated into **one authoritative master file**:
 
-1. **`SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`**: The living technical reference for mathematical formulations, dynamic coordinate frames, SO(3) leveling, Delta-v speed observer, dynamic heading fusion, repaired road governor, active parameters, edge C++ NDK engine, and complete codebase inventory.
-   - **MANDATORY RULE**: MUST be updated ANYTIME parameters are tweaked or new features/algorithms are added.
-2. **`PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`**: The definitive record of the SIH 26168 Problem Statement, Indian road challenges, 3 operational tiers, initial 5-phase roadmap, key scientific discoveries (why neural heading failed, 9s GPS illusion), and the 20 physical failure modes.
-3. **`FINAL_JUDGE_EVALUATION_REPORT.md` (and `.html`)**: The SINGLE SOURCE OF TRUTH for all empirical figures, 6-seed 240-scenario benchmark matrix, domain scorecards, error decompositions, and scenario plots.
-   - **MANDATORY RULE**: MUST be re-generated whenever benchmarks are executed.
-   - **NO DIVERGENT METRICS RULE**: Never hardcode or duplicate benchmark numbers into other markdown files. All other documents link directly to `FINAL_JUDGE_EVALUATION_REPORT.md`.
-   - **NO DUPLICATE FILES RULE**: Do not create auxiliary markdown files in `docs/` or elsewhere that duplicate system architecture, roadmap, or benchmark results.
+* **`README.md`**: The sole living technical reference and context union containing:
+  - Full SIH 26168 Problem Statement, operational tiers, and Indian transit realities.
+  - Initial 5-phase plan, original hypotheses, and chronological evolution across all phases.
+  - Key scientific discoveries (why neural heading failed, 9s GPS optical illusion, 1.3s causal lag, OSM kinks).
+  - Comprehensive record of all 20 physical failure modes and hardening solutions.
+  - Complete mathematical formulations (in clean plain-text math, Rule 12), physical models, and architecture.
+  - Active tuned parameters registry and full codebase module inventory.
+  - Canonical empirical benchmark results (6 seeds x 40 scenarios = 240 evaluation runs), domain breakdowns, and trajectory plots.
+  - Quickstart reproduction guide and unit test instructions.
+
+**MANDATORY UPDATE RULES**:
+1. **Direct In-Line Context**: `README.md` contains the full context directly inline. It must NOT delegate core information to external/auxiliary markdown files.
+2. **Synchronization**: Whenever code, parameters, or models are tweaked, or benchmarks are re-run, `README.md` MUST be updated directly.
+3. **No Auxiliary Markdown Files**: Never create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate or fragment system architecture, roadmap, or metrics.
+4. **Benchmark Automation Output**: `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html` are the automated direct outputs of `benchmarks/run_final_benchmark.py`. Their latest empirical tables and scorecards must always be mirrored into Section 16 of `README.md`.

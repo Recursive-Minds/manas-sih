@@ -28,11 +28,17 @@ To prevent conversation token exhaustion, infinite polling loops, and remote API
 - **Concise Command Outputs**: Always pipe, filter, or truncate terminal commands (e.g. `Select-Object -First 20`, `head -n 20`, `--quiet`). Never allow long dumps or recursive scans to flood the tool response buffer.
 - **Zero Raw Media/Archive Inspection**: Never call `view_file`, `grep_search`, or unfiltered git diff on massive offline archives (e.g. `FIX_IMU_SENSOR_FUSION_FULL_CHAT_ARCHIVE.html`), video files, or large data arrays.
 - **Strict Prohibition of Polling Loops**: Never call `manage_task("list")` or status check in a rapid loop. Rely entirely on the reactive wakeup system.
-15. **The 3 Authoritative Master Documentation Files (Single Source of Truth)**:
-The entire project documentation is strictly consolidated into **3 authoritative master files** at the root of the repository:
-- **`SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`**: The living record of the current system implementation, physical models, math formulas, algorithms, module code inventory, and parameters. **MUST be updated ANYTIME parameters are tweaked or new features/algorithms are added.**
-- **`PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`**: The definitive record of the SIH 26168 Problem Statement, initial ideas, initial planned roadmap, phase-by-phase evolution, key scientific discoveries (why neural heading failed, 9s GPS illusion), and the 20 physical failure modes.
-- **`FINAL_JUDGE_EVALUATION_REPORT.md` (and `.html`)**: The single source of truth for empirical benchmark results, multi-seed statistical validation (6 seeds x 40 scenarios), domain scorecards, error decompositions, and trajectory plots. **MUST be updated whenever benchmarks are run.**
-16. **No Divergent Metrics or Duplicate Files Protocol**:
-- NEVER duplicate or hardcode benchmark numbers across other files. `FINAL_JUDGE_EVALUATION_REPORT.md` is the SINGLE SOURCE OF TRUTH for all empirical figures. Any other file (including `README.md` and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`) MUST refer to `FINAL_JUDGE_EVALUATION_REPORT.md` rather than repeating static numbers that become stale or contradictory.
-- NEVER create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate system architecture, roadmaps, or metrics. Any new technical detail belongs in `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`.
+15. **The Master README.md Document (Single Source of Truth & Full Context Union)**:
+`README.md` is the SINGLE authoritative master reference document for the entire project. It is the comprehensive union containing all context directly inline:
+- Full SIH 26168 Problem Statement, Indian transit challenges, and 3 operational tiers.
+- Initial concept, foundational hypotheses, and chronological evolution across all phases.
+- Key scientific discoveries & architectural pivots (why neural heading failed, 9s GPS optical illusion, 1.3s causal lag, OSM curvature kinks).
+- Comprehensive record of all 20 physical failure modes and hardening solutions.
+- Full mathematical formulations (clean plain-text math, Rule 12), physical models, and architecture.
+- Complete active parameters registry and full codebase module inventory.
+- Definitive empirical benchmark evaluation scorecards (6 seeds x 40 scenarios = 240 runs, domain breakdowns, and trajectory plots).
+- Quickstart guide, reproduction commands, and test verification.
+**MANDATORY UPDATE**: `README.md` must be updated directly whenever any code change, model retraining, parameter tweak, or benchmark run is performed. It contains the context itself and must NOT delegate core information to external/auxiliary markdown files.
+16. **No Auxiliary / Dispersed Markdown Files Protocol**:
+- NEVER create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate or fragment system architecture, roadmap, or metrics. All technical details, formulas, and progress records belong exclusively in `README.md`.
+- `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html` are the automated direct outputs of `benchmarks/run_final_benchmark.py`. Their latest empirical tables and scorecards must always be mirrored into Section 16 of `README.md` so that numbers are 100% consistent across the codebase.
