@@ -518,10 +518,8 @@ def run_benchmark(
         trip_stats=trip_stats, trip_configs=trip_configs, mean_hdg_seed_err=mean_hdg_seed_err,
         multi_seed_results=multi_seed_results if len(multi_seed_results) > 1 else None,
     )
-    sync_system_implementation_record(df, med_drift, p90_drift, t1_count, t2_count, tot_sc, hwy_dom_drift, art_dom_drift, urb_dom_drift, spotlights)
-    sync_readme(df, med_drift, crawl_err_m, city_drift, hwy_drift, t1_count, t2_count, tot_sc)
-    sync_roadmap(med_drift, tot_sc=tot_sc)
     print("\nMaster Benchmark, Visualizations, and All Reports successfully generated & synchronized!")
+
 
 
 def plot_drift_histogram(df):
@@ -1117,144 +1115,41 @@ To guarantee authentic scientific validity and real-world generalizability:
         f.write(html_doc)
     print(f"Generated standalone HTML report: {html_path}")
 
-
-def sync_system_implementation_record(df, med_drift, p90_drift, t1_count, t2_count, tot_sc, hwy_dom_drift, art_dom_drift, urb_dom_drift, spotlights):
-    rec_path = os.path.join(ROOT_DIR, "docs", "SYSTEM_IMPLEMENTATION_AND_TECHNIQUES_RECORD.md")
-    if not os.path.exists(rec_path):
-        return
-    print(f"Syncing {rec_path}...")
-    with open(rec_path, "r", encoding="utf-8") as f:
-        doc = f.read()
-
-    import re
-    # 1. Update executive metric bullets
-    doc = re.sub(r'The overall \*\*median drift is [\d\.]+%\*\*', f'The overall **median drift is {med_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*Overall Median Drift\*\*:\s*\*\*[\d\.]+%\*\*', f'* **Overall Median Drift**: **{med_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*P90 \(Worst Decile\) Drift\*\*:\s*\*\*[\d\.]+%\*\*', f'* **P90 (Worst Decile) Drift**: **{p90_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*Tier 1 \(< 10% drift\) Pass Rate\*\*:\s*\*\*[\d\.]+% \(\d+ \/ \d+ scenarios\)\*\*',
-                 f'* **Tier 1 (< 10% drift) Pass Rate**: **{t1_count/tot_sc*100:.1f}% ({t1_count} / {tot_sc} scenarios)**', doc)
-    doc = re.sub(r'\*\s*\*\*Sub-30% Consistency Rate\*\*:\s*\*\*[\d\.]+% \(\d+ \/ \d+ scenarios\)\*\*',
-                 f'* **Sub-30% Consistency Rate**: **{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc} scenarios)**', doc)
-
-    # 2. Update domain breakdown
-    doc = re.sub(r'\*\s*\*\*Highway Cruising \(`S-M`\)\*\*:\s*\*\*[\d\.]+%\*\*', f'* **Highway Cruising (`S-M`)**: **{hwy_dom_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*Arterial Corridors \(`S-S2`\)\*\*:\s*\*\*[\d\.]+%\*\*', f'* **Arterial Corridors (`S-S2`)**: **{art_dom_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*Urban Grid & Crawl \(`S-S1`\)\*\*:\s*\*\*[\d\.]+%\*\*', f'* **Urban Grid & Crawl (`S-S1`)**: **{urb_dom_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*Checkpoint Metrics\*\*\s*\(`models/checkpoints/best_moe_velocity_model\.pt`\):.*',
-                 '* **Checkpoint Metrics** (`models/checkpoints/best_moe_velocity_model.pt`): 10 Hz CAN-supervised, Validation RMSE **3.28 m/s**, scale ratio **1.07**.', doc)
-
-    # 3. Update Section 9.3 table with the exact new benchmark results
-    table_lines = [
-        "| Scenario ID | Domain & Sequence | Duration | Distance | Pure 6-Axis Drift | Phase 4 Map Drift | Accuracy Gain |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- |"
-    ]
-    for _, row in df.iterrows():
-        sc_id = int(row["scenario_id"])
-        trip = str(row["trip"])
-        dur = f"{row['duration_s']:.0f}s"
-        dist = f"{row['distance_m']:.1f}m"
-        pure_d = f"{row['pure_drift_pct']:.2f}%"
-        map_d = f"**{row['map_drift_pct']:.2f}%**"
-        gain = f"+{row['pure_drift_pct'] - row['map_drift_pct']:.2f}%"
-        table_lines.append(f"| **#{sc_id:02d}** | {trip} | {dur} | {dist} | {pure_d} | {map_d} | {gain} |")
-    new_table_str = "\n".join(table_lines)
-
-    sec9_pattern = r"(### 9\.3 Scenario-by-Scenario Evaluation Table\s*\n\s*.*?\n\n)(?:\|.*?\n)+"
-    match = re.search(sec9_pattern, doc)
-    if match:
-        doc = doc[:match.start(1)] + f"### 9.3 Scenario-by-Scenario Evaluation Table\n\nEvaluated on held-out Part 3 partitions and unseen test sequences across all 5 real-world driving sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`):\n\n" + new_table_str + "\n" + doc[match.end():]
-        print("  -> Updated Section 9.3 scenario table.")
-
-    # 4. Instant line-by-line relative image link update (lightweight, zero base64 bloat)
-    lines = doc.split("\n")
-    new_lines = []
-    for line in lines:
-        if 'alt="35-Scenario Drift Distribution' in line or 'alt="40-Scenario Drift Distribution' in line:
-            new_lines.append('  <img src="../artifacts/phase4_unseen_sm_drift_comparison_chart.png" width="850" alt="40-Scenario Drift Distribution Comparison Chart" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Master 9-Panel Trajectory Gallery"' in line:
-            new_lines.append('  <img src="../artifacts/unseen_sm_all_tiers_gallery.png" width="1050" alt="Master 9-Panel Trajectory Gallery" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Bayesian MoE Dual-Expert Training Dynamics"' in line:
-            new_lines.append('  <img src="../artifacts/moe_training_curves.png" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 15 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 30 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 30 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 02 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 02 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 17 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_precision_outage.png" width="750" alt="Scenario 17 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 10 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_highway_cruise.png" width="750" alt="Scenario 10 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 14 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_urban_chicane.png" width="750" alt="Scenario 14 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        elif 'alt="Scenario 31 Map"' in line:
-            new_lines.append('  <img src="../artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 31 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />')
-        else:
-            new_lines.append(line)
-    doc = "\n".join(new_lines)
-
-    with open(rec_path, "w", encoding="utf-8") as f:
-        f.write(doc)
-    print(f"  -> Successfully updated SYSTEM_IMPLEMENTATION_AND_TECHNIQUES_RECORD.md ({os.path.getsize(rec_path)/1024:.1f} KB)")
+    # Synchronize Section 16 of master README.md
+    sync_readme(md_content)
 
 
-def sync_readme(df, med_drift, crawl_err_m, city_drift, hwy_drift, t1_count, t2_count, tot_sc):
+def sync_readme(md_content):
     readme_path = os.path.join(ROOT_DIR, "README.md")
     if not os.path.exists(readme_path):
         return
-    print(f"Syncing {readme_path}...")
+    print(f"Syncing {readme_path} with latest benchmark evaluation...")
     with open(readme_path, "r", encoding="utf-8") as f:
-        doc = f.read()
+        readme_doc = f.read()
 
     import re
-    # 1. Update line 7 badge
-    doc = re.sub(r'\[!\[Evaluation\]\(https://img\.shields\.io/badge/Unseen%20Trip%20S--M-[\d\.]+%25%20Median%20Drift-success\.svg\)\]',
-                 f'[![Evaluation](https://img.shields.io/badge/Unseen%20Trip%20S--M-{med_drift:.2f}%25%20Median%20Drift-success.svg)]', doc)
+    # Strip top header from md_content
+    body = re.sub(r"^# Smartphone Intelligent Dead Reckoning.*?\n---", "", md_content, flags=re.DOTALL).strip()
 
-    # 2. Update Section 4.2 table
-    doc = re.sub(r'\|\s*\*\*Tier 1: Traffic Crawl\*\*\s*\|\s*&lt; 20 km/h / &lt; 200 m\s*\|\s*30s - 60s\s*\|\s*\*\*[\d\.]+ m Median Error\*\*',
-                 f'| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200 m | 30s - 60s | **{crawl_err_m:.1f} m Median Error**', doc)
-    doc = re.sub(r'\|\s*\*\*Tier 2: City Maneuvers\*\*\s*\|\s*20 - 50 km/h / 200 - 550 m\s*\|\s*30s - 60s\s*\|\s*\*\*[\d\.]+%\s*Median Drift\*\*',
-                 f'| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200 - 550 m | 30s - 60s | **{city_drift:.2f}% Median Drift**', doc)
-    doc = re.sub(r'\|\s*\*\*Tier 3: Highway Cruising\*\*\s*\|\s*&gt; 50 km/h / &gt; 500m – 1.2km\s*\|\s*60s – 75s\s*\|\s*\*\*[\d\.]+%\s*Median Drift\*\*',
-                 f'| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **{hwy_drift:.2f}% Median Drift**', doc)
+    # Clean any raw LaTeX math syntax for Rule 12 compliance
+    body = body.replace(r"\(", "").replace(r"\)", "").replace(r"\[", "").replace(r"\]", "")
+    body = body.replace(r"\sqrt", "sqrt").replace(r"\kappa", "kappa")
 
-    # 3. Update summary lines
-    doc = re.sub(r'\*\s*\*\*Overall Median Drift\*\*:\s*\*\*[\d\.]+%\*\*', f'* **Overall Median Drift**: **{med_drift:.2f}%**', doc)
-    doc = re.sub(r'\*\s*\*\*High Reliability Rate \(Drift < 30%\)\*\*:\s*\*\*[\d\.]+% \(\d+ / \d+ scenarios\)\*\*',
-                 f'* **High Reliability Rate (Drift < 30%)**: **{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc} scenarios)**', doc)
+    # Use string partitioning to safely replace Section 16 without regex escape issues
+    marker_start = "## 16. Definitive Empirical Benchmark Evaluation"
+    marker_end = "## 17. Active Tuned Parameters & Configuration Registry"
 
-    # 4. Update duration breakdown table in Section 4.3
-    for dur_val in [30.0, 45.0, 60.0, 75.0]:
-        dur_sub = df[df["duration_s"] == dur_val]
-        if len(dur_sub) > 0:
-            count = len(dur_sub)
-            mean_dist = dur_sub["distance_m"].mean()
-            pure_med = dur_sub["pure_drift_pct"].median()
-            map_med = dur_sub["map_drift_pct"].median()
-            final_err_med = dur_sub["map_err_m"].median()
-            row_pattern = rf'\|\s*\*\*{int(dur_val)} Seconds\*\*\s*\|\s*\d+\s*\|\s*[\d\.]+ m\s*\|\s*[\d\.]+%\s*\|\s*\*\*[\d\.]+%\*\*\s*\|\s*\*\*[\d\.]+ m\*\*\s*\|'
-            row_repl = f'| **{int(dur_val)} Seconds** | {count} | {mean_dist:.1f} m | {pure_med:.2f}% | **{map_med:.2f}%** | **{final_err_med:.1f} m** |'
-            doc = re.sub(row_pattern, row_repl, doc)
-
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write(doc)
-    print(f"  -> Successfully updated README.md")
+    if marker_start in readme_doc and marker_end in readme_doc:
+        prefix, _, rest = readme_doc.partition(marker_start)
+        _, _, suffix = rest.partition(marker_end)
+        new_readme = prefix + marker_start + "\n\n" + body + "\n\n---\n\n" + marker_end + suffix
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write(new_readme)
+        print("  -> Successfully synchronized Section 16 of master README.md with latest benchmark results.")
+    else:
+        print("  -> Warning: Section markers not found in README.md; skipping inline sync.")
 
 
-def sync_roadmap(med_drift, tot_sc=40):
-    rm_path = os.path.join(ROOT_DIR, "docs", "PROGRESS_AND_ROADMAP.md")
-    if not os.path.exists(rm_path):
-        return
-    print(f"Syncing {rm_path}...")
-    with open(rm_path, "r", encoding="utf-8") as f:
-        doc = f.read()
-
-    import re
-    doc = re.sub(r'\(Achieved [\d\.]+%\s*across \d+ scenarios\)', f'(Achieved {med_drift:.2f}% across {tot_sc} scenarios)', doc)
-    with open(rm_path, "w", encoding="utf-8") as f:
-        f.write(doc)
-    print(f"  -> Successfully updated PROGRESS_AND_ROADMAP.md")
 
 
 if __name__ == "__main__":
