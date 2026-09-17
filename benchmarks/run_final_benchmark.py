@@ -368,6 +368,7 @@ def run_benchmark(
     seeds: Optional[List[int]] = None,
     single: bool = False,
     model_path: Optional[str] = None,
+    fixed: bool = False,
 ):
     os.makedirs(ARTIFACT_DIR, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -392,8 +393,11 @@ def run_benchmark(
         rep_seed = seed
         multi_seed_results.append(metrics)
     else:
-        if seeds is None or len(seeds) == 0:
+        if fixed:
             seeds = [541098, 75496, 45736, 12345, 987654, 314159]
+        elif seeds is None or len(seeds) == 0:
+            import random
+            seeds = [int(random.randint(10000, 999999)) for _ in range(6)]
 
         print("\n" + "=" * 80)
         print(f"    [MULTI-SEED BENCHMARK SUITE] Evaluating {len(seeds)} Diverse Seeds: {seeds}")
@@ -1259,6 +1263,7 @@ if __name__ == "__main__":
     parser.add_argument("--single", action="store_true", help="Run benchmark on a single random or specified seed")
     parser.add_argument("--seed", type=int, default=None, help="Specific random seed (default: random when --single is set, or 541098)")
     parser.add_argument("--seeds", type=int, nargs="+", default=None, help="List of custom random seeds for multi-seed mode")
+    parser.add_argument("--fixed", action="store_true", help="Use standard canonical fixed 6 seeds [541098, 75496, 45736, 12345, 987654, 314159]")
     parser.add_argument("--model-path", type=str, default=None, help="Path to custom model checkpoint to benchmark")
     args = parser.parse_args()
-    run_benchmark(seed=args.seed, seeds=args.seeds, single=args.single, model_path=args.model_path)
+    run_benchmark(seed=args.seed, seeds=args.seeds, single=args.single, model_path=args.model_path, fixed=args.fixed)
