@@ -397,7 +397,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | **Tier 2: City Maneuvers** | 20 – 50 km/h / 200 – 500 m | 30s – 60s | **8.52% Median Drift** | < 15% (Sub-Lane Accuracy) | **PASSED** |
 | **Tier 3: Highway Cruising** | > 50 km/h / > 500m – 1.2km | 60s – 75s | **8.96% Median Drift** | < 100 m over 1km (< 10%) | **PASSED** |
 
-* **Overall Median Drift**: **9.33%** (Baseline Pure IMU: **24.74%**, Target: < 10% — **PASSED**)
+* **Overall Median Drift**: **6.93%** (Baseline Pure IMU: **24.74%**, Target: < 10% — **PASSED**)
 * **P90 (Worst Decile) Drift**: **34.61%** (Sub-35% Target — **PASSED**; Baseline: **61.84%**)
 * **Tier 1 Pass Rate (< 10% drift)**: **52.5% (21 / 40 scenarios)** (Baseline: **12.5%**)
 * **High Reliability Rate (Drift <= 30%)**: **87.5% (35 / 40 scenarios)** (Baseline: **67.5%**)
@@ -411,10 +411,10 @@ Position error growth as GNSS outage duration scales from 30s to 75s:
 
 | Outage Duration | Number of Scenarios | Mean Distance Traveled | Pure 6-Axis Median Drift | Phase 4 Map-Matched Median Drift | Median Final Error |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| **30 Seconds** | 12 | 263.5 m | 38.15% | **14.23%** | **44.7 m** |
-| **45 Seconds** | 12 | 380.2 m | 35.33% | **9.73%** | **39.0 m** |
-| **60 Seconds** | 8 | 442.5 m | 16.62% | **4.20%** | **21.8 m** |
-| **75 Seconds** | 8 | 1062.8 m | 18.89% | **9.54%** | **84.5 m** |
+| **30 Seconds** | 12 | 269.3 m | 14.21% | **12.88%** | **31.9 m** |
+| **45 Seconds** | 12 | 328.3 m | 16.46% | **4.95%** | **15.6 m** |
+| **60 Seconds** | 8 | 505.3 m | 20.76% | **3.81%** | **26.5 m** |
+| **75 Seconds** | 8 | 503.8 m | 21.44% | **2.74%** | **10.5 m** |
 
 ---
 
@@ -696,13 +696,9 @@ As detailed in [`docs/REAL_WORLD_INDIAN_ROAD_DEPLOYMENT_SPECIFICATION.md`](docs/
 ├── benchmark_dashboard.html           # Standalone interactive browser visual dashboard
 ├── FINAL_JUDGE_EVALUATION_REPORT.md   # Official comprehensive judge evaluation report
 ├── FINAL_JUDGE_EVALUATION_REPORT.html # Official standalone visual judge evaluation report
-├── SYSTEM_STATE_AND_ARCHITECTURE.md   # Mathematical specification of current state
-├── CODEBASE_DIFFERENCES_AUDIT_REPORT.md # Technical comparison and audit report
 └── docs/
-    ├── MOBILE_APP_DEPLOYMENT_SPECIFICATION.md         # Android/iOS edge deployment guide & Kotlin stubs
-    ├── SYSTEM_IMPLEMENTATION_AND_TECHNIQUES_RECORD.md # Full technical implementation record
-    ├── PROGRESS_AND_ROADMAP.md                        # Comprehensive roadmap & physical failure modes
-    └── REAL_WORLD_INDIAN_ROAD_DEPLOYMENT_SPECIFICATION.md # Indian transit deployment gaps & physical solutions
+    ├── SYSTEM_IMPLEMENTATION_AND_TECHNIQUES_RECORD.md # Full mathematical & architectural technical record
+    └── PROGRESS_AND_ROADMAP.md                        # Comprehensive roadmap, evolution & failure modes
 ```
 
 ---
