@@ -36,12 +36,14 @@ class DeadReckoningEngine:
         smoothing_factor: float = 0.35,
         min_route_ratio: float = 1.80,
         enable_route_matching: bool = False,
+        enable_speed_scale: bool = True,
     ):
         self.turn_threshold_rad_s = turn_threshold_rad_s
         self.cooldown_duration_s = cooldown_duration_s
         self.max_gyro_bias_rad_s = max_gyro_bias_rad_s
         self.smoothing_factor = smoothing_factor
         self.enable_route_matching = enable_route_matching
+        self.enable_speed_scale = enable_speed_scale
         self.route_matcher = RouteMatcher(min_route_ratio=min_route_ratio)
 
     @staticmethod
@@ -296,7 +298,7 @@ class DeadReckoningEngine:
                     )
 
                 # Dynamic pre-blackout speed scale factor learning from healthy GNSS fixes
-                if pre_gnss_window:
+                if self.enable_speed_scale and pre_gnss_window:
                     v_entry = float(pre_gnss_window[-1].speed_mps) if pre_gnss_window[-1].speed_mps is not None else 8.0
                     g_speeds = [g.speed_mps for g in pre_gnss_window if g.speed_mps is not None and g.speed_mps > 2.0]
                     ai_speeds = [v_preds[k] for k in range(max(0, j - len(g_speeds) * 10), j)]
@@ -494,6 +496,48 @@ class DeadReckoningEngine:
         pure_drift_pct = (final_err_pure / gt_dist) * 100.0
         map_drift_pct = (final_err_map / gt_dist) * 100.0
 
+        # Ground-truth track unit tangent and normal at outage exit
+        if bo_gnss[-1].bearing_deg is not None and bo_gnss[-1].speed_mps is not None and bo_gnss[-1].speed_mps > 0.5:
+            b_rad = np.radians(bo_gnss[-1].bearing_deg)
+            te_end = float(np.sin(b_rad))
+            tn_end = float(np.cos(b_rad))
+        elif len(gt_pts) >= 2:
+            d_end = gt_pts[-1] - gt_pts[-2]
+            k_step = -2
+            while np.linalg.norm(d_end) < 0.1 and k_step >= -len(gt_pts):
+                d_end = gt_pts[-1] - gt_pts[k_step]
+                k_step -= 1
+            d_norm = float(np.linalg.norm(d_end))
+            if d_norm > 1e-4:
+                te_end = float(d_end[0] / d_norm)
+                tn_end = float(d_end[1] / d_norm)
+            else:
+                te_end, tn_end = 1.0, 0.0
+        else:
+            te_end, tn_end = 1.0, 0.0
+
+        t_end_norm = float(np.hypot(te_end, tn_end))
+        if t_end_norm > 1e-6:
+            te_end /= t_end_norm
+            tn_end /= t_end_norm
+        else:
+            te_end, tn_end = 1.0, 0.0
+
+        ne_end = -tn_end
+        nn_end = te_end
+
+        err_vec_map = eval_pt - gt_end_enu
+        final_at_map = float(err_vec_map[0] * te_end + err_vec_map[1] * tn_end)
+        final_ct_map = float(err_vec_map[0] * ne_end + err_vec_map[1] * nn_end)
+
+        err_vec_pure = eval_pure_pt - gt_end_enu
+        final_at_pure = float(err_vec_pure[0] * te_end + err_vec_pure[1] * tn_end)
+        final_ct_pure = float(err_vec_pure[0] * ne_end + err_vec_pure[1] * nn_end)
+
+        assert abs(np.hypot(final_at_map, final_ct_map) - final_err_map) < 1e-4, (
+            f"Decomposition invariant failed: sqrt({final_at_map}^2 + {final_ct_map}^2) != {final_err_map}"
+        )
+
         # Time-series error decomposition along the blackout duration
         gt_interp_e = np.interp(map_ts_arr, gt_ts_arr, gt_pts[:, 0])
         gt_interp_n = np.interp(map_ts_arr, gt_ts_arr, gt_pts[:, 1])
@@ -511,13 +555,42 @@ class DeadReckoningEngine:
 
         de = np.gradient(gt_interp_e)
         dn = np.gradient(gt_interp_n)
-        ds = np.hypot(de, dn) + 1e-6
-        te = de / ds
-        tn = dn / ds
+        ds = np.hypot(de, dn)
+
+        # Fill unit tangent vectors for stationary or clamped steps
+        valid_ds = ds > 1e-3
+        te = np.zeros_like(ds)
+        tn = np.zeros_like(ds)
+        if np.any(valid_ds):
+            te[valid_ds] = de[valid_ds] / ds[valid_ds]
+            tn[valid_ds] = dn[valid_ds] / ds[valid_ds]
+            for idx in range(len(te)):
+                if not valid_ds[idx]:
+                    prev_valid = np.where(valid_ds[:idx])[0]
+                    next_valid = np.where(valid_ds[idx + 1:])[0]
+                    if len(prev_valid) > 0:
+                        te[idx] = te[prev_valid[-1]]
+                        tn[idx] = tn[prev_valid[-1]]
+                    elif len(next_valid) > 0:
+                        te[idx] = te[idx + 1 + next_valid[0]]
+                        tn[idx] = tn[idx + 1 + next_valid[0]]
+                    else:
+                        te[idx] = te_end
+                        tn[idx] = tn_end
+        else:
+            te[:] = te_end
+            tn[:] = tn_end
+
+        # Ensure the final point matches the exact endpoint decomposition
+        te[-1] = te_end
+        tn[-1] = tn_end
+
         diff_e = map_pts[:, 0] - gt_interp_e
         diff_n = map_pts[:, 1] - gt_interp_n
         along_track_series = diff_e * te + diff_n * tn
         cross_track_series = diff_e * (-tn) + diff_n * te
+        along_track_series[-1] = final_at_map
+        cross_track_series[-1] = final_ct_map
         time_rel_s = (map_ts_arr - bo_start_ns) * 1e-9
 
         return {
@@ -541,6 +614,12 @@ class DeadReckoningEngine:
             "err_map_series": err_map_series,
             "along_track_series": along_track_series,
             "cross_track_series": cross_track_series,
+            "final_at_m": final_at_map,
+            "final_ct_m": final_ct_map,
+            "along_track_m": final_at_map,
+            "cross_track_m": final_ct_map,
+            "pure_at_m": final_at_pure,
+            "pure_ct_m": final_ct_pure,
             "hdg_seed_err": hdg_seed_err,
             "total_match_steps": matcher.total_match_steps,
             "gate_suppressed_steps": matcher.gate_suppressed_steps,
@@ -579,11 +658,15 @@ def run_dead_reckoning_scenario(
     domain: str = "Highway",
     can_speeds: Optional[np.ndarray] = None,
     enable_route_matching: bool = False,
+    enable_speed_scale: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """
     Convenience functional wrapper for executing a dead-reckoning scenario with default engine settings.
     """
-    engine = DeadReckoningEngine(enable_route_matching=enable_route_matching)
+    engine = DeadReckoningEngine(
+        enable_route_matching=enable_route_matching,
+        enable_speed_scale=enable_speed_scale,
+    )
     return engine.run_scenario(
         trip=trip,
         calib_samples=calib_samples,

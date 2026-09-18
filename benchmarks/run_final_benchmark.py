@@ -147,13 +147,7 @@ def load_precomputed_benchmark_data(
     v_preds_dict = {}
     can_speeds_dict = {}
 
-    can_time_offsets = {
-        "S-M": 8,       # +0.80s (cross-correlation aligned)
-        "S-S1": 0,      # 0.00s
-        "S-S2": 86,     # +8.60s
-        "S-S3a": -68,   # -6.80s
-        "S-S4": 3138,   # +313.75s (Table A1-1 author hardware restart clock offset)
-    }
+    from sih.data.can_sync import load_synchronized_can_speed, is_can_supervised_allowed, get_can_offset_seconds
 
     model, norm_mean, norm_std, model_type = load_ai_model(device, model_path=model_path)
 
@@ -163,29 +157,15 @@ def load_precomputed_benchmark_data(
         trips[tid] = trip
         print(f"Loaded Trip {tid} ({domain}): {len(trip.imu_samples):,} IMU, {len(trip.gnss_samples):,} GNSS")
 
-        # Load 10 Hz continuous vehicle CAN wheel speed ground truth
-        v_path = os.path.join(DATA_DIR, f"V-{tid[2:]}.csv")
-        if os.path.exists(v_path):
-            import pandas as pd
-            v_df = pd.read_csv(v_path, encoding="latin-1")
-            v_cols = {c.strip(): c for c in v_df.columns}
-            v_col = v_cols.get("Velocity (km/hr)", v_cols.get("Indicated Vehicle Speed (km/hr)"))
-            if v_col:
-                raw_v = (v_df[v_col].fillna(0).to_numpy() / 3.6).astype(np.float32)
-                lag = can_time_offsets.get(tid, 0)
-                if lag > 0:
-                    c_spd = np.zeros_like(raw_v)
-                    c_spd[:-lag] = raw_v[lag:]
-                    c_spd[-lag:] = raw_v[-1]
-                elif lag < 0:
-                    c_spd = np.zeros_like(raw_v)
-                    c_spd[-lag:] = raw_v[:lag]
-                    c_spd[:-lag] = raw_v[0]
-                else:
-                    c_spd = raw_v
-                c_spd[c_spd < 0.2] = 0.0
+        # Load 10 Hz continuous vehicle CAN wheel speed ground truth (enforcing S-S4 exclusion)
+        if is_can_supervised_allowed(tid):
+            c_spd = load_synchronized_can_speed(tid, DATA_DIR)
+            if c_spd is not None:
                 can_speeds_dict[tid] = c_spd
-                print(f"  - Loaded 10 Hz CAN Ground Truth: {len(c_spd):,} samples (offset {lag*0.1:+.2f}s)")
+                offset_s = get_can_offset_seconds(tid)
+                print(f"  - Loaded 10 Hz CAN Ground Truth: {len(c_spd):,} samples (offset {offset_s:+.2f}s)")
+        else:
+            print(f"  - Trip {tid} CAN GT: PERMANENTLY EXCLUDED (Using GPS Doppler ground truth instead)")
 
         calibrator = MountCalibrator(min_samples=30)
         gnss_idx = 0
@@ -229,6 +209,7 @@ def evaluate_seed_scenarios(
     seed: int,
     pre: Dict[str, Any],
     map_source: Optional[str] = None,
+    enable_speed_scale: bool = True,
 ) -> Tuple[pd.DataFrame, List[Dict[str, Any]], Dict[str, Any]]:
     if map_source is None:
         map_source = pre.get("map_source", "osm")
@@ -332,7 +313,8 @@ def evaluate_seed_scenarios(
         for t_start, t_end, dur, g_cand in selected_candidates:
             res = run_scenario(
                 trip, calib_samples, v_preds, road_net, g_cand, dur,
-                domain=domain, can_speeds=can_speeds_dict.get(tid)
+                domain=domain, can_speeds=can_speeds_dict.get(tid),
+                enable_speed_scale=enable_speed_scale,
             )
             if res is not None and res["dist_m"] >= 20.0:
                 selected_for_trip.append((t_start, t_end, dur, g_cand, res))

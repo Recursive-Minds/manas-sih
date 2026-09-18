@@ -1,0 +1,23 @@
+{
+  "description": "Validated 10 Hz Vehicle CAN bus clock offsets against GNSS timebase (IO-VNBD dataset).",
+  "sampling_rate_hz": 10.0,
+  "offsets_seconds": {
+    "S-M": 2.3,
+    "S-S1": 0.0,
+    "S-S2": 8.6,
+    "S-S3a": -6.9
+  },
+  "offsets_ticks_10hz": {
+    "S-M": 23,
+    "S-S1": 0,
+    "S-S2": 86,
+    "S-S3a": -69
+  },
+  "excluded_trips": {
+    "S-S4": {
+      "status": "PERMANENTLY_EXCLUDED",
+      "reason": "Split-clock CAN logging failure. Uncorrelated for the first 65 minutes (Pearson r in [-0.38, 0.15], MAE ~ 22 km/h); subsequent highway stretch aligns at r ~ 0.99. No constant temporal offset exists across the full 157-minute trip. GPS Doppler is mandatory ground truth.",
+      "ground_truth_replacement": "gps_doppler"
+    }
+  }
+}

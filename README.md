@@ -222,7 +222,9 @@ Initial Assumption                        Real-Data Finding                     
 ### Pivot 2: Resolving the 9-Second Phone GPS Stair-Step Optical Illusion
 * **Why it mattered**: Initial velocity models trained against smartphone GPS ground truth exhibited unexplained phase lags and systematic under-prediction on curves.
 * **The Discovery**: Consumer smartphone GPS chipsets apply internal smoothing filters that introduce up to 9 seconds of effective delay during velocity transients, producing a "stair-step" velocity curve that does not match instantaneous chassis physics.
-* **The Solution**: Ground-truth supervision was completely transitioned to synchronized 10 Hz vehicle ECU CAN-bus wheel speeds (`V-M.csv`, `V-S1.csv`, `V-S2.csv`), with cross-correlation temporal offset alignment (+0.10s, +8.60s, +1.70s, -6.90s).
+* **The Solution**: Ground-truth supervision was transitioned to synchronized 10 Hz vehicle ECU CAN-bus wheel speeds (`V-M.csv`, `V-S1.csv`, `V-S2.csv`, `V-S3a.csv`), with validated cross-correlation clock offsets loaded from `config/can_sync.json`: `S-M (+2.30s)`, `S-S1 (0.00s)`, `S-S2 (+8.60s)`, `S-S3a (-6.90s)`.
+* **Ground-Truth Integrity Audit (Trip S-S4 Permanent Exclusion)**:
+  Trip `S-S4` was comprehensively investigated. A 5-minute rolling window correlation revealed that `S-S4` CAN was completely uncorrelated for the first 65 minutes (r between -0.38 and +0.15, MAE ~ 22 km/h) before locking onto r ~= 0.99 during the second-half highway cruise. Because no constant temporal offset exists across the full 157-minute trip, a single constant lag (such as +313.6s) is spurious. `S-S4` is permanently excluded from CAN supervision in code (`sih/data/can_sync.py`), and GPS Doppler is used as ground truth. Furthermore, the previously cited "IO-VNBD thesis Table A1-1 logger restart" reference could not be verified in the published paper or dataset documentation and has been formally withdrawn.
 
 ### Pivot 3: Inventing the Kinematic Delta-v Speed Observer
 * **Why it mattered**: Pure neural speed estimation relies on a rolling window buffer (2.0s to 6.0s). While this accurately predicts steady-state cruising speed, it suffers from a 1.3-second causal phase lag during sudden braking or full-throttle acceleration.
@@ -233,7 +235,7 @@ Initial Assumption                        Real-Data Finding                     
 ### 3.5 Initial Plan vs. Delivered Reality Comparison Matrix
 | Architectural Subsystem | Initial Planned Concept (Phase 1 Proposals) | Delivered Production Reality | Empirical Benefit |
 | :--- | :--- | :--- | :--- |
-| **Speed Estimation** | Single 1D-CNN regressing forward speed from 20-sample accelerometer windows. | **Dual-Brain Bayesian Mixture-of-Experts (MoE)**: ResNet-1D micro-expert (2.0s) + Dilated TCN-Attention macro-expert (6.0s) + Kinematic Delta-v Observer. | Speed RMSE reduced to 1.46 m/s; 1.3s lag eliminated; scale ratio = 1.00. |
+| **Speed Estimation** | Single 1D-CNN regressing forward speed from 20-sample accelerometer windows. | **Dual-Brain Bayesian Mixture-of-Experts (MoE)**: ResNet-1D micro-expert (2.0s) + Dilated TCN-Attention macro-expert (6.0s) + Kinematic Delta-v Observer. | CAN Wheel Speed RMSE of 2.77 m/s (training trips) and 2.49 m/s (held-out S-S3a); 1.46 m/s observed on GPS Doppler subset; 1.3s lag eliminated; scale ratio = 1.00. |
 | **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. | Completely immune to vehicle magnetic distortion (+76°); initial heading error cut to 0.14° average (0.0002° median). |
 | **Mount Calibration** | Manual user calibration or static orientation assumption. | **Dynamic Autonomous SO(3) Leveling**: Rodrigues rotation from gravity + continuous least-squares centripetal acceleration turn correlation. | Zero user calibration required; adapts to arbitrary portrait/landscape/tilted phone orientations. |
 | **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor**: Turn-inflated likelihood, branch multi-hypothesis gating, and IRC:73 lateral comfort limits. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
@@ -241,6 +243,57 @@ Initial Assumption                        Real-Data Finding                     
 | **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ NDK Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 2.68 ms latency on mobile CPU). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
 
 ---
+
+### 3.6 Diagnostic Error Decomposition, Headroom & Negative Result: Speed Recalibration f(v)
+
+#### Corrected Along-Track / Cross-Track Error Decomposition
+Following the resolution of the terminal ground-truth projection bug (where series was previously evaluated past the last fix, producing zero error for 32/40 scenarios), the along-track (speed scale) and cross-track (heading) error decomposition satisfies the strict invariant:
+```
+sqrt(along_track_m^2 + cross_track_m^2) == map_err_m
+```
+Across all 40 canonical scenarios:
+* **Along-Track (Speed Error)**: Accounts for **87.9% of total squared position error**.
+* **Cross-Track (Heading Error)**: Accounts for **12.1% of total squared position error** (Cross-Track P90 = 74.2m).
+
+#### Counterfactual Headroom Analysis (Seed 541098, 40 Scenarios)
+| Pipeline Counterfactual | Median Drift (%) | P90 Drift (%) | Tier 1 (< 10%) | High Reliability (<= 30%) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Actual Production Baseline** | **11.59%** | **32.56%** | **16 / 40 (40.0%)** | **35 / 40 (87.5%)** |
+| **Counterfactual (i): Perfect Instantaneous Speed** | **1.40%** | **22.02%** | **36 / 40 (90.0%)** | **37 / 40 (92.5%)** |
+| **Counterfactual (ii): Perfect Instantaneous Heading** | **8.52%** | **30.56%** | **24 / 40 (60.0%)** | **36 / 40 (90.0%)** |
+| **Counterfactual (iii): Both Speed & Heading Perfect** | **0.00%** | **0.00%** | **40 / 40 (100.0%)** | **40 / 40 (100.0%)** |
+
+#### Negative Result: Monotonic Speed Recalibration f(v)
+Because along-track error accounted for 87.9% of squared error, a monotonic post-hoc recalibration function `f(v_predicted) -> v_corrected` was hypothesized to eliminate the observed +0.65 m/s speed bias in the 20-50 km/h regime.
+Two non-decreasing candidates were fitted on 49,869 held-out validation samples (Part 2 temporal slices of `S-M`, `S-S1`, `S-S2`):
+1. **Piecewise-Linear Model**: Knots at 0, 5.56, and 13.89 m/s (20 km/h and 50 km/h). Fitted slopes: `s1 = 1.0354`, `s2 = 0.8162`, `s3 = 1.0279`.
+2. **Isotonic Regression**: Non-parametric isotonic step function.
+
+##### Per-Band Evaluation (Held-Out Data)
+| Speed Band | Sample Count | Raw Bias (m/s) | PW-Linear Bias (m/s) | Raw RMSE (m/s) | PW-Linear RMSE (m/s) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Part 2 Validation (< 20 km/h)** | 15,520 | +1.111 | +1.117 | 2.271 | 2.165 |
+| **Part 2 Validation (20 - 50 km/h)**| 28,090 | +0.651 | +0.042 | 2.512 | 2.128 |
+| **Part 2 Validation (> 50 km/h)** | 6,259 | -1.646 | -2.834 | 3.511 | 4.149 |
+| **Held-Out S-S3a (> 50 km/h)** | 6,205 | -2.022 | -3.191 | 3.313 | 4.078 |
+| **Held-Out S-S4 (> 50 km/h)** | 21,729 | -5.480 | -6.499 | 7.253 | 7.959 |
+
+##### Benchmark Drift Ablation (Canonical Seed 541098, 40 Scenarios)
+| Configuration | Fitted Trips (20 Scenarios) | Held-Out Trips (20 Scenarios) | All 40 Scenarios (Median) | All 40 Scenarios (P90) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Baseline (Raw MoE + alpha)** | **12.87%** | **8.73%** | **11.59%** | **32.56%** |
+| **`f` only (alpha = OFF)** | 12.96% | 9.86% | 11.46% | 41.10% |
+| **`f + alpha` (alpha = ON)** | 13.84% | 9.18% | 12.34% | 32.78% |
+
+##### Why Speed Recalibration Was Formally Rejected
+1. **Baseline Wins Decisively**: Baseline 11.59% median / 32.56% P90 beat `f-only` (11.46% / 41.10% P90) and `f+alpha` (12.34% / 32.78% P90). On held-out trips, baseline won clearly (8.73% vs 9.86% and 9.18%).
+2. **High-Speed Generalization Failure**: Per band, `f` degraded the >50 km/h regime on both held-out trips (S-S3a bias degraded from -2.02 to -3.19 m/s, RMSE from 3.31 to 4.08 m/s; S-S4 bias from -5.48 to -6.50 m/s). Because the high-speed regime had only 6,259 samples in the validation partition, `f` overfit the slice and failed out-of-sample.
+3. **Pre-Blackout Dynamic Anchoring (`alpha`) Is Indispensable**: Turning `alpha` off caused P90 tail error to blow out from 32.56% to 41.10%. Furthermore, when `f` and `alpha` were combined, `alpha = mean(v_GPS) / mean(f(v_AI))` mechanically counteracted `f` by inflating the multiplier.
+4. **Final Disposition**: `f` was completely reverted from `predict_velocities` and the exported TorchScript graph (`MoEEdgeWrapper`). It is preserved as a documented negative result in `config/speed_recalibration.json` and `scripts/fit_speed_recalibration.py` (marked NOT IN USE).
+
+#### Two Open Identified Phases
+1. **Crawl Stop-Creep (Low-Speed Standstill)**: In the < 20 km/h band, median distance ratio is 1.552 - 1.605. The neural network outputs residual speeds of 0.5-1.2 m/s during zero-velocity stops (traffic lights, congestion). This is a stop-detection problem (ZUPT engagement), not a calibration curve problem.
+2. **Heading Dominance**: Cross-track error accounts for 12.1% of squared error with P90 of 74.2m. Scenarios #5, #7, #16, #23, and #35 are heading-dominated (|CT| between 51m and 105m). Perfect speed alone only reduces P90 from 32.56% to 22.02%. Heading fusion represents a distinct architectural phase.
 
 ---
 
@@ -416,7 +469,7 @@ Loss = SmoothL1(v, v_GT) + 2.0 * (sum(v_hat) / sum(v_GT) - 1.0)^2 + 0.5 * I(v_GT
 ```
 * `L_dyn_var`: Asymmetric variance deficit penalty preventing flat predictions during acceleration.
 * `L_var`: Clamped heteroscedastic uncertainty loss learning true observation noise.
-* **Checkpoint Metrics** (`models/checkpoints/best_moe_velocity_model.pt`): 10 Hz CAN-supervised, Validation RMSE **3.28 m/s**, scale ratio **1.07**.
+* **Checkpoint Metrics** (`models/checkpoints/best_moe_velocity_model.pt`): 10 Hz CAN-supervised, Validation RMSE **2.49 m/s** (held-out trip `S-S3a`) and **2.77 m/s** (training trips `S-M`, `S-S1`, `S-S2`); 1.46 m/s observed on GPS Doppler subset; scale ratio **1.00**.
 
 <p align="center">
   <img src="../artifacts/moe_training_curves.png" width="850" alt="Bayesian MoE Dual-Expert Training Dynamics" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
@@ -653,6 +706,17 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
 ## 16. Definitive Empirical Benchmark Evaluation
 
 <!-- BEGIN GENERATED BENCHMARK SECTION -->
+
+# Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
+## Final Judge Evaluation & Architectural Benchmark Report
+
+**Generated:** 2026-09-18 14:40:47 UTC  
+**Primary Multi-Seed Benchmark:** **10.58% ± 2.39%** over 6 seeds (range 7.16% - 12.93%, 2 seeds under 10%)  
+**Canonical Reference Seed 541098:** **11.59%** Median Drift (Supporting Single-Seed Detail)  
+**Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
+**Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
+
+---
 
 ### Executive Performance Summary
 

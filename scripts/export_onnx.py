@@ -9,6 +9,7 @@ Performs numerical parity verification and CPU latency benchmarking.
 import os
 import sys
 import time
+from typing import Optional
 import torch
 import numpy as np
 
@@ -59,7 +60,6 @@ def export_edge_models(
     expert_tcn.load_state_dict(ckpt["expert_tcn_state_dict"])
     moe_model = BayesianMoEFusion(expert_resnet=expert_resnet, expert_tcn=expert_tcn)
     moe_model.eval()
-
     wrapper = MoEEdgeWrapper(moe_model)
     wrapper.eval()
 

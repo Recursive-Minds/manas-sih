@@ -1,0 +1,31 @@
+{
+  "status": "NOT IN USE - REJECTED NEGATIVE RESULT (Phase 2)",
+  "rationale": "Evaluated during Phase 2 speed recalibration. Rejected because baseline (11.59% median / 32.56% P90) outperformed f-only (11.46% / 41.10% P90) and f+alpha (12.34% / 32.78% P90). Furthermore, on held-out trips baseline won clearly (8.73% vs 9.86% and 9.18%) and f degraded the >50 km/h regime on both held-out trips (S-S3a bias -2.02 -> -3.19 m/s, RMSE 3.31 -> 4.08 m/s; S-S4 bias -5.48 -> -6.50 m/s). Not used in production inference pipeline.",
+  "type": "piecewise_linear_monotonic",
+  "knots_mps": [
+    0.0,
+    5.56,
+    13.89
+  ],
+  "slopes": [
+    1.035363076736134,
+    0.8162017128658389,
+    1.0279028234275887
+  ],
+  "knot_values_mps": [
+    0.0,
+    5.756618706652905,
+    12.555578974825345
+  ],
+  "ablation_results": {
+    "baseline_median_drift_pct": 11.59,
+    "baseline_p90_drift_pct": 32.56,
+    "f_only_median_drift_pct": 11.46,
+    "f_only_p90_drift_pct": 41.10,
+    "f_plus_alpha_median_drift_pct": 12.34,
+    "f_plus_alpha_p90_drift_pct": 32.78,
+    "held_out_trips_baseline_drift_pct": 8.73,
+    "held_out_trips_f_only_drift_pct": 9.86,
+    "held_out_trips_f_plus_alpha_drift_pct": 9.18
+  }
+}

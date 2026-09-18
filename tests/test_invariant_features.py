@@ -17,8 +17,8 @@ from scipy.spatial.transform import Rotation
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from engine.invariant_features import INVARIANT_CHANNELS, InvariantFeatureExtractor
-from engine.orientation import (
+from sih.velocity.invariant_features import INVARIANT_CHANNELS, InvariantFeatureExtractor
+from sih.data.orientation import (
     GRAVITY,
     MountFrameEstimator,
     deleaned_yaw_rate,

@@ -19,13 +19,7 @@ from torch.utils.data import Dataset
 from scipy.spatial.transform import Rotation as R
 
 from sih.data.split import compute_trip_partition
-
-
-CAN_TIME_OFFSETS = {
-    "S-S1": 1,    # +0.10 s (1 tick at 10 Hz)
-    "S-S2": 86,   # +8.60 s (86 ticks at 10 Hz)
-    "S-M": 17,    # +1.70 s (17 ticks at 10 Hz)
-}
+from sih.data.can_sync import load_synchronized_can_speed
 
 ALLOWED_TRAIN_TRIPS = {"S-M", "S-S1", "S-S2"}
 
@@ -80,28 +74,7 @@ class MultiScaleCANMoEDataset(Dataset):
             f_gyro = cached["f_gyro"]
 
             # 2. Load and synchronize 10 Hz vehicle CAN wheel speed
-            v_path = os.path.join(data_dir, f"V-{tid[2:]}.csv")
-            if not os.path.exists(v_path):
-                raise FileNotFoundError(f"CAN reference file missing for {tid}: {v_path}")
-
-            v_df = pd.read_csv(v_path, encoding="latin-1")
-            v_cols = {c.strip(): c for c in v_df.columns}
-            v_col = v_cols.get("Velocity (km/hr)", v_cols.get("Indicated Vehicle Speed (km/hr)"))
-            raw_v_mps = (v_df[v_col].fillna(0).to_numpy() / 3.6).astype(np.float32)
-
-            # Apply cross-correlation temporal offset
-            lag = CAN_TIME_OFFSETS.get(tid, 0)
-            can_speeds = np.zeros_like(raw_v_mps)
-            if lag > 0:
-                can_speeds[:-lag] = raw_v_mps[lag:]
-                can_speeds[-lag:] = raw_v_mps[-1]
-            elif lag < 0:
-                can_speeds[-lag:] = raw_v_mps[:lag]
-                can_speeds[:-lag] = raw_v_mps[0]
-            else:
-                can_speeds = raw_v_mps
-
-            can_speeds[can_speeds < 0.2] = 0.0
+            can_speeds = load_synchronized_can_speed(tid, data_dir, strict=True)
 
             # Ensure lengths match
             min_len = min(len(feats), len(can_speeds))
