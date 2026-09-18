@@ -1,0 +1,147 @@
+{
+  "S-M": {
+    "domain": "Highway",
+    "bbox": [
+      52.35336,
+      -1.59612,
+      52.4837,
+      -1.37111
+    ],
+    "tile_count": 1,
+    "ways_fetched": 10428,
+    "cache_size_mb": 5.27,
+    "build_time_s": 11.33,
+    "peak_mem_mb": 52.45,
+    "segments_before_chord": 16464,
+    "segments_after_dp": 29888,
+    "d_perp_before": {
+      "mean": 7.22,
+      "median": 3.4,
+      "p10": 0.58,
+      "p90": 16.14
+    },
+    "d_perp_after": {
+      "mean": 2.79,
+      "median": 2.24,
+      "p10": 0.4,
+      "p90": 5.24
+    },
+    "frac_within_25m": 99.5
+  },
+  "S-S2": {
+    "domain": "Arterial",
+    "bbox": [
+      52.38581,
+      -1.60438,
+      52.56329,
+      -1.35585
+    ],
+    "tile_count": 1,
+    "ways_fetched": 13981,
+    "cache_size_mb": 6.76,
+    "build_time_s": 11.557,
+    "peak_mem_mb": 72.03,
+    "segments_before_chord": 22937,
+    "segments_after_dp": 42269,
+    "d_perp_before": {
+      "mean": 9.35,
+      "median": 3.28,
+      "p10": 0.59,
+      "p90": 17.34
+    },
+    "d_perp_after": {
+      "mean": 4.58,
+      "median": 2.46,
+      "p10": 0.43,
+      "p90": 6.1
+    },
+    "frac_within_25m": 97.7
+  },
+  "S-S1": {
+    "domain": "Urban",
+    "bbox": [
+      52.3939,
+      -1.61075,
+      52.42441,
+      -1.49792
+    ],
+    "tile_count": 1,
+    "ways_fetched": 2888,
+    "cache_size_mb": 1.34,
+    "build_time_s": 2.41,
+    "peak_mem_mb": 13.08,
+    "segments_before_chord": 4419,
+    "segments_after_dp": 7345,
+    "d_perp_before": {
+      "mean": 5.8,
+      "median": 2.91,
+      "p10": 0.54,
+      "p90": 13.22
+    },
+    "d_perp_after": {
+      "mean": 2.83,
+      "median": 2.08,
+      "p10": 0.35,
+      "p90": 5.01
+    },
+    "frac_within_25m": 99.2
+  },
+  "S-S3a": {
+    "domain": "Mixed",
+    "bbox": [
+      52.35814,
+      -1.50766,
+      52.41218,
+      -1.22155
+    ],
+    "tile_count": 2,
+    "ways_fetched": 4876,
+    "cache_size_mb": 2.3,
+    "build_time_s": 3.759,
+    "peak_mem_mb": 24.27,
+    "segments_before_chord": 7837,
+    "segments_after_dp": 14500,
+    "d_perp_before": {
+      "mean": 7.22,
+      "median": 4.94,
+      "p10": 0.95,
+      "p90": 16.61
+    },
+    "d_perp_after": {
+      "mean": 3.82,
+      "median": 3.68,
+      "p10": 0.79,
+      "p90": 6.86
+    },
+    "frac_within_25m": 100.0
+  },
+  "S-S4": {
+    "domain": "Arterial",
+    "bbox": [
+      52.36553,
+      -1.59746,
+      52.44269,
+      -1.4231
+    ],
+    "tile_count": 1,
+    "ways_fetched": 7891,
+    "cache_size_mb": 3.96,
+    "build_time_s": 6.106,
+    "peak_mem_mb": 38.77,
+    "segments_before_chord": 12379,
+    "segments_after_dp": 21458,
+    "d_perp_before": {
+      "mean": 6.77,
+      "median": 3.31,
+      "p10": 0.64,
+      "p90": 17.06
+    },
+    "d_perp_after": {
+      "mean": 2.94,
+      "median": 2.29,
+      "p10": 0.43,
+      "p90": 5.63
+    },
+    "frac_within_25m": 99.8
+  }
+}

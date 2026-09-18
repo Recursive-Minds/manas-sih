@@ -15,6 +15,7 @@ from sih.fusion.es_ekf import ErrorStateEKF
 from sih.map.network import RoadNetwork
 from sih.map.governor import RoadKinematicsGovernor
 from sih.map.matcher import HMMMapMatcher
+from sih.map.route_matcher import RouteMatcher
 from sih.data.geo import geodetic_to_enu
 from sih.core.contracts import VelocityEstimate, GNSSSample
 from sih.engine.speed_observer import KinematicSpeedObserver
@@ -24,7 +25,7 @@ class DeadReckoningEngine:
     """
     Unified execution engine for vehicle dead reckoning during GNSS blackouts.
     Orchestrates ES-EKF filtering, AI velocity integration, road kinematics governance,
-    and topological HMM map matching.
+    topological HMM map matching, and route-level hypothesis evaluation.
     """
 
     def __init__(
@@ -33,11 +34,54 @@ class DeadReckoningEngine:
         cooldown_duration_s: float = 0.5,
         max_gyro_bias_rad_s: float = np.radians(0.1),
         smoothing_factor: float = 0.35,
+        min_route_ratio: float = 1.80,
+        enable_route_matching: bool = False,
     ):
         self.turn_threshold_rad_s = turn_threshold_rad_s
         self.cooldown_duration_s = cooldown_duration_s
         self.max_gyro_bias_rad_s = max_gyro_bias_rad_s
         self.smoothing_factor = smoothing_factor
+        self.enable_route_matching = enable_route_matching
+        self.route_matcher = RouteMatcher(min_route_ratio=min_route_ratio)
+
+    @staticmethod
+    def acquire_entry_segment(
+        entry_pos_enu: np.ndarray,
+        ref_heading_deg: float,
+        road_net: RoadNetwork,
+        search_radii: Optional[List[float]] = None,
+        max_heading_diff_deg: float = 45.0,
+    ) -> Tuple[Optional[RoadSegment], Optional[float], Optional[float], str]:
+        """
+        Acquires initial road segment via widening search (35m -> 75m -> 150m),
+        filtering candidates by heading alignment (<= 45 deg) rather than purely spatial proximity.
+        """
+        if search_radii is None:
+            search_radii = [35.0, 75.0, 150.0]
+
+        best_cand = None
+        acq_radius_m = None
+        acq_h_diff_deg = None
+
+        for r_search in search_radii:
+            cands = road_net.find_candidates(entry_pos_enu, radius_m=r_search)
+            valid_cands = []
+            for s in cands:
+                b_diff = abs((s.bearing_deg - ref_heading_deg + 180.0) % 360.0 - 180.0)
+                if b_diff <= max_heading_diff_deg:
+                    valid_cands.append((b_diff, s))
+            if valid_cands:
+                valid_cands.sort(key=lambda x: x[0])
+                acq_h_diff_deg, best_cand = valid_cands[0]
+                acq_radius_m = r_search
+                break
+
+        if best_cand is not None:
+            acq_info = f"Acquired at radius {acq_radius_m:.0f}m (heading diff {acq_h_diff_deg:.1f} deg)"
+        else:
+            acq_info = f"no entry segment (none found within {search_radii[-1]:.0f}m, {max_heading_diff_deg:.0f} deg heading match)"
+
+        return best_cand, acq_radius_m, acq_h_diff_deg, acq_info
 
     def run_scenario(
         self,
@@ -163,6 +207,14 @@ class DeadReckoningEngine:
         blackout_started = False
         speed_scale = 1.00
         v_entry = 10.0
+        entry_segment = None
+        acq_radius_m = None
+        acq_h_diff_deg = None
+        entry_acq_info = "no entry segment"
+        bo_timestamps_ns = []
+        bo_yaw_rates = []
+        bo_speeds = []
+        bo_dr_enu = []
 
         for j, imu in enumerate(trip.imu_samples):
             t_curr = imu.timestamp_ns
@@ -285,20 +337,20 @@ class DeadReckoningEngine:
                 ref_motion_hdg = float(valid_hist[-1].bearing_deg) if valid_hist else (float(np.degrees(ekf_map._heading_rad)) % 360.0)
 
                 init_road_bearing = None
-                init_cands = road_net.find_candidates(gt_start_enu, radius_m=35.0)
                 best_cand = None
-                min_cost = 1e9
-                for s in init_cands:
-                    proj, d_p, _ = s.project_point(gt_start_enu)
-                    b_diff = abs((s.bearing_deg - ref_motion_hdg + 180.0) % 360.0 - 180.0)
-                    if d_p < 25.0 and b_diff < 35.0:
-                        cost = d_p + 0.5 * b_diff
-                        if cost < min_cost:
-                            min_cost = cost
-                            best_cand = s
+                acq_radius_m = None
+                acq_h_diff_deg = None
+
+                # 1. Entry Segment Acquisition: widening search (35m, 75m, 150m) preferring closest bearing match within 45 deg
+                best_cand, acq_radius_m, acq_h_diff_deg, entry_acq_info = self.acquire_entry_segment(
+                    gt_start_enu, ref_motion_hdg, road_net
+                )
                 if best_cand is not None:
                     init_road_bearing = best_cand.bearing_deg
                     matcher.set_active_segment(best_cand)
+                    entry_segment = best_cand
+                else:
+                    entry_segment = None
 
                 turn_rate_entry = float(cal.gyro_vehicle[2])
                 ekf_pure.seed_pre_blackout_heading(
@@ -376,11 +428,53 @@ class DeadReckoningEngine:
                 pure_speeds.append(float(np.linalg.norm(fused_pure.velocity_enu_mps)))
                 map_speeds.append(float(np.linalg.norm(ekf_map._v)))
 
+                bo_timestamps_ns.append(t_curr)
+                bo_yaw_rates.append(float(cal.gyro_vehicle[2]))
+                bo_speeds.append(float(v_map_fwd))
+                bo_dr_enu.append(fused_pure.position_enu_m[:2].copy())
+
         pure_pts = np.array(pure_pts)
         map_pts = np.array(map_pts)
 
         if len(pure_pts) < 2 or len(map_pts) < 2:
             return None
+
+        # Route-level matching evaluation at blackout exit
+        final_route_res = None
+        if self.enable_route_matching and entry_segment is not None and len(bo_timestamps_ns) >= 5:
+            final_route_res = self.route_matcher.match_blackout_route(
+                entry_segment=entry_segment,
+                succ_map=matcher._succ_map,
+                timestamps_ns=np.array(bo_timestamps_ns),
+                yaw_rates_rad_s=np.array(bo_yaw_rates),
+                speeds_mps=np.array(bo_speeds),
+                dr_trajectory_enu=np.array(bo_dr_enu),
+            )
+
+        route_won = False
+        route_ratio = 0.0
+        route_count = 0
+        route_time_ms = 0.0
+        route_memory_kb = 0.0
+        route_turns = 0
+        if not self.enable_route_matching:
+            route_fallback_reason = "route matching disabled"
+        elif entry_segment is None:
+            route_fallback_reason = "no entry segment"
+        else:
+            route_fallback_reason = "Evaluation skipped (<5 samples)"
+
+        if final_route_res is not None:
+            route_ratio = final_route_res.confidence_ratio
+            route_count = final_route_res.total_routes_evaluated
+            route_time_ms = final_route_res.enumeration_time_ms + final_route_res.scoring_time_ms
+            route_memory_kb = final_route_res.peak_memory_kb
+            route_turns = final_route_res.observed_turns_count
+            route_fallback_reason = final_route_res.fallback_reason
+
+            if final_route_res.won and final_route_res.projected_pts_enu is not None:
+                route_won = True
+                map_pts = final_route_res.projected_pts_enu.copy()
 
         # Ground truth timestamp synchronization: evaluate at last valid blackout GNSS fix
         map_ts_arr = np.array(map_ts_list, dtype=np.float64)
@@ -448,6 +542,30 @@ class DeadReckoningEngine:
             "along_track_series": along_track_series,
             "cross_track_series": cross_track_series,
             "hdg_seed_err": hdg_seed_err,
+            "total_match_steps": matcher.total_match_steps,
+            "gate_suppressed_steps": matcher.gate_suppressed_steps,
+            "gate_suppressed_pct": (matcher.gate_suppressed_steps / max(1, matcher.total_match_steps)) * 100.0,
+            "hard_gate_suppressed_steps": matcher.hard_gate_suppressed_steps,
+            "hard_gate_suppressed_pct": (matcher.hard_gate_suppressed_steps / max(1, matcher.total_match_steps)) * 100.0,
+            "ambiguity_gate_suppressed_steps": matcher.ambiguity_gate_suppressed_steps,
+            "ambiguity_gate_suppressed_pct": (matcher.ambiguity_gate_suppressed_steps / max(1, matcher.total_match_steps)) * 100.0,
+            "hysteresis_suppressed_steps": matcher.hysteresis_suppressed_steps,
+            "hysteresis_suppressed_pct": (matcher.hysteresis_suppressed_steps / max(1, matcher.total_match_steps)) * 100.0,
+            "single_candidate_steps": matcher.single_candidate_steps,
+            "single_candidate_pct": (matcher.single_candidate_steps / max(1, matcher.total_match_steps)) * 100.0,
+            "score_ratio_median": float(np.median(matcher.score_ratios)) if matcher.score_ratios else 0.0,
+            "score_ratio_p10": float(np.percentile(matcher.score_ratios, 10)) if len(matcher.score_ratios) >= 2 else 0.0,
+            "score_ratio_p90": float(np.percentile(matcher.score_ratios, 90)) if len(matcher.score_ratios) >= 2 else 0.0,
+            "route_match_won": route_won,
+            "route_match_ratio": float(route_ratio),
+            "route_count": int(route_count),
+            "route_time_ms": float(route_time_ms),
+            "route_memory_kb": float(route_memory_kb),
+            "route_turns_count": int(route_turns),
+            "route_fallback_reason": route_fallback_reason,
+            "entry_radius_m": acq_radius_m,
+            "entry_h_diff_deg": acq_h_diff_deg,
+            "entry_acq_info": entry_acq_info,
         }
 
 
@@ -460,11 +578,12 @@ def run_dead_reckoning_scenario(
     duration_s: float,
     domain: str = "Highway",
     can_speeds: Optional[np.ndarray] = None,
+    enable_route_matching: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """
     Convenience functional wrapper for executing a dead-reckoning scenario with default engine settings.
     """
-    engine = DeadReckoningEngine()
+    engine = DeadReckoningEngine(enable_route_matching=enable_route_matching)
     return engine.run_scenario(
         trip=trip,
         calib_samples=calib_samples,

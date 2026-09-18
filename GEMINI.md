@@ -42,3 +42,5 @@ To prevent conversation token exhaustion, infinite polling loops, and remote API
 16. **No Auxiliary / Dispersed Markdown Files Protocol**:
 - NEVER create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate or fragment system architecture, roadmap, or metrics. All technical details, formulas, and progress records belong exclusively in `README.md`.
 - `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html` are the automated direct outputs of `benchmarks/run_final_benchmark.py`. Their latest empirical tables and scorecards must always be mirrored into Section 16 of `README.md` so that numbers are 100% consistent across the codebase.
+17. **Background Process Transparency & Log Reporting**:
+Whenever launching, running, or reporting on any asynchronous command or background process (e.g. `run_command` sent to background), always explicitly provide the user with the direct task log file path / URI (e.g. [task log](file:///C:/Users/carpe/.gemini/antigravity-ide/brain/.../.system_generated/tasks/task-XYZ.log)) and status updates so the user can inspect live terminal stdout/stderr streams and progress in real time.

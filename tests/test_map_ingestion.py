@@ -116,6 +116,7 @@ class TestMapIngestion(unittest.TestCase):
             end_lat_lon=(lat + 0.0005, lon + 0.0005),
             bearing_deg=45.0,
             length_m=70.71,
+            is_oneway=True,
         )
         net.add_segment(seg)
 

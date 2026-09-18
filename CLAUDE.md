@@ -60,6 +60,7 @@
 6. **No Unilateral Architectural Decisions**: Present 2–3 concrete options with trade-offs on non-trivial architectural or model choices.
 7. **Flag Native/JNI & Performance Risks**: Explicitly call out on-device battery, thermal, and C++/JNI integration constraints.
 8. **Definition of Done**: A specific, testable claim, inspectable metric, or real-data plot.
+9. **Background Process Transparency & Log Reporting**: Whenever launching, running, or reporting on any asynchronous command or background process (e.g. `run_command` sent to background), always explicitly provide the user with the direct task log file path / URI (e.g. `[task log](file:///C:/Users/carpe/.gemini/antigravity-ide/brain/.../.system_generated/tasks/task-XYZ.log)`) and status updates so the user can inspect live terminal stdout/stderr streams and progress in real time.
 
 ---
 
@@ -83,7 +84,7 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
   - *Pre-Blackout Dynamic Speed Scaling*: Adapts pavement vibration scale (`s_v = mean(v_GPS) / mean(v_AI)`) over the 20s prior to blackout.
   - *ZARU Highway Straight-Line Lock*: Freezes yaw gyro bias when `v > 15 m/s` and `|omega_z| < 0.005 rad/s` for > 2.0s, eliminating phantom highway curvature.
   - *Hybrid Speed Blending*: Blends accelerometer forward velocity integration with neural MoE speed using 3-8 Hz frequency vibration power.
-- **Map-Matching & Gating (Phase 5)** (`sih/map/network.py`, `sih/map/matcher.py`, `sih/map/governor.py`): Spatial polyline indexing with turn-inflated Gaussian emission likelihood (`sigma_eff >= 45°`), curvature kinematics governor (`v <= sqrt(a_lat_max / kappa)`), branch multi-hypothesis fork gating (`diff_theta > 15 deg, L2 > 0.20 * L1`), expanded 110° successor turn gates (`sigma_h = 60°`), anti-boundary clamping watchdog suppressing junction stalls, and prompt corridor heading steering (`0.50 * diff_rad`).
+- **Map-Matching & Gating (Phase 5)** (`sih/map/network.py`, `sih/map/matcher.py`, `sih/map/governor.py`): Spatial polyline indexing with turn-inflated Gaussian emission likelihood (`sigma_eff >= 45°`), curvature kinematics governor (`v <= sqrt(a_lat_max / kappa)`), branch multi-hypothesis fork gating (`diff_theta > 15 deg, L2 > 0.20 * L1`), expanded 105°–110° successor turn gates with 60° hard heading limit (`sigma_heading_deg = 30.0°`), anti-boundary clamping watchdog suppressing junction stalls, and prompt corridor heading steering (`0.50 * diff_rad`).
 - **Standalone 200 Hz C++ Core** (`engine/cpp/`): Zero-dependency modern C++ implementation compiled into `idr_core.dll` for dual-deliverable embedded telematics.
 
 ---
@@ -122,11 +123,9 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
    - Exported PyTorch Mobile TorchScript graph `models/exported/moe_velocity_model.torchscript.pt` (**2.66 MB**, 0.000000 m/s numerical parity, **2.68 ms latency** on CPU / 373 Hz throughput).
    - Exported 12-channel normalization vectors `models/exported/normalization_params.npz`.
    - Production streaming causal interface `sih/mobile/causal_stream.py` (`MobileDeadReckoningStream`) ingesting 10-50 Hz IMU and 1 Hz GNSS with zero lookahead.
-   - Comprehensive unit test suite `tests/test_mobile_stream.py` (3/3 passed, 40/40 repo-wide).
-
 4. **Phase 8: Final Presentation & Jury Demonstration**:
    - Standalone evaluation executable and interactive web dashboard (`FINAL_JUDGE_EVALUATION_REPORT.html`).
-   - Slide deck highlighting 93.6% drift reduction, 0.0000m exit jump, and 2.66 MB edge model footprint.
+   - Slide deck highlighting leak-free OSM fusion (10.58% ± 2.39% multi-seed median drift, 87.5% win rate vs pure DR, and 2.66 MB edge model footprint).
 
 ---
 

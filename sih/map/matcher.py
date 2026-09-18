@@ -30,6 +30,11 @@ class HMMMapMatcher(IMapMatcher):
         max_heading_diff_deg: float = 50.0,
         smoothing_factor: float = 0.35,
         min_confidence_threshold: float = 0.25,
+        min_emission_score: Optional[float] = None,
+        hard_dist_k: float = 2.5,
+        hard_heading_k: float = 2.0,
+        min_ambiguity_ratio: float = 1.5,
+        hysteresis_count: int = 2,
         reference_lat_deg: float = 0.0,
         reference_lon_deg: float = 0.0,
         reference_alt_m: float = 0.0,
@@ -42,6 +47,32 @@ class HMMMapMatcher(IMapMatcher):
         self.max_heading_diff_deg = max_heading_diff_deg
         self.smoothing_factor = smoothing_factor
         self.min_confidence_threshold = min_confidence_threshold
+        # Legacy min_emission_score kept for backward compat but no longer the primary gate
+        self.min_emission_score = min_emission_score if min_emission_score is not None else float(np.exp(-4.5))
+
+        # --- Three-Stage Confidence Gate Config ---
+        # Stage 1: Hard geometric reject thresholds (multiples of sigma)
+        self.hard_dist_k = hard_dist_k          # reject if d_perp > hard_dist_k * sigma_dist_m
+        self.hard_heading_k = hard_heading_k      # reject if h_diff > hard_heading_k * sigma_heading_deg
+        # Stage 2: Ambiguity ratio gate
+        self.min_ambiguity_ratio = min_ambiguity_ratio  # skip snap if score_1/score_2 < this
+        # Stage 3: Hysteresis — consecutive confident steps required to resume after suppression
+        self.hysteresis_count = hysteresis_count
+
+        # --- Gate Diagnostics ---
+        self.last_emission_score: Optional[float] = None
+        self.total_match_steps: int = 0
+        self.gate_suppressed_steps: int = 0           # total (any gate)
+        self.hard_gate_suppressed_steps: int = 0      # stage 1 hard reject
+        self.ambiguity_gate_suppressed_steps: int = 0  # stage 2 ambiguity
+        self.hysteresis_suppressed_steps: int = 0      # stage 3 hysteresis hold
+        self.single_candidate_steps: int = 0          # single candidate survived (no ambiguity check)
+        self.score_ratios: List[float] = []            # score_1/score_2 per step (only when >= 2 candidates)
+
+        # Hysteresis state
+        self._suppressed: bool = False
+        self._confident_streak: int = 0
+
         self.governor = governor or RoadKinematicsGovernor()
 
         self.ref_lat = reference_lat_deg
@@ -60,16 +91,82 @@ class HMMMapMatcher(IMapMatcher):
         self._build_succ_map()
 
     def _build_succ_map(self) -> None:
-        """Build directed topological successor lookup table for road segments."""
+        """
+        Build directed topological successor lookup table for road segments.
+        Uses exact node identity (seg_a.end_node_id == seg_b.start_node_id) when node IDs are present.
+        Falls back to 8.0m endpoint distance heuristic with spatial hash grid when node IDs are absent.
+        """
         self._succ_map = {}
         if not self.road_network or not self.road_network.segments:
             return
-        for s1 in self.road_network.segments:
-            self._succ_map[s1.segment_id] = []
-            for s2 in self.road_network.segments:
-                if s1.segment_id != s2.segment_id:
-                    if np.linalg.norm(s1.end_enu_m - s2.start_enu_m) < 15.0:
-                        self._succ_map[s1.segment_id].append(s2)
+
+        # Check for cached topological successor map on the road network
+        cached = getattr(self.road_network, "_cached_succ_map", None)
+        if cached is not None:
+            self._succ_map = cached
+            return
+
+        # Check whether segments have node IDs
+        has_node_ids = any(
+            s.start_node_id is not None and s.end_node_id is not None
+            for s in self.road_network.segments
+        )
+
+        if has_node_ids:
+            # Primary topology: exact node identity matching
+            start_node_map: Dict[Any, List[RoadSegment]] = {}
+            for s in self.road_network.segments:
+                if s.start_node_id is not None:
+                    if s.start_node_id not in start_node_map:
+                        start_node_map[s.start_node_id] = []
+                    start_node_map[s.start_node_id].append(s)
+
+            for s1 in self.road_network.segments:
+                succs = []
+                if s1.end_node_id is not None and s1.end_node_id in start_node_map:
+                    for s2 in start_node_map[s1.end_node_id]:
+                        if s1.segment_id != s2.segment_id:
+                            # Exclude immediate U-turn onto own reverse segment or exact opposite node edge
+                            if s2.segment_id == f"{s1.segment_id}_rev" or s1.segment_id == f"{s2.segment_id}_rev":
+                                continue
+                            if s1.start_node_id is not None and s1.start_node_id == s2.end_node_id and s1.end_node_id == s2.start_node_id:
+                                continue
+                            succs.append(s2)
+                self._succ_map[s1.segment_id] = succs
+        else:
+            # Fallback: 8.0m endpoint distance heuristic with spatial hash grid
+            dist_threshold_m = 8.0
+            dist_threshold_sq = dist_threshold_m ** 2
+            cell_size = max(15.0, dist_threshold_m * 1.5)
+            start_grid: Dict[Tuple[int, int], List[RoadSegment]] = {}
+            for s in self.road_network.segments:
+                cx = int(np.floor(s.start_enu_m[0] / cell_size))
+                cy = int(np.floor(s.start_enu_m[1] / cell_size))
+                key = (cx, cy)
+                if key not in start_grid:
+                    start_grid[key] = []
+                start_grid[key].append(s)
+
+            for s1 in self.road_network.segments:
+                succs = []
+                ecx = int(np.floor(s1.end_enu_m[0] / cell_size))
+                ecy = int(np.floor(s1.end_enu_m[1] / cell_size))
+                e_pt = s1.end_enu_m
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        cand_list = start_grid.get((ecx + dx, ecy + dy), None)
+                        if cand_list is not None:
+                            for s2 in cand_list:
+                                if s1.segment_id != s2.segment_id:
+                                    if s2.segment_id == f"{s1.segment_id}_rev" or s1.segment_id == f"{s2.segment_id}_rev":
+                                        continue
+                                    d2 = (e_pt[0] - s2.start_enu_m[0])**2 + (e_pt[1] - s2.start_enu_m[1])**2
+                                    if d2 <= dist_threshold_sq:
+                                        succs.append(s2)
+                self._succ_map[s1.segment_id] = succs
+
+        # Cache on road network object for instant reuse across scenario evaluations
+        setattr(self.road_network, "_cached_succ_map", self._succ_map)
 
     def set_reference(self, lat_deg: float, lon_deg: float, alt_m: float = 0.0) -> None:
         self.ref_lat = lat_deg
@@ -94,6 +191,16 @@ class HMMMapMatcher(IMapMatcher):
         self._last_timestamp_ns = None
         self._trailing_turn_deg = 0.0
         self._consecutive_unmatched_count = 0
+        self.last_emission_score = None
+        self.total_match_steps = 0
+        self.gate_suppressed_steps = 0
+        self.hard_gate_suppressed_steps = 0
+        self.ambiguity_gate_suppressed_steps = 0
+        self.hysteresis_suppressed_steps = 0
+        self.single_candidate_steps = 0
+        self.score_ratios = []
+        self._suppressed = False
+        self._confident_streak = 0
 
     def set_active_segment(self, segment: Optional[RoadSegment]) -> None:
         """Explicitly initialize or update the active road segment."""
@@ -182,6 +289,13 @@ class HMMMapMatcher(IMapMatcher):
         is_single_corridor = (num_succs <= 1)
         active_bearing = self._active_segment.bearing_deg if self._active_segment else v_heading_deg
 
+        # --- Stage 1: Hard Geometric Reject ---
+        # Pre-filter candidates before emission scoring.
+        # Reject any candidate with d_perp > hard_dist_k * sigma_d
+        # OR h_diff > hard_heading_k * sigma_h.
+        hard_dist_limit = self.hard_dist_k * self.sigma_dist_m
+        hard_heading_limit = self.hard_heading_k * self.sigma_heading_deg
+
         scored_candidates = []
         for sid, (seg, role) in cands_dict.items():
             proj_enu, d_perp, frac = seg.project_point(p_enu)
@@ -190,6 +304,10 @@ class HMMMapMatcher(IMapMatcher):
 
             h_diff = abs((v_heading_deg - seg.bearing_deg + 180.0) % 360.0 - 180.0)
             branch_turn_deg = (seg.bearing_deg - active_bearing + 180.0) % 360.0 - 180.0
+
+            # Hard geometric reject (Stage 1): skip candidate entirely
+            if d_perp > hard_dist_limit or (v_speed > 1.0 and h_diff > hard_heading_limit):
+                continue
 
             # Max allowable heading discrepancy:
             if role in ("succ", "succ2"):
@@ -237,11 +355,55 @@ class HMMMapMatcher(IMapMatcher):
 
             scored_candidates.append((seg, proj_enu, d_perp, h_diff, score, frac))
 
+        self.total_match_steps += 1
+
+        # If no candidates survived the hard gate, return unsnapped
         if not scored_candidates:
+            self.last_emission_score = 0.0
+            self.gate_suppressed_steps += 1
+            self.hard_gate_suppressed_steps += 1
+            self._suppressed = True
+            self._confident_streak = 0
             return self._create_unmatched(position, p_enu, v_heading_deg)
 
         scored_candidates.sort(key=lambda x: x[4], reverse=True)
         best_seg, best_proj, best_dist, best_h_diff, best_score, frac = scored_candidates[0]
+        self.last_emission_score = float(best_score)
+
+        # --- Stage 2: Ambiguity Gate ---
+        # If there are >= 2 surviving candidates, compute score ratio.
+        # If best / second-best < min_ambiguity_ratio, the match is ambiguous — skip snap.
+        ambiguity_ok = True
+        if len(scored_candidates) >= 2:
+            second_score = scored_candidates[1][4]
+            ratio = best_score / max(second_score, 1e-12)
+            self.score_ratios.append(float(ratio))
+            if ratio < self.min_ambiguity_ratio:
+                ambiguity_ok = False
+        else:
+            # Single candidate survived hard gate: track in own category, exclude from ratio distribution
+            self.single_candidate_steps += 1
+
+        if not ambiguity_ok:
+            self.gate_suppressed_steps += 1
+            self.ambiguity_gate_suppressed_steps += 1
+            self._suppressed = True
+            self._confident_streak = 0
+            return self._create_unmatched(position, p_enu, v_heading_deg)
+
+        # --- Stage 3: Hysteresis ---
+        # Once suppressed, require `hysteresis_count` consecutive confident steps
+        # before resuming snapping, to prevent flicker.
+        if self._suppressed:
+            self._confident_streak += 1
+            if self._confident_streak < self.hysteresis_count:
+                self.gate_suppressed_steps += 1
+                self.hysteresis_suppressed_steps += 1
+                return self._create_unmatched(position, p_enu, v_heading_deg)
+            else:
+                # Hysteresis satisfied — resume snapping
+                self._suppressed = False
+                self._confident_streak = 0
 
         # Domain-Appropriate Road Snapping:
         if domain == "Urban" or best_h_diff > 40.0 or is_turning_intent:

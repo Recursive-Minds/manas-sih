@@ -11,6 +11,17 @@ from sih.map.osm_client import OSMOverpassClient
 from sih.map.local_gis import LocalGISProvider
 from sih.map.hybrid_provider import HybridIndiaMapProvider
 from sih.map.corridor_manager import PredictiveCorridorManager, compute_lookahead_radius
+from sih.map.route_matcher import (
+    RouteMatcher,
+    TurnEvent,
+    TurnSequence,
+    CandidateRoute,
+    RouteMatchResult,
+    extract_turn_sequence_from_imu,
+    enumerate_routes_dfs,
+    score_candidate_route,
+    project_by_arclength,
+)
 
 __all__ = [
     "RoadSegment",
@@ -27,5 +38,14 @@ __all__ = [
     "HybridIndiaMapProvider",
     "PredictiveCorridorManager",
     "compute_lookahead_radius",
+    "RouteMatcher",
+    "TurnEvent",
+    "TurnSequence",
+    "CandidateRoute",
+    "RouteMatchResult",
+    "extract_turn_sequence_from_imu",
+    "enumerate_routes_dfs",
+    "score_candidate_route",
+    "project_by_arclength",
 ]
 

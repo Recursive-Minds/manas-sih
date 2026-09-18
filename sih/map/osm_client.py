@@ -24,9 +24,9 @@ class OSMOverpassClient(IRoadNetworkProvider):
     """
 
     OVERPASS_ENDPOINTS = [
+        "https://lz4.overpass-api.de/api/interpreter",
         "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+        "https://z.overpass-api.de/api/interpreter",
     ]
 
     HIGHWAY_SPEED_LIMITS_MPS = {
@@ -47,7 +47,7 @@ class OSMOverpassClient(IRoadNetworkProvider):
     def __init__(
         self,
         endpoint_url: Optional[str] = None,
-        timeout_s: float = 12.0,
+        timeout_s: float = 60.0,
         max_retries: int = 2,
     ) -> None:
         self.endpoint = endpoint_url or self.OVERPASS_ENDPOINTS[0]
@@ -59,40 +59,71 @@ class OSMOverpassClient(IRoadNetworkProvider):
         return False
 
     def build_query(self, lat: float, lon: float, radius_m: float) -> str:
-        """Constructs a compact Overpass QL query string."""
-        # Query highways within radius
+        """Constructs a compact Overpass QL query string for circular radius."""
         query = f"""[out:json][timeout:{int(self.timeout_s)}];
 (
-  way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|service|link"](around:{int(radius_m)},{lat},{lon});
+  way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|link"](around:{int(radius_m)},{lat},{lon});
 );
 out body geom;"""
         return query
 
-    def fetch_raw_osm(self, lat: float, lon: float, radius_m: float) -> Optional[Dict[str, Any]]:
-        """
-        Queries Overpass API with retry fallback across endpoints.
-        """
-        query = self.build_query(lat, lon, radius_m)
-        encoded_data = urllib.parse.urlencode({"data": query}).encode("utf-8")
+    def build_bbox_query(self, min_lat: float, min_lon: float, max_lat: float, max_lon: float) -> str:
+        """Constructs a compact Overpass QL query string for a bounding box."""
+        query = f"""[out:json][timeout:{int(self.timeout_s)}];
+(
+  way["highway"~"motorway|trunk|primary|secondary|tertiary|residential|unclassified|link"]({min_lat:.6f},{min_lon:.6f},{max_lat:.6f},{max_lon:.6f});
+);
+out body geom;"""
+        return query
 
+    def _execute_query(self, query: str) -> Optional[Dict[str, Any]]:
+        """Queries Overpass API with retry fallback across endpoints."""
+        encoded_data = urllib.parse.urlencode({"data": query}).encode("utf-8")
         endpoints_to_try = [self.endpoint] + [ep for ep in self.OVERPASS_ENDPOINTS if ep != self.endpoint]
 
-        for ep in endpoints_to_try[: self.max_retries + 1]:
-            req = urllib.request.Request(
-                ep,
-                data=encoded_data,
-                headers={"User-Agent": "SIH-Smart-Dead-Reckoning/1.0 (India-Transit-Research)"},
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout_s) as response:
-                    if response.status == 200:
-                        raw_text = response.read().decode("utf-8")
-                        return json.loads(raw_text)
-            except Exception as e:
-                # Fallback to next mirror endpoint
-                continue
+        for attempt in range(self.max_retries + 1):
+            for ep in endpoints_to_try:
+                req = urllib.request.Request(
+                    ep,
+                    data=encoded_data,
+                    headers={"User-Agent": "SIH-Smart-Dead-Reckoning/1.0 (India-Transit-Research)"},
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=self.timeout_s) as response:
+                        if response.status == 200:
+                            raw_text = response.read().decode("utf-8")
+                            return json.loads(raw_text)
+                except urllib.error.HTTPError as e:
+                    if e.code in (429, 504):
+                        backoff_s = 2.0 * (attempt + 1)
+                        print(f"[OSM Overpass] HTTP {e.code} on {ep}, backing off {backoff_s:.1f}s...")
+                        time.sleep(backoff_s)
+                    continue
+                except Exception:
+                    # Fallback to next mirror endpoint
+                    continue
 
         return None
+
+    def fetch_raw_osm(self, lat: float, lon: float, radius_m: float) -> Optional[Dict[str, Any]]:
+        """
+        Queries Overpass API for radius with retry fallback across endpoints.
+        """
+        query = self.build_query(lat, lon, radius_m)
+        return self._execute_query(query)
+
+    def fetch_raw_osm_bbox(
+        self,
+        min_lat: float,
+        min_lon: float,
+        max_lat: float,
+        max_lon: float,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Queries Overpass API for bounding box with retry fallback across endpoints.
+        """
+        query = self.build_bbox_query(min_lat, min_lon, max_lat, max_lon)
+        return self._execute_query(query)
 
     def parse_osm_to_geojson(self, osm_json: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -130,6 +161,7 @@ out body geom;"""
                 },
                 "properties": {
                     "osm_id": el.get("id"),
+                    "nodes": el.get("nodes", []),
                     "name": tags.get("name", "Unnamed Road"),
                     "road_type": hw_type,
                     "speed_limit_mps": speed_limit,
@@ -149,19 +181,24 @@ out body geom;"""
         lon: float,
         radius_m: float,
         bearing_deg: Optional[float] = None,
+        cache_dir: str = "data/maps/cache",
+        simplification_tol_m: float = 2.0,
     ) -> RoadNetwork:
         """
-        Queries OSM Overpass and returns a populated RoadNetwork.
+        Queries OSM Overpass and returns a populated RoadNetwork for the vehicle corridor.
+        Uses tile-based caching and Douglas-Peucker simplification (simplification_tol_m=2.0).
+        Gracefully degrades to empty RoadNetwork on complete network / cache failure.
         """
-        osm_json = self.fetch_raw_osm(lat, lon, radius_m)
-        if osm_json is None:
-            # Graceful fallback: return empty network
-            return RoadNetwork(cell_size_m=100.0)
-
-        geojson_dict = self.parse_osm_to_geojson(osm_json)
-        return RoadNetwork.from_geojson_dict(
-            geojson_dict,
+        from sih.map.network import build_road_network_from_osm
+        d_lat = radius_m / 111139.0
+        d_lon = radius_m / (111139.0 * max(0.01, float(np.cos(np.radians(lat)))))
+        bbox = (lat - d_lat, lon - d_lon, lat + d_lat, lon + d_lon)
+        rnet, _ = build_road_network_from_osm(
+            bbox_ll=bbox,
             ref_lat=lat,
             ref_lon=lon,
-            road_id_prefix="osm_way",
+            cache_dir=cache_dir,
+            client=self,
+            simplification_tol_m=simplification_tol_m,
         )
+        return rnet
