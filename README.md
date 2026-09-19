@@ -707,17 +707,6 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
 
 <!-- BEGIN GENERATED BENCHMARK SECTION -->
 
-# Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
-## Final Judge Evaluation & Architectural Benchmark Report
-
-**Generated:** 2026-09-18 14:40:47 UTC  
-**Primary Multi-Seed Benchmark:** **10.58% ± 2.39%** over 6 seeds (range 7.16% - 12.93%, 2 seeds under 10%)  
-**Canonical Reference Seed 541098:** **11.59%** Median Drift (Supporting Single-Seed Detail)  
-**Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
-**Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
-
----
-
 ### Executive Performance Summary
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |

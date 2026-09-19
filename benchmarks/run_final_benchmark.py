@@ -1282,8 +1282,9 @@ To guarantee authentic scientific validity and real-world generalizability:
         f.write(html_doc)
     print(f"Generated standalone HTML report: {html_path}")
 
-    # Synchronize Section 16 of master README.md
+    # Synchronize Section 16 of master README.md and Section 9 of SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md
     sync_readme(md_content)
+    sync_architecture_doc(md_content)
 
 
 def sync_readme(md_content):
@@ -1318,6 +1319,40 @@ def sync_readme(md_content):
         print("  -> Successfully synchronized Section 16 of master README.md with latest benchmark results.")
     else:
         print("  -> Warning: Section markers not found in README.md; skipping inline sync.")
+
+
+def sync_architecture_doc(md_content):
+    arch_path = os.path.join(ROOT_DIR, "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md")
+    if not os.path.exists(arch_path):
+        return
+    print(f"Syncing {arch_path} with latest benchmark evaluation...")
+    with open(arch_path, "r", encoding="utf-8") as f:
+        arch_doc = f.read()
+
+    import re
+    # Strip top header from md_content
+    body = re.sub(r"^<!-- BEGIN GENERATED BENCHMARK SECTION -->\s*# Smartphone Intelligent Dead Reckoning.*?\n---", "", md_content, flags=re.DOTALL).strip()
+    body = re.sub(r"<!-- END GENERATED BENCHMARK SECTION -->", "", body).strip()
+
+    # Clean any raw LaTeX math syntax for Rule 12 compliance
+    body = body.replace(r"\(", "").replace(r"\)", "").replace(r"\[", "").replace(r"\]", "")
+    body = body.replace(r"\sqrt", "sqrt").replace(r"\kappa", "kappa")
+
+    # Delimit generated section with clear markers
+    gen_block = "<!-- BEGIN GENERATED BENCHMARK SECTION -->\n\n" + body + "\n\n<!-- END GENERATED BENCHMARK SECTION -->"
+
+    marker_start = "## 9. Full 40-Scenario Benchmark Performance Record"
+    marker_end = "## 10. Summary of All Resolved Bottlenecks"
+
+    if marker_start in arch_doc and marker_end in arch_doc:
+        prefix, _, rest = arch_doc.partition(marker_start)
+        _, _, suffix = rest.partition(marker_end)
+        new_arch = prefix + marker_start + "\n\n" + gen_block + "\n\n---\n\n" + marker_end + suffix
+        with open(arch_path, "w", encoding="utf-8") as f:
+            f.write(new_arch)
+        print("  -> Successfully synchronized Section 9 of SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md with latest benchmark results.")
+    else:
+        print("  -> Warning: Section markers not found in SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md; skipping inline sync.")
 
 
 

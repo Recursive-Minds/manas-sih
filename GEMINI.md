@@ -18,7 +18,7 @@ Whenever any algorithmic change, model retraining, or parameter update is made, 
 - **Step 1**: Implement the changes directly in production code (`benchmarks/run_final_benchmark.py`, `sih/`).
 - **Step 2**: Re-run the full 40-scenario benchmark on real data to produce new coordinates and error metrics.
 - **Step 3**: Re-render all trajectory maps, gallery plots, and distribution charts from the newly generated benchmark run.
-- **Step 4**: Re-generate BOTH `FINAL_JUDGE_EVALUATION_REPORT.md` AND `FINAL_JUDGE_EVALUATION_REPORT.html` with updated tables, scorecards, and clean relative image references to `artifacts/` (never inline raw base64 image strings into Markdown files, to prevent IDE and server context window exhaustion). Never report an update complete without running this entire chain end-to-end.
+- **Step 4**: Re-generate BOTH `FINAL_JUDGE_EVALUATION_REPORT.md` AND `FINAL_JUDGE_EVALUATION_REPORT.html` with updated tables, scorecards, and clean relative image references to `artifacts/` (never inline raw base64 image strings into Markdown files, to prevent IDE and server context window exhaustion). Automatically synchronize Section 16 of `README.md` AND Section 9 of `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`. Never report an update complete without running this entire chain end-to-end.
 12. **Clean Plain-Text Math Formatting**: NEVER use raw LaTeX syntax (e.g. `$`, `$$`, `\approx`, `\frac`, `\text{}`, `\omega`, `\Delta`, `\sigma`) in user responses, implementation plans, or generated markdown files. Always format mathematical expressions and physical variables in readable plain text or standard Unicode symbols (e.g. `p_head = exp(-0.5 * (diff_h / sigma)^2)`, `omega_z >= 2.5 deg/s`, `90 degrees`, `kappa = 1/R`, `a_lat <= 1.2 m/s^2`).
 13. **Strict Benchmark / Core Logic Separation**: The benchmark script (`benchmarks/run_final_benchmark.py`) must ONLY contain benchmark orchestration code (scenario selection, metric computation, plotting, report generation). ALL algorithmic logic — including GPS interpolation, heading seeding preparation, speed scaling, road network construction, and EKF configuration — MUST live in dedicated modules under `sih/` (e.g. `sih/fusion/`, `sih/data/`, `sih/map/`, `sih/calibration/`). The benchmark script calls into these modules; it never re-implements or inlines core logic. Any new algorithmic feature must be implemented in `sih/` first, then invoked from the benchmark. Violating this rule is a critical architectural bug.
 14. **Anti-Bloat & Token Conservation Protocol (Prefix-Clear Prevention)**:
@@ -28,8 +28,8 @@ To prevent conversation token exhaustion, infinite polling loops, and remote API
 - **Concise Command Outputs**: Always pipe, filter, or truncate terminal commands (e.g. `Select-Object -First 20`, `head -n 20`, `--quiet`). Never allow long dumps or recursive scans to flood the tool response buffer.
 - **Zero Raw Media/Archive Inspection**: Never call `view_file`, `grep_search`, or unfiltered git diff on massive offline archives (e.g. `FIX_IMU_SENSOR_FUSION_FULL_CHAT_ARCHIVE.html`), video files, or large data arrays.
 - **Strict Prohibition of Polling Loops**: Never call `manage_task("list")` or status check in a rapid loop. Rely entirely on the reactive wakeup system.
-15. **The Master README.md Document (Single Source of Truth & Full Context Union)**:
-`README.md` is the SINGLE authoritative master reference document for the entire project. It is the comprehensive union containing all context directly inline:
+15. **The Master README.md Document (Single Full-Context Union)**:
+`README.md` is the SINGLE authoritative comprehensive master union containing all context directly inline:
 - Full SIH 26168 Problem Statement, Indian transit challenges, and 3 operational tiers.
 - Initial concept, foundational hypotheses, and chronological evolution across all phases.
 - Key scientific discoveries & architectural pivots (why neural heading failed, 9s GPS optical illusion, 1.3s causal lag, OSM curvature kinks).
@@ -38,9 +38,12 @@ To prevent conversation token exhaustion, infinite polling loops, and remote API
 - Complete active parameters registry and full codebase module inventory.
 - Definitive empirical benchmark evaluation scorecards (6 seeds x 40 scenarios = 240 runs, domain breakdowns, and trajectory plots).
 - Quickstart guide, reproduction commands, and test verification.
-**MANDATORY UPDATE**: `README.md` must be updated directly whenever any code change, model retraining, parameter tweak, or benchmark run is performed. It contains the context itself and must NOT delegate core information to external/auxiliary markdown files.
-16. **No Auxiliary / Dispersed Markdown Files Protocol**:
-- NEVER create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate or fragment system architecture, roadmap, or metrics. All technical details, formulas, and progress records belong exclusively in `README.md`.
-- `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html` are the automated direct outputs of `benchmarks/run_final_benchmark.py`. Their latest empirical tables and scorecards must always be mirrored into Section 16 of `README.md` so that numbers are 100% consistent across the codebase.
+**MANDATORY UPDATE**: `README.md` must be updated directly whenever any code change, model retraining, parameter tweak, or benchmark run is performed.
+16. **Authoritative Standalone Documentation Files (Synchronized Modular Record)**:
+While `README.md` serves as the full-context master union, the following 3 standalone documentation files are officially maintained in the repository root for modular jury review and inspection:
+1. `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`: Dedicated record of the SIH 26168 problem statement, 3 operational tiers, Indian transit challenges, evolution roadmap, scientific discoveries, and 20 physical failure modes.
+2. `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`: Dedicated living technical reference for mathematical formulations, coordinate frames, SO(3) leveling, 15-state ES-EKF, Bayesian MoE speed estimator, topological map matcher, road governor, parameter registries, and codebase inventory.
+3. `FINAL_JUDGE_EVALUATION_REPORT.md` (and `.html`): Dedicated empirical single source of truth for benchmark scorecards, error decompositions, and trajectory plots.
+**Mandatory Synchronization**: Whenever benchmarks or architectural parameters are updated, `README.md` and these 3 standalone files MUST be updated and synchronized together (via `benchmarks/run_final_benchmark.py` and `scripts/sync_all_docs.py`) so that all documentation remains 100% consistent across the codebase.
 17. **Background Process Transparency & Log Reporting**:
 Whenever launching, running, or reporting on any asynchronous command or background process (e.g. `run_command` sent to background), always explicitly provide the user with the direct task log file path / URI (e.g. [task log](file:///C:/Users/carpe/.gemini/antigravity-ide/brain/.../.system_generated/tasks/task-XYZ.log)) and status updates so the user can inspect live terminal stdout/stderr streams and progress in real time.

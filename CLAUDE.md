@@ -129,11 +129,12 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
 
 ---
 
-## 10. The Master README.md Document (Single Source of Truth & Full Context Union)
+## 10. Master README.md Union & Synchronized Standalone Documentation Architecture
 
-To eliminate fragmented documentation and contradictory metrics, the entire project specification is strictly consolidated into **one authoritative master file**:
+To eliminate fragmented documentation and contradictory metrics while maintaining clean modular files for jury review, the project uses a dual-tier documentation architecture:
 
-* **`README.md`**: The sole living technical reference and context union containing:
+* **`README.md` (The Single Full-Context Union)**:
+  The authoritative master reference document containing the complete end-to-end context inline:
   - Full SIH 26168 Problem Statement, operational tiers, and Indian transit realities.
   - Initial 5-phase plan, original hypotheses, and chronological evolution across all phases.
   - Key scientific discoveries (why neural heading failed, 9s GPS optical illusion, 1.3s causal lag, OSM kinks).
@@ -143,8 +144,13 @@ To eliminate fragmented documentation and contradictory metrics, the entire proj
   - Canonical empirical benchmark results (6 seeds x 40 scenarios = 240 evaluation runs), domain breakdowns, and trajectory plots.
   - Quickstart reproduction guide and unit test instructions.
 
-**MANDATORY UPDATE RULES**:
-1. **Direct In-Line Context**: `README.md` contains the full context directly inline. It must NOT delegate core information to external/auxiliary markdown files.
-2. **Synchronization**: Whenever code, parameters, or models are tweaked, or benchmarks are re-run, `README.md` MUST be updated directly.
-3. **No Auxiliary Markdown Files**: Never create auxiliary markdown documentation files (e.g. in `docs/` or scratch directories) that duplicate or fragment system architecture, roadmap, or metrics.
-4. **Benchmark Automation Output**: `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html` are the automated direct outputs of `benchmarks/run_final_benchmark.py`. Their latest empirical tables and scorecards must always be mirrored into Section 16 of `README.md`.
+* **Authoritative Standalone Documentation Files (Synchronized Modular Record)**:
+  Maintained in the root directory for modular inspection and jury presentation:
+  1. **`PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`**: Dedicated record of the SIH 26168 problem statement, 3 operational tiers, Indian transit challenges, evolution roadmap, scientific discoveries, and 20 physical failure modes.
+  2. **`SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`**: Dedicated living technical reference for mathematical formulations, coordinate frames, SO(3) leveling, 15-state ES-EKF, Bayesian MoE speed estimator, topological map matcher, road governor, parameter registries, and codebase inventory.
+  3. **`FINAL_JUDGE_EVALUATION_REPORT.md` (and `.html`)**: Dedicated empirical single source of truth for benchmark scorecards, error decompositions, and trajectory plots.
+
+**MANDATORY SYNCHRONIZATION RULES**:
+1. **Direct In-Line Context in README**: `README.md` contains the full context directly inline.
+2. **Automated Synchronization**: Whenever benchmarks are re-run, `benchmarks/run_final_benchmark.py` automatically updates `FINAL_JUDGE_EVALUATION_REPORT.md`, `FINAL_JUDGE_EVALUATION_REPORT.html`, Section 16 of `README.md`, and Section 9 of `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`.
+3. **Consistency Verification**: Run `python scripts/sync_all_docs.py` to ensure all scorecards, tables, and relative image references match 100% across all documentation.
