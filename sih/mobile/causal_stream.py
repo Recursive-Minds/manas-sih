@@ -72,6 +72,9 @@ class MobileDeadReckoningStream:
                 smoothing_factor=0.35,
             )
 
+        from sih.features.streaming import StreamingFeatureExtractor
+        self.feature_extractor = StreamingFeatureExtractor(sampling_rate=10.0, window_len=60, spectral_stride=5)
+
         # Ring buffer for 12-channel rolling features (60 samples @ 10 Hz)
         self.feature_buffer = collections.deque(maxlen=60)
         self.short_len = 20
@@ -209,20 +212,8 @@ class MobileDeadReckoningStream:
         if self.alignment is None and self.calibrator.is_calibrated:
             self.alignment = self.calibrator.alignment
 
-        # 2. Extract 12-channel kinematic features
-        f_acc = cal.accel_vehicle
-        f_gyr = cal.gyro_vehicle
-        norm_a = float(np.linalg.norm(f_acc))
-        norm_w = float(np.linalg.norm(f_gyr))
-        grav_dev = norm_a - 9.81
-        abs_wz = abs(float(f_gyr[2]))
-        ax_sq = float(f_acc[0] ** 2)
-        wz_sq = float(f_gyr[2] ** 2)
-
-        feat_12 = np.array(
-            [f_acc[0], f_acc[1], f_acc[2], f_gyr[0], f_gyr[1], f_gyr[2], norm_a, norm_w, grav_dev, abs_wz, ax_sq, wz_sq],
-            dtype=np.float32,
-        )
+        # 2. Extract 12-channel causal kinematic and spectral features
+        feat_12 = self.feature_extractor.push(cal)
         self.feature_buffer.append(feat_12)
 
         # 3. Forward Speed Estimation

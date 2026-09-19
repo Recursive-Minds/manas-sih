@@ -63,15 +63,9 @@ class MultiScaleCANMoEDataset(Dataset):
             if tid not in ALLOWED_TRAIN_TRIPS:
                 continue
 
-            # 1. Load cached phone IMU features
-            cache_path = os.path.join(cache_dir, f"{tid}_features_{in_channels}ch.npz")
-            if not os.path.exists(cache_path):
-                raise FileNotFoundError(f"Feature cache missing for {tid}: {cache_path}")
-
-            cached = np.load(cache_path)
-            feats = cached["feats"]
-            f_accel = cached["f_accel"]
-            f_gyro = cached["f_gyro"]
+            # 1. Load or compute causal streaming phone IMU features (Zero-Future Lookahead)
+            from sih.features.streaming import load_or_compute_causal_features
+            feats, f_accel, f_gyro = load_or_compute_causal_features(trip, in_channels=in_channels, cache_dir=cache_dir)
 
             # 2. Load and synchronize 10 Hz vehicle CAN wheel speed
             can_speeds = load_synchronized_can_speed(tid, data_dir, strict=True)

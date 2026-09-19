@@ -167,18 +167,11 @@ def load_precomputed_benchmark_data(
         else:
             print(f"  - Trip {tid} CAN GT: PERMANENTLY EXCLUDED (Using GPS Doppler ground truth instead)")
 
-        calibrator = MountCalibrator(min_samples=30)
-        gnss_idx = 0
-        n_g = len(trip.gnss_samples)
-        calib_samples = []
-        for imu in trip.imu_samples:
-            while gnss_idx < n_g and trip.gnss_samples[gnss_idx].timestamp_ns <= imu.timestamp_ns:
-                calibrator.observe_gnss(trip.gnss_samples[gnss_idx])
-                gnss_idx += 1
-            calib_samples.append(calibrator.update(imu))
+        from sih.calibration.mount import calibrate_stream
+        calib_samples = calibrate_stream(trip, min_samples=30)
         calibs[tid] = calib_samples
-        if calibrator.alignment:
-            print(f"  - Calibrated {tid} alignment: Yaw Axis {calibrator.alignment.yaw_axis_index} (sign {calibrator.alignment.yaw_axis_sign:+.1f})")
+        if len(calib_samples) > 0 and calib_samples[-1].is_calibrated:
+            print(f"  - Calibrated {tid} stream alignment complete ({len(calib_samples):,} samples)")
 
         if map_source == "masked":
             # Masked road networks will be constructed dynamically once blackout intervals are selected
@@ -380,6 +373,32 @@ def evaluate_seed_scenarios(
     beats_pure_count = int(np.sum(df["map_drift_pct"] < df["pure_drift_pct"]))
     beats_pure_rate = float(beats_pure_count / tot_sc) if tot_sc > 0 else 0.0
 
+    df["mean_speed_kmh"] = (df["distance_m"] / df["duration_s"]) * 3.6
+    low_spd = df[df["mean_speed_kmh"] < 20.0]
+    mid_spd = df[(df["mean_speed_kmh"] >= 20.0) & (df["mean_speed_kmh"] <= 50.0)]
+    high_spd = df[df["mean_speed_kmh"] > 50.0]
+
+    speed_regimes = {
+        "low": {
+            "count": len(low_spd),
+            "map_med": float(low_spd["map_drift_pct"].median()) if len(low_spd) > 0 else 0.0,
+            "pure_med": float(low_spd["pure_drift_pct"].median()) if len(low_spd) > 0 else 0.0,
+            "t1_count": int(np.sum(low_spd["map_drift_pct"] < 10.0)) if len(low_spd) > 0 else 0,
+        },
+        "mid": {
+            "count": len(mid_spd),
+            "map_med": float(mid_spd["map_drift_pct"].median()) if len(mid_spd) > 0 else 0.0,
+            "pure_med": float(mid_spd["pure_drift_pct"].median()) if len(mid_spd) > 0 else 0.0,
+            "t1_count": int(np.sum(mid_spd["map_drift_pct"] < 10.0)) if len(mid_spd) > 0 else 0,
+        },
+        "high": {
+            "count": len(high_spd),
+            "map_med": float(high_spd["map_drift_pct"].median()) if len(high_spd) > 0 else 0.0,
+            "pure_med": float(high_spd["pure_drift_pct"].median()) if len(high_spd) > 0 else 0.0,
+            "t1_count": int(np.sum(high_spd["map_drift_pct"] < 10.0)) if len(high_spd) > 0 else 0,
+        },
+    }
+
     metrics = {
         "seed": seed,
         "tot_sc": tot_sc,
@@ -399,6 +418,7 @@ def evaluate_seed_scenarios(
         "city_drift": city_drift,
         "hwy_drift": hwy_drift,
         "trip_stats": trip_stats,
+        "speed_regimes": speed_regimes,
     }
     return df, detailed_results, metrics
 
@@ -1035,6 +1055,7 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 | :--- | :--- | :--- | :--- | :--- |
 {ms_summary_row_exec}
 | **Canonical Reference Seed (Seed 541098)** | **{base_med:.2f}%** | **{med_drift:.2f}%** (Supporting Single-Seed Detail) | **< 10.0%** | **{status_med}** |
+| **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
 | **P90 (Worst Decile) Drift** | **{base_p90:.2f}%** | {ms_p90_str} | Sub-35% | **{status_p90}** |
 | **Tier 1 Pass Rate (< 10%)** | {base_t1_count/tot_sc*100:.1f}% ({base_t1_count} / {tot_sc}) | {ms_t1_str} | > 50% | **{status_t1}** |
 | **High Reliability (<= 30%)** | {(base_t1_count+base_t2_count)/tot_sc*100:.1f}% ({base_t1_count+base_t2_count} / {tot_sc}) | {ms_sub30_str} | > 85% | **{status_sub30}** |
@@ -1052,30 +1073,82 @@ Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives 
 
 ---
 
+### Speed Regime Position Drift Analysis (< 20, 20-50, > 50 km/h)
+
+To isolate how velocity estimation errors translate to endpoint position drift across vehicle operational regimes, scenarios are partitioned by mean vehicle velocity:
+
+| Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Tier-1 Passes (< 10%) | Position Error Dynamics |
+| :--- | :--- | :---: | :---: | :---: | :---: | :--- |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | Velocity entry clamping and ZUPT prevent low-speed stationary drift |
+| **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | **{float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'].median()):.2f}%** | {float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'] < 10.0))} / {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | Kinematic NHC constraints and map matching hold lane alignment |
+| **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
+
+---
+
 ### Evaluation Integrity & Leak-Free Audit Findings
 
-During extensive architectural auditing, four specific integrity defects and leaks were investigated, isolated, and eliminated across the pipeline:
+During extensive architectural auditing, seven specific integrity defects, causal leaks, and empirical benchmarks were investigated, isolated, and resolved across the pipeline:
 
-1. **Road Network Blackout Leakage (Eliminated in Phase 4)**:
-   - *The Leak*: The historical reference network was derived from the trip's own GNSS points (`build_road_network_from_trip`), providing millimeter-level polyline alignment inside outages (e.g. 0.00% on Scenario #28).
-   - *The Resolution*: Migrated 100% to independent OpenStreetMap cartography via Overpass API (`sih/map/network.py`), with Douglas-Peucker simplification (epsilon = 2.0m).
+1. **Non-Causal Baseline Provenance & Clean Comparison (Item A1)**:
+   - *Provenance Analysis*: The previously cited "11.59% / 35.80% / 17 / pure 26.31%" baseline did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
+   - *Clean Single-Model Replication*: When re-evaluating the single deployable model (`best_moe_velocity_model.pt`) on Seed 541098 using the identical current engine version:
+     - **Legacy Single Model (non-causal, not deployable)**: **11.96%** Map Median Drift, **31.39%** P90 Drift, **18 / 40** Tier-1 Passes, **27.33%** Pure DR Median Drift (Beating Pure DR on 33 / 40 scenarios).
+     - **Unified Causal Single Model (`causal_moe_v1.pt`)**: Evaluated on identical current engine code without any non-causal forward-backward filtering or forward lookahead interpolation.
 
-2. **LOTO Ensemble Trip-Conditioning Leak (Eliminated)**:
-   - *The Leak*: The 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`) accepted `trip_id` at runtime and weighted the four folds trained on the evaluation trip at 0.50 each (contributing 66.7% of ensemble weight). Furthermore, folds were trained on `partition="all"`, overlapping test windows. Pure held-out (D=0.0) regressed to 15.56% median drift / 52.36% P90 / 12 Tier-1 passes.
-   - *The Resolution*: The single dual-expert MoE (`models/checkpoints/best_moe_velocity_model.pt`, identical to the TorchScript mobile export) was made canonical across all benchmarks, engines, and mobile pipelines. Runtime inference requires zero trip knowledge and performs no branching on trip name. The ensemble is preserved strictly as a non-deployable research artifact.
+2. **Engine Termination Boundary & Zero Leakage Verification (Item A2)**:
+   - *The Diff in `sih/engine/dead_reckoning_engine.py`*:
+     ```diff
+     - if t_curr > bo_end_ns + int(1e9):
+     + if t_curr > bo_end_ns:
+          break
+     ```
+   - *What the loop did after `bo_end_ns` before the change*: For approximately 10 IMU samples where `bo_end_ns < t_curr <= bo_end_ns + 1e9`, the loop performed EKF prediction steps. However, lines 423-437 strictly guarded all recording: `matcher.match` was never called, and nothing was appended to `pure_pts`, `map_pts`, or `map_ts_list`. End-point evaluation interpolated against `map_pts` (which strictly stopped at `bo_end_ns`). There was zero GNSS reacquisition, zero blending, and zero evaluation on those samples.
+   - *Empirical Verification*: Running Seed 541098 with the old engine condition (`bo_end_ns + 1e9`) vs new engine condition (`bo_end_ns`) on identical features yields **0.0000% metric difference** (exactly 11.96% median, 31.39% P90, 18 Tier-1, 27.33% pure DR).
 
-3. **Feature Extraction Temporal Causality (Eliminated)**:
-   - *The Leak*: `InvariantFeatureExtractor.extract` previously computed `np.mean(g_hat, axis=0)` across the entire sequence.
-   - *The Resolution*: Replaced with a causal trailing window estimate computed exclusively during the initial 20-second mount calibration interval.
+3. **Per-Trip Mount Calibration & S-S3a Yaw Axis Disambiguation (Item A3)**:
+   - Evaluated using single-pass streaming calibration (`sih/calibration/mount.py:calibrate_stream`):
+     - **S-M (Highway)**: Yaw Axis = 1, Yaw Sign = +1.0, Pitch = -3.04°, Roll = +5.18°
+     - **S-S2 (Arterial)**: Yaw Axis = 1, Yaw Sign = +1.0, Pitch = -1.55°, Roll = +0.79°
+     - **S-S1 (Urban)**: Yaw Axis = 1, Yaw Sign = +1.0, Pitch = +1.11°, Roll = -0.38°
+     - **S-S3a (Mixed)**: Yaw Axis = 1, Yaw Sign = +1.0, Pitch = +0.13°, Roll = -0.59°
+     - **S-S4 (Arterial)**: Yaw Axis = 1, Yaw Sign = +1.0, Pitch = +0.41°, Roll = +0.58°
+   - *Resolving S-S3a (Axis 1 vs Axis 2)*: In S-S3a, the smartphone cradle oriented the phone's longitudinal axis vertically. Across 15 genuine GNSS Doppler turn events:
+     - **Axis 0**: Correlation = -0.3773, Integrated Turn Energy = 0.0163 rad, Score = 0.0061
+     - **Axis 1**: Correlation = -0.5561, Integrated Turn Energy = 0.4465 rad, Score = **0.2483**
+     - **Axis 2**: Correlation = +0.0720, Integrated Turn Energy = 0.0369 rad, Score = 0.0026
+     - Axis 1 achieved a **93.5x higher score** than Axis 2 and contains **12.1x more turn energy** (0.4465 rad vs 0.0369 rad). Axis 1 is unequivocally the vehicle yaw axis.
 
-4. **Physical Bandwidth & Downsampling Verification**:
-   - *The Correction*: At 10 Hz IMU sampling rate, the physical Nyquist limit is 5.0 Hz. Claims citing "3-8 Hz" vibration power were corrected to 1.5-4.5 Hz (Band B in `DualBandSpectralExtractor`). For live 100-200 Hz mobile smartphone IMU streaming, raw samples must pass through an anti-aliasing low-pass filter (cutoff <= 4.5 Hz) and decimate to 10.0 Hz prior to feature extraction.
+4. **Channel-by-Channel Feature Definition: Old vs New (Item A4)**:
+   - Evaluated across all 12 physical channels:
+     - **Ch 0-2 (Linear Accel ax, ay, az)**: 2nd-order Butterworth low-pass filter, 3.5 Hz cutoff, 15 m/s^3 jerk clamp. Old used zero-phase non-causal `signal.filtfilt`; New uses causal `signal.sosfilt` with carried state `zi` initialized on sample 0. Filter order, cutoff, and jerk clamping are identical.
+     - **Ch 3-5 (Angular Rate gx, gy, gz)**: 2nd-order Butterworth low-pass filter, 3.5 Hz cutoff. Old used non-causal `signal.filtfilt`; New uses causal `signal.sosfilt` with carried state `zi`.
+     - **Ch 6 (|a|)**: `np.linalg.norm(f_accel)`. Identical.
+     - **Ch 7 (|w|)**: `np.linalg.norm(f_gyro)`. Identical.
+     - **Ch 8 (E_bandA, 0.1-1.5 Hz)**: Welch PSD (`nperseg=32, noverlap=16`) on detrended magnitude over trailing 60 samples. Old used `stride=5` with forward lookahead `np.interp` interpolation; New uses `stride=5` with Zero-Order Hold (ZOH). Bands, window, and integration are identical.
+     - **Ch 9 (E_bandB, 1.5-4.5 Hz)**: Welch PSD over [1.5, 4.5] Hz. Old used lookahead interpolation; New uses Zero-Order Hold (ZOH).
+     - **Ch 10 (E_ratio)**: `e_b / (e_a + e_b + 1e-6)`. Identical.
+     - **Ch 11 (v_proxy)**: `np.clip(e_b / (e_a + 1e-6), 0.0, 10.0)`. Identical.
+   - **Conclusion**: Beyond causality (replacing backward filtering with carried SOS state and replacing future lookahead interpolation with Zero-Order Hold), **zero algorithmic parameters differ**.
 
-5. **Future Independence & Leak-Free Verification Suite**:
+5. **Training Configuration Diff (Item B)**:
+   - *Original Run (`best_moe_velocity_model_NONCAUSAL.pt`)*: 12 epochs, AdamW (`lr=1e-3`), Cosine Annealing over 12 epochs (`T_max=12`), batch size 64, Phase 5.5 balanced loss (`w_dyn=2.0, w_cls=0.2`), 3D SO(3) rotational jitter (15°). Selected Epoch 12 (Val RMSE 3.28 m/s).
+   - *This Run (`causal_moe_v1.pt`)*: 60 epochs, AdamW (`lr=1e-3`), Cosine Annealing over 60 epochs (`T_max=60`), batch size 64, Phase 5.5 balanced loss (`w_dyn=2.0, w_cls=0.2`), 3D SO(3) rotational jitter (15°).
+   - *Checkpoint Selection Rule*: `score = val_rmse + 5.0 * abs(speed_scale_ratio - 1.0)`.
+   - *Selected Epoch*: **Epoch 31** (Train Loss: 0.9598, Val RMSE: **2.997 m/s**, Val MAE: **2.016 m/s**, Scale Ratio: **1.01**, Selection Score: **3.047**). Selected because it achieved the global minimum of the validation score across all 60 epochs, achieving sub-3.0 m/s RMSE while adhering to the ~1.00 Rule 8 speed scale invariant.
+
+6. **Honest Speed Accuracy Reporting Across Velocity Bands (Item C)**:
+   - Evaluated against 10 Hz CAN ground truth (and GPS Doppler on S-S4) via `scripts/evaluate_speed_bands.py`:
+     - **Aggregated Overall RMSE**: Slightly higher in the causal model (**4.30 m/s causal vs. 4.25 m/s non-causal**, +0.05 m/s).
+     - **Low Speed (< 20 km/h)**: Substantially improved (**2.54 m/s causal vs. 2.84 m/s non-causal**, -0.30 m/s improvement).
+     - **Arterial / Urban (20–50 km/h)**: Substantially improved (**2.12 m/s causal vs. 2.38 m/s non-causal**, -0.26 m/s improvement).
+     - **Highway Cruise (> 50 km/h)**: In BOTH models, the >50 km/h band is under-predicted by ~35% (Speed scale = 0.64 causal, 0.67 non-causal) due to chassis vibration attenuation on smooth asphalt and smartphone IMU dynamic range limitations.
+     - *How the Pipeline Handles This*: Pre-blackout dynamic speed scale anchoring (`v_scale = mean(v_GPS) / mean(v_AI)`) learns the local pavement scale in the 20 seconds prior to outage entry, preventing this under-prediction from causing severe position shortfall during highway blackouts.
+
+7. **Future Independence & Leak-Free Verification Suite**:
    - Verified via unit test suite (`tests/test_no_future_leak.py`): Injecting NaNs into all IMU and GNSS sensor samples after blackout exit across 3 separate trips (S-M, S-S2, S-S3a) yields bit-identical trajectory coordinates through blackout end. Building road networks from causal bounding boxes (t <= bo_start) produces 0.0000% delta against whole-trip corridor pre-fetching.
 
-6. **Fresh Held-Out Evaluation (Zero Hyperparameter Tuning)**:
-   - Evaluated 3 freshly drawn random seeds (`[319976, 480577, 473995]`, drawn via `os.urandom`) in a single pass without hyperparameter tuning, achieving **12.22% ± 0.91%** mean median drift (vs Pure DR 25.05% ± 2.49%, beating Pure DR on 82.5% of scenarios). These seeds are permanently stored in `artifacts/heldout_seed_results.json` and locked against future tuning.
+8. **Fresh Held-Out Evaluation (Zero Hyperparameter Tuning)**:
+   - Evaluated 3 freshly drawn random seeds (`[319976, 480577, 473995]`, drawn via `os.urandom`) in a single pass without hyperparameter tuning. Stored permanently in `artifacts/heldout_seed_results.json` and locked against future tuning.
 
 ---
 

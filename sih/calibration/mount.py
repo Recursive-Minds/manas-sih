@@ -213,3 +213,21 @@ register_calibration(
     "auto",
     lambda **params: MountCalibrator(**params)
 )
+
+
+def calibrate_stream(trip: Any, min_samples: int = 30) -> List[CalibratedSample]:
+    """
+    Standard chronological streaming mount calibration helper.
+    Interleaves IMU and GNSS fixes in strict timestamp order.
+    Used uniformly across training datasets, offline benchmarks, and streaming engines.
+    """
+    calibrator = MountCalibrator(min_samples=min_samples)
+    g_idx = 0
+    n_g = len(trip.gnss_samples)
+    calib_samples = []
+    for imu in trip.imu_samples:
+        while g_idx < n_g and trip.gnss_samples[g_idx].timestamp_ns <= imu.timestamp_ns:
+            calibrator.observe_gnss(trip.gnss_samples[g_idx])
+            g_idx += 1
+        calib_samples.append(calibrator.update(imu))
+    return calib_samples

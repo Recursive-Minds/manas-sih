@@ -1,7 +1,8 @@
-"""Vibration and Shock Conditioning Pre-Filter for Vehicle Inertial Navigation.
-
-Filters high-frequency engine acoustic vibrations and clamps pothole jerk spikes
-to condition noisy consumer smartphone sensor streams prior to inertial integration.
+"""DEPRECATED / NON-CAUSAL LEGACY CONDITIONER.
+DO NOT USE IN PRODUCTION OR INFERENCE.
+Replaced by StreamingFeatureExtractor (sih/features/streaming.py), which uses causal
+sosfilt with carried state and physical jerk clamping. This class uses scipy.signal.filtfilt,
+which violates causality by filtering backwards across future sequence samples.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from scipy import signal
 
 
 class VibrationConditioner:
-    """Butterworth low-pass filtering and shock suppression for IMU streams."""
+    """[DEPRECATED - NON-CAUSAL] Butterworth forward-backward low-pass filtering."""
 
     def __init__(
         self,

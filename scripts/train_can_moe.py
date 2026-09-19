@@ -45,13 +45,20 @@ def train_can_moe(
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
     in_channels: int = 12,
-    checkpoint_path: str = "models/checkpoints/moe_can_supervised.pt",
+    seed: int = 42,
+    checkpoint_path: str = "models/checkpoints/causal_moe_v1.pt",
 ):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print("=" * 80)
     print("   10 Hz CAN-SUPERVISED BAYESIAN DUAL-EXPERT MoE TRAINING PIPELINE")
     print("   Strict Zero-Leakage: Part 1 (60% Train) + Part 2 (20% Val) of S-M, S-S1, S-S2")
     print(f"   Compute Device: {device} ({torch.cuda.get_device_name(0) if device.type == 'cuda' else 'CPU'})")
+    print(f"   Random Seed: {seed} | Checkpoint: {checkpoint_path}")
     print("=" * 80)
 
     os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
@@ -227,7 +234,7 @@ def train_can_moe(
             best_score = score
             best_rmse = val_rmse
             best_scale = speed_scale_ratio
-            torch.save({
+            save_payload = {
                 "epoch": epoch,
                 "model_type": "moe_bayesian",
                 "expert_resnet_state_dict": expert_res.state_dict(),
@@ -241,7 +248,11 @@ def train_can_moe(
                 "in_channels": in_channels,
                 "short_len": 20,
                 "long_len": 60,
-            }, checkpoint_path)
+            }
+            torch.save(save_payload, checkpoint_path)
+            canonical_path = "models/checkpoints/best_moe_velocity_model.pt"
+            if os.path.abspath(checkpoint_path) != os.path.abspath(canonical_path):
+                torch.save(save_payload, canonical_path)
 
     elapsed = time.time() - start_time
     print("=" * 80)
@@ -280,4 +291,18 @@ def train_can_moe(
 
 
 if __name__ == "__main__":
-    train_can_moe(epochs=12, batch_size=64)
+    parser = argparse.ArgumentParser(description="Train Causal MoE Velocity Model")
+    parser.add_argument("--epochs", type=int, default=15, help="Number of training epochs (default: 15)")
+    parser.add_argument("--batch-size", type=int, default=64, help="Batch size (default: 64)")
+    parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate (default: 1e-3)")
+    parser.add_argument("--seed", type=int, default=42, help="Fixed random seed (default: 42)")
+    parser.add_argument("--checkpoint-path", type=str, default="models/checkpoints/causal_moe_v1.pt", help="Path to save best checkpoint")
+    args = parser.parse_args()
+
+    train_can_moe(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        seed=args.seed,
+        checkpoint_path=args.checkpoint_path,
+    )

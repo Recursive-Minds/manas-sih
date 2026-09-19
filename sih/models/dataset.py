@@ -200,54 +200,23 @@ class MultiScaleMoEDataset(Dataset):
             if len(trip.imu_samples) < long_len or len(trip.gnss_samples) == 0:
                 continue
 
-            cache_path = os.path.join(cache_dir, f"{trip.trip_id}_features_{in_channels}ch.npz")
-            if os.path.exists(cache_path):
-                cached = np.load(cache_path)
-                feats = cached["feats"]
-                interp_speeds = cached["interp_speeds"]
-                f_accel = cached["f_accel"]
-                f_gyro = cached["f_gyro"]
-            else:
-                from sih.data.spectral import DualBandSpectralExtractor
-                from sih.data.vibration import VibrationConditioner
-                cond = VibrationConditioner(sampling_rate=10.0)
-                spec = DualBandSpectralExtractor(sampling_rate=10.0)
+            from sih.features.streaming import load_or_compute_causal_features
+            feats, f_accel, f_gyro = load_or_compute_causal_features(trip, in_channels=in_channels, cache_dir=cache_dir)
 
-                imu_ts = np.array([s.timestamp_ns for s in trip.imu_samples], dtype=np.int64)
+            imu_ts = np.array([s.timestamp_ns for s in trip.imu_samples], dtype=np.int64)
+            gnss_ts = np.array([g.timestamp_ns for g in trip.gnss_samples], dtype=np.int64)
+            gnss_speeds = np.array([
+                g.speed_mps if g.speed_mps is not None else 0.0
+                for g in trip.gnss_samples
+            ], dtype=np.float32)
+            interp_speeds = np.interp(imu_ts, gnss_ts, gnss_speeds).astype(np.float32)
+            interp_speeds[interp_speeds < 0.2] = 0.0
 
-                if use_calibrated:
-                    from sih.calibration.mount import MountCalibrator
-                    calib = MountCalibrator(window_size=100)
-                    for g in trip.gnss_samples:
-                        calib.observe_gnss(g)
-                    calib_samples = [calib.update(s) for s in trip.imu_samples]
-                    accels = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
-                    gyros = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
-                else:
-                    accels = np.array([s.accel for s in trip.imu_samples], dtype=np.float32)
-                    gyros = np.array([s.gyro for s in trip.imu_samples], dtype=np.float32)
-
-                f_accel, f_gyro = cond.filter_imu_sequence(accels, gyros)
-
-                gnss_ts = np.array([g.timestamp_ns for g in trip.gnss_samples], dtype=np.int64)
-                gnss_speeds = np.array([
-                    g.speed_mps if g.speed_mps is not None else 0.0
-                    for g in trip.gnss_samples
-                ], dtype=np.float32)
-                interp_speeds = np.interp(imu_ts, gnss_ts, gnss_speeds).astype(np.float32)
-                interp_speeds[interp_speeds < 0.2] = 0.0
-
-                raw_6 = np.hstack([f_accel, f_gyro])
-                norm_a = np.linalg.norm(f_accel, axis=1, keepdims=True)
-                norm_w = np.linalg.norm(f_gyro, axis=1, keepdims=True)
-
-                if in_channels == 12:
-                    spec_feats = spec.extract_sequence_features(raw_6, window_len=long_len, stride=5)
-                    feats = np.hstack([raw_6, norm_a, norm_w, spec_feats])
-                else:
-                    feats = np.hstack([raw_6, norm_a, norm_w])
-
-                np.savez_compressed(cache_path, feats=feats, interp_speeds=interp_speeds, f_accel=f_accel, f_gyro=f_gyro)
+            min_len = min(len(feats), len(interp_speeds))
+            feats = feats[:min_len]
+            f_accel = f_accel[:min_len]
+            f_gyro = f_gyro[:min_len]
+            interp_speeds = interp_speeds[:min_len]
 
             if partition != "all":
                 part = compute_trip_partition(trip.trip_id, len(feats))

@@ -1,7 +1,8 @@
-"""Dual-Band Spectral Feature Extractor for IMU Speed Estimation.
-
-Computes spectral energy distribution across macroscopic chassis dynamics (Band A: 0.1-1.5 Hz)
-and aliased tyre/road interaction harmonics (Band B: 1.5-4.5 Hz) from sliding IMU windows.
+"""DEPRECATED / NON-CAUSAL LEGACY SPECTRAL EXTRACTOR.
+DO NOT USE IN PRODUCTION OR INFERENCE.
+Replaced by StreamingFeatureExtractor (sih/features/streaming.py).
+This class's extract_sequence_features method with stride > 1 used np.interp forward lookahead,
+violating causality by interpolating intermediate samples towards future FFT windows.
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from typing import Tuple, Optional
 
 
 class DualBandSpectralExtractor:
-    """Extracts frequency-domain energy features from sliding IMU windows."""
+    """[DEPRECATED - NON-CAUSAL] Legacy frequency-domain feature extractor."""
 
     def __init__(
         self,

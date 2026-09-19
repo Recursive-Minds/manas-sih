@@ -133,18 +133,10 @@ def predict_velocities(
         return np.array(preds, dtype=np.float32)
 
     if model_type == "moe":
-        from sih.data.spectral import DualBandSpectralExtractor
-        from sih.data.vibration import VibrationConditioner
-        cond = VibrationConditioner(sampling_rate=10.0)
-        spec = DualBandSpectralExtractor(sampling_rate=10.0)
-        acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
-        gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
-        f_accel, f_gyro = cond.filter_imu_sequence(acc, gyr)
-        raw_6 = np.hstack([f_accel, f_gyro])
-        norm_a = np.linalg.norm(f_accel, axis=1, keepdims=True)
-        norm_w = np.linalg.norm(f_gyro, axis=1, keepdims=True)
-        spec_feats = spec.extract_sequence_features(raw_6, window_len=60, stride=5)
-        feats = np.hstack([raw_6, norm_a, norm_w, spec_feats]).astype(np.float32)
+        from sih.features.streaming import StreamingFeatureExtractor
+
+        extractor = StreamingFeatureExtractor(sampling_rate=10.0, window_len=60, spectral_stride=5)
+        feats = extractor.batch_extract(calib_samples)
 
         N = len(feats)
         norm_feats = (feats.T - norm_mean) / (norm_std + 1e-6)

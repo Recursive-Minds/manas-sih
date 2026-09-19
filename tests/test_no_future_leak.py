@@ -118,8 +118,23 @@ class TestNoFutureLeak(unittest.TestCase):
                     new_gnss.append(g)
             trip_nan.gnss_samples = new_gnss
 
+            # Re-run mount calibration and AI inference on the NaN-injected trip
+            calibrator_nan = MountCalibrator(min_samples=30)
+            gnss_idx = 0
+            n_g = len(trip_nan.gnss_samples)
+            calib_samples_nan = []
+            for imu in trip_nan.imu_samples:
+                while gnss_idx < n_g and trip_nan.gnss_samples[gnss_idx].timestamp_ns <= imu.timestamp_ns:
+                    calibrator_nan.observe_gnss(trip_nan.gnss_samples[gnss_idx])
+                    gnss_idx += 1
+                calib_samples_nan.append(calibrator_nan.update(imu))
+
+            v_preds_nan = predict_velocities(
+                self.model, calib_samples_nan, self.norm_mean, self.norm_std, self.device, model_type=self.model_type
+            )
+
             res_nan = run_dead_reckoning_scenario(
-                trip_nan, calib_samples, v_preds, rnet, g_cand, dur, domain=domain
+                trip_nan, calib_samples_nan, v_preds_nan, rnet, g_cand, dur, domain=domain
             )
             self.assertIsNotNone(res_nan, f"NaN scenario run failed for {tid}")
 

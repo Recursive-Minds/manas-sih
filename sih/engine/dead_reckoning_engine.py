@@ -222,7 +222,7 @@ class DeadReckoningEngine:
             t_curr = imu.timestamp_ns
             if t_curr < warmup_start_ns:
                 continue
-            if t_curr > bo_end_ns + int(1e9):
+            if t_curr > bo_end_ns:
                 break
 
             while gnss_idx < n_gnss and trip.gnss_samples[gnss_idx].timestamp_ns <= t_curr:
