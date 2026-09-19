@@ -243,19 +243,25 @@ class MobileDeadReckoningStream:
         fused = self.ekf.predict(cal, vel)
 
         # 6. Topological Map Matching (if available and driving)
+        matched = None
         if self.enable_map_matching and self.matcher is not None and v_smooth > 1.0:
-            self.matcher.match(fused, ekf=self.ekf, domain="Highway", v_fwd=v_smooth)
+            matched = self.matcher.match(fused, ekf=self.ekf, domain="Highway", v_fwd=v_smooth)
 
         # Update consecutive outage count if no recent healthy GNSS fix
         self.consecutive_outage_samples += 1
+
+        # Use snapped road coordinates if map matching succeeded
+        pos_enu = fused.position_enu_m
+        if matched is not None and matched.is_matched and matched.matched_position_enu_m is not None:
+            pos_enu = np.array([matched.matched_position_enu_m[0], matched.matched_position_enu_m[1], fused.position_enu_m[2]], dtype=np.float64)
 
         # Transform to WGS-84 lat/lon if reference frame is available
         lat_out, lon_out = self.ref_lat, self.ref_lon
         if self.has_ref_coords:
             lat_out, lon_out, _ = enu_to_geodetic(
-                fused.position_enu_m[0],
-                fused.position_enu_m[1],
-                fused.position_enu_m[2],
+                pos_enu[0],
+                pos_enu[1],
+                pos_enu[2],
                 self.ref_lat,
                 self.ref_lon,
                 self.ref_alt,
@@ -266,8 +272,8 @@ class MobileDeadReckoningStream:
             timestamp_ns=timestamp_ns,
             latitude_deg=lat_out,
             longitude_deg=lon_out,
-            altitude_m=float(fused.position_enu_m[2]),
-            position_enu_m=fused.position_enu_m,
+            altitude_m=float(pos_enu[2]),
+            position_enu_m=pos_enu,
             velocity_enu_mps=fused.velocity_enu_mps,
             heading_rad=fused.heading_rad,
             covariance=fused.covariance,

@@ -228,7 +228,13 @@ class InvariantFeatureExtractor:
         # axes coincide and this is a no-op.
         g_hat_gyro = g_hat
         if self.gyro_frame_autocalibrate:
-            cal = estimate_gyro_up_axis(gyro, accel_up=np.mean(g_hat, axis=0))
+            # Causal trailing estimate of accel_up to eliminate future lookahead across the trip
+            w_causal = min(n, 200)
+            accel_up_est = np.mean(g_hat[:w_causal], axis=0) if n > 0 else np.array([0.0, 0.0, 1.0])
+            norm_u = np.linalg.norm(accel_up_est)
+            if norm_u > 1e-6:
+                accel_up_est = accel_up_est / norm_u
+            cal = estimate_gyro_up_axis(gyro, accel_up=accel_up_est)
             if not cal.agrees_with_accel and cal.confident:
                 g_hat_gyro = np.tile(cal.axis, (n, 1))
 

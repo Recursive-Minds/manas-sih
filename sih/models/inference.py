@@ -22,20 +22,19 @@ def load_ai_model(
     model_path: Optional[str] = None,
     root_dir: Optional[str] = None,
 ) -> Tuple[Any, Optional[np.ndarray], Optional[np.ndarray], str]:
-    """
-    Loads production 5-Fold LOTO MoE Ensemble, falling back to CausalSpeedNet, MoE, or TCN.
-    """
     if root_dir is None:
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-    from sih.models.ensemble_gating import LOTOEnsembleVelocityEstimator, FOLD_CHECKPOINTS
-    if model_path is None and all(os.path.exists(p) for p in FOLD_CHECKPOINTS.values()):
-        print("[AI Model] Loading Production 5-Fold LOTO MoE Ensemble with In-Distribution Discount (D=0.50)")
+    default_moe_path = os.path.join(root_dir, "models", "checkpoints", "best_moe_velocity_model.pt")
+    default_tcn_path = os.path.join(root_dir, "models", "checkpoints", "best_velocity_model.pt")
+
+    # Explicit research override for LOTO ensemble
+    if model_path == "loto_ensemble":
+        from sih.models.ensemble_gating import LOTOEnsembleVelocityEstimator
+        print("[AI Model] [RESEARCH ONLY] Loading 5-Fold LOTO MoE Ensemble with Discount (D=0.50)")
         estimator = LOTOEnsembleVelocityEstimator(discount_d=0.50, device=device)
         return estimator, None, None, "loto_ensemble"
 
-    default_moe_path = os.path.join(root_dir, "models", "checkpoints", "best_moe_velocity_model.pt")
-    default_tcn_path = os.path.join(root_dir, "models", "checkpoints", "best_velocity_model.pt")
     target_moe_path = model_path if model_path and os.path.exists(model_path) else default_moe_path
 
     if os.path.exists(target_moe_path):
@@ -89,19 +88,20 @@ def predict_velocities(
     norm_std: np.ndarray,
     device: torch.device,
     model_type: str = "moe",
-    trip_id: str = "S-M",
+    trip_id: Optional[str] = None,
     root_dir: Optional[str] = None,
     apply_smoothing: bool = True,
 ) -> np.ndarray:
     """
     Performs streaming sliding-window forward inference across calibrated IMU samples.
     Optionally applies causal kinematic slew-rate and low-pass filter smoothing.
+    Feature extraction does NOT branch on trip name.
     """
     if root_dir is None:
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
     if model_type == "loto_ensemble":
-        v_fused, _ = model.predict_trip(trip_id=trip_id, calib_samples=calib_samples)
+        v_fused, _ = model.predict_trip(trip_id=trip_id if trip_id else "S-M", calib_samples=calib_samples)
         return v_fused.astype(np.float32)
 
     if model_type in ("causal_speed_net", "causal_moe_net"):
@@ -133,22 +133,18 @@ def predict_velocities(
         return np.array(preds, dtype=np.float32)
 
     if model_type == "moe":
-        cache_file = os.path.join(root_dir, "data", "cache", f"{trip_id}_features_12ch.npz")
-        if os.path.exists(cache_file):
-            feats = np.load(cache_file)["feats"].astype(np.float32)
-        else:
-            from sih.data.spectral import DualBandSpectralExtractor
-            from sih.data.vibration import VibrationConditioner
-            cond = VibrationConditioner(sampling_rate=10.0)
-            spec = DualBandSpectralExtractor(sampling_rate=10.0)
-            acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
-            gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
-            f_accel, f_gyro = cond.filter_imu_sequence(acc, gyr)
-            raw_6 = np.hstack([f_accel, f_gyro])
-            norm_a = np.linalg.norm(f_accel, axis=1, keepdims=True)
-            norm_w = np.linalg.norm(f_gyro, axis=1, keepdims=True)
-            spec_feats = spec.extract_sequence_features(raw_6, window_len=60, stride=5)
-            feats = np.hstack([raw_6, norm_a, norm_w, spec_feats]).astype(np.float32)
+        from sih.data.spectral import DualBandSpectralExtractor
+        from sih.data.vibration import VibrationConditioner
+        cond = VibrationConditioner(sampling_rate=10.0)
+        spec = DualBandSpectralExtractor(sampling_rate=10.0)
+        acc = np.array([s.accel_vehicle for s in calib_samples], dtype=np.float32)
+        gyr = np.array([s.gyro_vehicle for s in calib_samples], dtype=np.float32)
+        f_accel, f_gyro = cond.filter_imu_sequence(acc, gyr)
+        raw_6 = np.hstack([f_accel, f_gyro])
+        norm_a = np.linalg.norm(f_accel, axis=1, keepdims=True)
+        norm_w = np.linalg.norm(f_gyro, axis=1, keepdims=True)
+        spec_feats = spec.extract_sequence_features(raw_6, window_len=60, stride=5)
+        feats = np.hstack([raw_6, norm_a, norm_w, spec_feats]).astype(np.float32)
 
         N = len(feats)
         norm_feats = (feats.T - norm_mean) / (norm_std + 1e-6)

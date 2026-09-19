@@ -83,16 +83,16 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
   - *Low-Speed Crawl Clamping*: Enforces `v_fwd <= max(v_entry + 1.2 m/s, 3.5 m/s)` during crawl entries (`v_entry < 4.0 m/s`), preventing engine idle vibrations from simulating cruising.
   - *Pre-Blackout Dynamic Speed Scaling*: Adapts pavement vibration scale (`s_v = mean(v_GPS) / mean(v_AI)`) over the 20s prior to blackout.
   - *ZARU Highway Straight-Line Lock*: Freezes yaw gyro bias when `v > 15 m/s` and `|omega_z| < 0.005 rad/s` for > 2.0s, eliminating phantom highway curvature.
-  - *Hybrid Speed Blending*: Blends accelerometer forward velocity integration with neural MoE speed using 3-8 Hz frequency vibration power.
+  - *Hybrid Speed Blending*: Blends accelerometer forward velocity integration with neural MoE speed using 1.5-4.5 Hz frequency vibration power (Band B).
 - **Map-Matching & Gating (Phase 5)** (`sih/map/network.py`, `sih/map/matcher.py`, `sih/map/governor.py`): Spatial polyline indexing with turn-inflated Gaussian emission likelihood (`sigma_eff >= 45°`), curvature kinematics governor (`v <= sqrt(a_lat_max / kappa)`), branch multi-hypothesis fork gating (`diff_theta > 15 deg, L2 > 0.20 * L1`), expanded 105°–110° successor turn gates with 60° hard heading limit (`sigma_heading_deg = 30.0°`), anti-boundary clamping watchdog suppressing junction stalls, and prompt corridor heading steering (`0.50 * diff_rad`).
-- **Standalone 200 Hz C++ Core** (`engine/cpp/`): Zero-dependency modern C++ implementation compiled into `idr_core.dll` for dual-deliverable embedded telematics.
+- **Standalone C++ Core Prototype** (`engine/cpp/`): Standalone reference C++ implementation (`idr_core.cpp`) for telematics integration.
 
 ---
 
 ## 8. Master Benchmark Results (Empirical Single Source of Truth)
 
 All benchmark scores, multi-seed statistical validations (6 random seeds x 40 scenarios = 240 evaluation runs), domain breakdowns, and trajectory maps are maintained exclusively in:
-👉 [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md)
+👉 [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md)
 
 **Official SIH Benchmark Criteria**:
 - **Grand Target**: Dead Reckoning Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km).
@@ -100,7 +100,7 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
 - **Tier 2 (City Maneuvers, 20-50 km/h, 200-500m)**: Heading drift < 10% through dynamic multi-source heading and road governing.
 - **Tier 3 (Highway Cruising, > 50 km/h, > 500m-1.2km)**: Speed scale fidelity sum(v_hat)/sum(v_GT) approx 1.00 and high-speed gyro drift suppression.
 
-*(See [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md) for current verified scorecards passing all SIH criteria).*
+*(See [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md) for current verified scorecards passing all SIH criteria).*
 
 ---
 
@@ -109,7 +109,7 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
 1. **[COMPLETED] Phase 6: Seamless GNSS <-> INS Handoff State Machine**:
    - Production 6-state FSM (`sih/handoff/manager.py`): `INITIALIZING` -> `GNSS_HEALTHY` -> `GNSS_DEGRADED` -> `INS_DEAD_RECKONING` -> `REACQUISITION_VERIFY` -> `REACQUISITION_BLENDING`.
    - Chi-Square Normalized Innovation Squared (NIS) and multi-sample kinematic plausibility gating (`sih/handoff/integrity.py`).
-   - C^2 cubic Hermite smoothstep zero-jump reconciliation (`sih/handoff/reconciliation.py`), verified on real sequence `S-M.csv` with **0.0000 m exit jump** and **100.0% parameter freeze** during portal multipath.
+   - C^2 cubic Hermite smoothstep reconciliation (`sih/handoff/reconciliation.py`), verified on real sequence `S-M.csv` with sub-millimeter geometric C^2 continuity and **100.0% parameter freeze** during portal multipath.
    - Comprehensive test suite in `tests/test_handoff.py` (7/7 passed, 40/40 repo-wide).
 
 2. **[COMPLETED] Live Indian Road Vector Ingestion & Speed-Adaptive Predictive Corridor Caching Engine**:

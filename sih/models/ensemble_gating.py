@@ -1,18 +1,13 @@
 """
-Smartphone Intelligent Dead Reckoning (SIH) - Production LOTO MoE Ensemble Gating
----------------------------------------------------------------------------------
-Implements the 5-Fold Leave-One-Trip-Out (LOTO) CausalSpeedNet Mixture-of-Experts Ensemble
-with Intervention A (In-Distribution Confidence Discounting, D = 0.50).
-
-Mathematical Formulation:
-    For an evaluation trip T with held-out model expert k_held:
-        w_k(t) = (1.0 / var_k(t)) * (1.0 if k == k_held else D)
-        w_norm_k(t) = w_k(t) / sum_j(w_j(t))
-        v_fused(t) = sum_k(w_norm_k(t) * v_k(t))
-        var_fused(t) = 1.0 / sum_k(w_k(t))
-
-This eliminates overconfidence from in-distribution models while preserving domain-specific
-knowledge across highway cruising, urban grid, and arterial maneuvers.
+RESEARCH ARTIFACT ONLY - NOT DEPLOYABLE (TRIP-CONDITIONED WEIGHTING)
+====================================================================
+WARNING: This ensemble estimator conditions fold weights on the runtime trip_id.
+In a live deployment or streaming environment, trip_id is unknown. Furthermore,
+folds trained on partition="all" overlap with evaluation windows when D > 0.0.
+This module is retained strictly as an offline research artifact for ablation
+studies. It is EXCLUDED from canonical benchmarks, engine inference, and mobile streaming.
+Canonical deployment uses the single dual-expert MoE (best_moe_velocity_model.pt).
+====================================================================
 """
 
 import os

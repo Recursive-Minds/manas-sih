@@ -100,7 +100,7 @@ The project was originally structured into five sequential development phases:
 * **Goal**: Prevent visible jumps when entering and exiting tunnels.
 * **Outcome**:
   - 6-state finite state machine with portal parameter freezing.
-  - C^2 cubic Hermite smoothstep reconciliation, achieving **0.0000 m exit jump** on real data.
+  - C^2 cubic Hermite smoothstep reconciliation, achieving sub-millimeter geometric C^2 continuity on real data.
 
 ### Phase 7: Mobile App Deployment & Edge Causal Runtime
 * **Goal**: Export optimized edge binaries for smartphone CPU execution.
@@ -160,7 +160,7 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 9. **Intersection & Fork Trap Lock-in**: At acute branching highway off-ramps and Y-junctions, straight re-anchoring trapped the trajectory. Hardened via **Branch Multi-Hypothesis Fork Gating** (`diff_theta > 15 deg, L2 > 0.20 * L1`), letting gyro turn physics select the correct branch.
 10. **Perpendicular Turn Map Penalization**: Implemented **Turn-Inflated Map Emission Likelihood** (`sigma_eff >= 45°`), allowing the filter to latch onto cross-streets during 90-degree maneuvers.
 11. **Severe Hairpin Corner Overshoots**: Integrated **Curvature & Gyro Kinematic Governing** (`v <= sqrt(a_lat_max / kappa)` and `v <= a_lat_max / |omega_z|`), preventing along-track overshoots on tight curves.
-12. **Portal Multipath Jump & Exit Puck Teleportation**: Entering tunnels creates 20m–50m multipath jumps that corrupt scale and bias learning, while exiting tunnels causes jarring display puck jumps across lanes. Hardened via **6-State Finite State Machine** (`sih/handoff/manager.py`) with portal parameter freezing and **C^2 Cubic Hermite Smoothstep Reconciliation** (`sih/handoff/reconciliation.py`), achieving 0.0000 m exit jump on real data.
+12. **Portal Multipath Jump & Exit Puck Teleportation**: Entering tunnels creates 20m–50m multipath jumps that corrupt scale and bias learning, while exiting tunnels causes jarring display puck jumps across lanes. Hardened via **6-State Finite State Machine** (`sih/handoff/manager.py`) with portal parameter freezing and **C^2 Cubic Hermite Smoothstep Reconciliation** (`sih/handoff/reconciliation.py`), achieving sub-millimeter geometric C^2 continuity across the handoff interval.
 13. **Live Indian Road Vector Ingestion & Predictive Corridor Caching**: Bridged prototype-to-field gap on unseen Indian road networks via speed-adaptive lookahead (`R = clamp(v * 180s, 800m, 6000m)`), deterministic 0.05° spatial disk caching, and asynchronous double-buffered thread pool workers (`sih/map/`). Preserves sub-millisecond P99 IMU loop latency (0.42 ms) and achieves 14.19 ms offline tunnel retrieval across 3,142 road segments on Mumbai-Pune Expressway.
 14. **High-Speed Straight-Line Yaw Wander**: At speeds v > 15 m/s, residual micro-gyro bias causes unobservable phantom curvature. Hardened via **ZARU Highway Straight-Line Lock** (`update_straight_line_lock`), freezing heading drift when `|omega_z| < 0.005 rad/s` for > 2.0s.
 15. **9-Second Phone GPS Stair-Step Optical Illusion**: Sparse phone GPS updates induce apparent curve sagitta distortions and velocity lags. Hardened by supervising the Dual-Brain MoE with **10 Hz Continuous Vehicle CAN-Bus Wheel Speed Ground Truth** (`sih/models/can_dataset.py`) synchronized with cross-correlation offsets.
@@ -180,8 +180,8 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 | **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. | Completely immune to vehicle magnetic distortion (+76°); initial heading error cut to 0.14° average (0.0002° median). |
 | **Mount Calibration** | Manual user calibration or static orientation assumption. | **Dynamic Autonomous SO(3) Leveling**: Rodrigues rotation from gravity + continuous least-squares centripetal acceleration turn correlation. | Zero user calibration required; adapts to arbitrary portrait/landscape/tilted phone orientations. |
 | **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor**: Turn-inflated likelihood, branch multi-hypothesis gating, and IRC:73 lateral comfort limits. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
-| **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation**. | Portal multipath parameter protection; **0.0000 m exit jump** on real sequences. |
-| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ NDK Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 2.68 ms latency on mobile CPU). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
+| **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation**. | Portal multipath parameter protection; sub-millimeter geometric C^2 continuity on real sequences. |
+| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 2.68 ms benchmark on host CPU). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
 
 ---
 

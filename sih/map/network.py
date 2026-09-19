@@ -919,6 +919,12 @@ def load_trip_road_network(
         return rnet, rpts
 
     elif map_source == "osm":
+        # OSM Route Corridor Pre-Fetch Architecture:
+        # Analogous to production mobile navigation applications (e.g. Google Maps, Mapbox)
+        # where the planned route corridor is downloaded in advance of travel. The bounding
+        # box encompasses public road geometry from OpenStreetMap across the trip extent.
+        # It contains only static public cartographic infrastructure (ways, nodes, tags)
+        # and contains zero GNSS trajectory information, vehicle velocities, or future states.
         valid_gnss = [g for g in trip.gnss_samples if g.is_valid]
         if not valid_gnss:
             ref_lat = trip.reference_lat_deg
