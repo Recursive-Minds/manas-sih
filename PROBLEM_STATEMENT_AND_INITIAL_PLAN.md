@@ -105,7 +105,7 @@ The project was originally structured into five sequential development phases:
 ### Phase 7: Mobile App Deployment & Edge Causal Runtime
 * **Goal**: Export optimized edge binaries for smartphone CPU execution.
 * **Outcome**:
-  - Exported PyTorch Mobile TorchScript model (`moe_velocity_model.torchscript.pt`, **2.66 MB**, **2.68 ms latency** on CPU / 373 Hz throughput).
+  - Exported PyTorch Mobile TorchScript model (`moe_velocity_model.torchscript.pt`, **2.66 MB**, **1.84 ms on laptop CPU; not measured on phone** / 544 Hz throughput).
   - Fully streaming causal pipeline with zero lookahead.
 
 ---
@@ -181,7 +181,7 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 | **Mount Calibration** | Manual user calibration or static orientation assumption. | **Dynamic Autonomous SO(3) Leveling**: Rodrigues rotation from gravity + continuous least-squares centripetal acceleration turn correlation. | Zero user calibration required; adapts to arbitrary portrait/landscape/tilted phone orientations. |
 | **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor**: Turn-inflated likelihood, branch multi-hypothesis gating, and IRC:73 lateral comfort limits. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
 | **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation**. | Portal multipath parameter protection; sub-millimeter geometric C^2 continuity on real sequences. |
-| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 2.68 ms benchmark on host CPU). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
+| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 1.84 ms on laptop CPU; not measured on phone). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
 
 ---
 

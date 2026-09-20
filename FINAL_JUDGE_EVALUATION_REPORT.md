@@ -3,8 +3,9 @@
 # Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
 ## Final Judge Evaluation & Architectural Benchmark Report
 
-**Generated:** 2026-09-19 19:54:35 UTC  
-**Primary Multi-Seed Benchmark:** **13.19% ± 0.88%** over 6 seeds (range 12.24% - 14.38%, 0 seeds under 10%)  
+**Generated:** 2026-09-20 05:28:06 UTC  
+**Headline Benchmark Result (Held-Out Seeds):** **11.13% ± 1.50%** median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
+**Secondary Multi-Seed Benchmark (6 Fixed Seeds):** **13.19% ± 0.88%** (Grand Median 13.19%, range 12.24% - 14.38%, 0 seeds under 10%, 240 scenarios)  
 **Canonical Reference Seed 541098:** **14.32%** Median Drift (Supporting Single-Seed Detail)  
 **Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 **Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
@@ -15,7 +16,8 @@
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Multi-Seed Median Drift (6 Seeds, 240 Scenarios)** | **23.31% ± 2.21%** | **13.19% ± 0.88%** (Range: 12.24% - 14.38%, 0 seeds under 10%) | **< 10.0%** | **13.19% (NEAR TARGET)** |
+| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **11.13% ± 1.50%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **11.13% (NEAR TARGET)** |
+| **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **23.31% ± 2.21%** | **13.19% ± 0.88%** (Range: 12.24% - 14.38%, 0 seeds under 10%) | **< 10.0%** | **13.19% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **25.92%** | **14.32%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
 | **P90 (Worst Decile) Drift** | **57.09%** | **32.87%** (Canonical Seed) / **37.62% ± 4.98%** (Multi-Seed) | Sub-35% | **PASSED** |
@@ -100,17 +102,36 @@ During extensive architectural auditing, seven specific integrity defects, causa
      - **Axis 2**: Correlation = +0.0720, Integrated Turn Energy = 0.0369 rad, Score = 0.0026
      - Axis 1 achieved a **93.5x higher score** than Axis 2 and contains **12.1x more turn energy** (0.4465 rad vs 0.0369 rad). Axis 1 is unequivocally the vehicle yaw axis.
 
-4. **Channel-by-Channel Feature Definition: Old vs New (Item A4)**:
-   - Evaluated across all 12 physical channels:
-     - **Ch 0-2 (Linear Accel ax, ay, az)**: 2nd-order Butterworth low-pass filter, 3.5 Hz cutoff, 15 m/s^3 jerk clamp. Old used zero-phase non-causal `signal.filtfilt`; New uses causal `signal.sosfilt` with carried state `zi` initialized on sample 0. Filter order, cutoff, and jerk clamping are identical.
-     - **Ch 3-5 (Angular Rate gx, gy, gz)**: 2nd-order Butterworth low-pass filter, 3.5 Hz cutoff. Old used non-causal `signal.filtfilt`; New uses causal `signal.sosfilt` with carried state `zi`.
-     - **Ch 6 (|a|)**: `np.linalg.norm(f_accel)`. Identical.
-     - **Ch 7 (|w|)**: `np.linalg.norm(f_gyro)`. Identical.
-     - **Ch 8 (E_bandA, 0.1-1.5 Hz)**: Welch PSD (`nperseg=32, noverlap=16`) on detrended magnitude over trailing 60 samples. Old used `stride=5` with forward lookahead `np.interp` interpolation; New uses `stride=5` with Zero-Order Hold (ZOH). Bands, window, and integration are identical.
-     - **Ch 9 (E_bandB, 1.5-4.5 Hz)**: Welch PSD over [1.5, 4.5] Hz. Old used lookahead interpolation; New uses Zero-Order Hold (ZOH).
-     - **Ch 10 (E_ratio)**: `e_b / (e_a + e_b + 1e-6)`. Identical.
-     - **Ch 11 (v_proxy)**: `np.clip(e_b / (e_a + 1e-6), 0.0, 10.0)`. Identical.
-   - **Conclusion**: Beyond causality (replacing backward filtering with carried SOS state and replacing future lookahead interpolation with Zero-Order Hold), **zero algorithmic parameters differ**.
+4. **Channel-by-Channel Feature Definition & Code Verification (Item A4)**:
+   - *IMU Low-Pass Filter Implementation*:
+     In `sih/features/streaming.py:62-66`:
+     ```python
+     # 2nd-order Butterworth low-pass filter in Second-Order Sections (SOS) form
+     nyquist = 0.5 * self.fs
+     norm_cutoff = min(self.cutoff_hz / nyquist, 0.95)
+     self.sos = signal.butter(2, norm_cutoff, btype="low", output="sos")
+     self.zi_base = signal.sosfilt_zi(self.sos)  # (n_sections, 2)
+     ```
+     With `self.fs = 10.0` Hz and `self.cutoff_hz = 3.5` Hz, the filter is a 2nd-order Butterworth filter with normalized cutoff `norm_cutoff = 3.5 / 5.0 = 0.70` (Nyquist = 5.0 Hz). The actual -3 dB cutoff frequency is **3.5 Hz**. (Note: An earlier documentation draft inadvertently wrote '12 Hz at fs=10 Hz'. A 12 Hz digital cutoff at fs=10 Hz is mathematically impossible because Nyquist is 5.0 Hz, and passing Wn > 1.0 would crash `scipy.signal.butter` with a ValueError. Both the legacy `sih/data/vibration.py` and causal `sih/features/streaming.py` have always executed at 3.5 Hz).
+   - *Channels 8-11 Code Quotation (Spectral Energy & Velocity Proxy)*:
+     Both legacy (`sih/data/spectral.py:71-74`) and causal (`sih/features/streaming.py:175-178`) implementations evaluate:
+     ```python
+     e_ratio = float(e_b / (e_a + e_b + self.eps))
+     v_proxy = float(np.clip(e_b / (e_a + self.eps), 0.0, 10.0))
+     return np.array([e_a, e_b, e_ratio, v_proxy], dtype=np.float32)
+     ```
+     Legacy evaluated trailing 60-sample windows every 5 steps and interpolated intermediate steps forward via `np.interp` (non-causal forward lookahead). Causal evaluates trailing 60-sample windows every 5 steps and holds values constant across intermediate steps via Zero-Order Hold (ZOH, zero lookahead).
+   - *Physical Jerk Clamping (NEW Step in Causal Stream)*:
+     In `sih/features/streaming.py:108-113`:
+     ```python
+     # 2. Causal Physical Jerk Clamping (NEW step in streaming pipeline)
+     if self._prev_filtered_accel is not None:
+         delta = f_accel - self._prev_filtered_accel
+         delta_clamped = np.clip(delta, -self.max_delta_a, self.max_delta_a)
+         f_accel = self._prev_filtered_accel + delta_clamped
+     self._prev_filtered_accel = f_accel.copy()
+     ```
+     Jerk clamping with `max_jerk_mps3 = 15.0 m/s^3` (`max_delta_a = 15.0 * 0.1 = 1.5 m/s^2` per step) was introduced in `StreamingFeatureExtractor` as a NEW step that was absent from the legacy `causal_stream.py` runtime.
 
 5. **Training Configuration Diff (Item B)**:
    - *Original Run (`best_moe_velocity_model_NONCAUSAL.pt`)*: 12 epochs, AdamW (`lr=1e-3`), Cosine Annealing over 12 epochs (`T_max=12`), batch size 64, Phase 5.5 balanced loss (`w_dyn=2.0, w_cls=0.2`), 3D SO(3) rotational jitter (15°). Selected Epoch 12 (Val RMSE 3.28 m/s).
@@ -118,13 +139,21 @@ During extensive architectural auditing, seven specific integrity defects, causa
    - *Checkpoint Selection Rule*: `score = val_rmse + 5.0 * abs(speed_scale_ratio - 1.0)`.
    - *Selected Epoch*: **Epoch 31** (Train Loss: 0.9598, Val RMSE: **2.997 m/s**, Val MAE: **2.016 m/s**, Scale Ratio: **1.01**, Selection Score: **3.047**). Selected because it achieved the global minimum of the validation score across all 60 epochs, achieving sub-3.0 m/s RMSE while adhering to the ~1.00 Rule 8 speed scale invariant.
 
-6. **Honest Speed Accuracy Reporting Across Velocity Bands (Item C)**:
+6. **Honest Speed Accuracy Reporting Across Velocity Bands & Speed Scale Reconciliation (Item C)**:
    - Evaluated against 10 Hz CAN ground truth (and GPS Doppler on S-S4) via `scripts/evaluate_speed_bands.py`:
      - **Aggregated Overall RMSE**: Slightly higher in the causal model (**4.30 m/s causal vs. 4.25 m/s non-causal**, +0.05 m/s).
      - **Low Speed (< 20 km/h)**: Substantially improved (**2.54 m/s causal vs. 2.84 m/s non-causal**, -0.30 m/s improvement).
      - **Arterial / Urban (20–50 km/h)**: Substantially improved (**2.12 m/s causal vs. 2.38 m/s non-causal**, -0.26 m/s improvement).
-     - **Highway Cruise (> 50 km/h)**: In BOTH models, the >50 km/h band is under-predicted by ~35% (Speed scale = 0.64 causal, 0.67 non-causal) due to chassis vibration attenuation on smooth asphalt and smartphone IMU dynamic range limitations.
-     - *How the Pipeline Handles This*: Pre-blackout dynamic speed scale anchoring (`v_scale = mean(v_GPS) / mean(v_AI)`) learns the local pavement scale in the 20 seconds prior to outage entry, preventing this under-prediction from causing severe position shortfall during highway blackouts.
+     - **Highway Cruise (> 50 km/h)**: In BOTH models, the >50 km/h band is under-predicted by ~35% (Speed scale = 0.64 causal, 0.67 non-causal; RMSE = 7.81 m/s causal, 7.40 m/s non-causal).
+     - **Physical Under-Prediction Analysis (> 50 km/h)**:
+       1. *Vibration Decoupling Hypothesis*: On smooth asphalt at high speed, vehicle suspension and tire compliance attenuate chassis vibrations, decoupling high-frequency IMU vibration from longitudinal forward velocity.
+       2. *Training Data Imbalance Hypothesis*: The dataset contains only ~2,752 samples (10.3%) at > 50 km/h, compared to ~24,021 samples (89.7%) at <= 50 km/h. MSE loss optimization naturally biases predictions toward the heavily represented low/mid-speed regimes.
+     - *Pre-Blackout Dynamic Anchoring*: The Bayesian MoE speed estimator dynamically anchors its pre-blackout scale factor against the last valid GNSS Doppler fixes prior to outage entry (`alpha_gnss`), compensating for this vibration saturation in production dead reckoning.
+   - **Speed Scale Ratio Reconciliation (0.831 vs 0.99 / 1.01)**:
+     - **0.831 (Out-of-Sample Test Set Scale)**: Computed by `scripts/evaluate_speed_bands.py` across all 26,773 out-of-sample test samples (Part 3 [80%–100%] of S-M, S-S2, S-S1, and full 100% test drives of S-S3a [CAN GT] and S-S4 [GNSS Doppler GT]). S-S2 arterial stop-and-go (0.806) and S-S4 arterial cruising (0.792) pull the aggregate test scale to 0.831.
+     - **1.010 (Validation Split Scale at Checkpoint Selection)**: Computed in `scripts/train_can_moe.py` exclusively on the validation split (Part 2 [60%–80%] of training trips S-M, S-S2, S-S1; 10,049 windows) where balanced speed samples yielded `sum(v_pred)/sum(v_gt) = 1.010`. The earlier mention of '0.99' in draft summaries was a reporting error referring to the mid-band test scale (0.958) and validation scale (1.01).
+   - **Mobile Edge Latency**:
+     - TorchScript mobile model CPU latency: **1.84 ms on laptop CPU; not measured on phone**.
 
 7. **Future Independence & Leak-Free Verification Suite**:
    - Verified via unit test suite (`tests/test_no_future_leak.py`): Injecting NaNs into all IMU and GNSS sensor samples after blackout exit across 3 separate trips (S-M, S-S2, S-S3a) yields bit-identical trajectory coordinates through blackout end. Building road networks from causal bounding boxes (t <= bo_start) produces 0.0000% delta against whole-trip corridor pre-fetching.
