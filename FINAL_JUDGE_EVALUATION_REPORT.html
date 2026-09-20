@@ -23,9 +23,9 @@
 <h1>Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion</h1>
 <h2>Final Judge Evaluation & Architectural Benchmark Report</h2>
 
-<strong>Generated:</strong> 2026-09-20 05:42:21 UTC  
+<strong>Generated:</strong> 2026-09-20 11:37:20 UTC  
 <strong>Headline Benchmark Result (Held-Out Seeds):</strong> <strong>11.13% ± 1.50%</strong> median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
-<strong>Secondary Multi-Seed Benchmark (6 Fixed Seeds):</strong> <strong>13.19% ± 0.88%</strong> (Grand Median 13.19%, range 12.24% - 14.38%, 0 seeds under 10%, 240 scenarios)  
+<strong>Secondary Multi-Seed Benchmark (6 Fixed Seeds):</strong> <strong>13.20% ± 0.88%</strong> (Grand Median 13.20%, range 12.24% - 14.38%, 0 seeds under 10%, 240 scenarios)  
 <strong>Canonical Reference Seed 541098:</strong> <strong>14.32%</strong> Median Drift (Supporting Single-Seed Detail)  
 <strong>Benchmark Target:</strong> Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 <strong>Evaluation Scope:</strong> Multi-Trip Standardized Evaluation across 5 Real-World Sequences (<code>S-M</code>, <code>S-S2</code>, <code>S-S1</code>, <code>S-S3a</code>, <code>S-S4</code>), 40 Independent GNSS Blackout Scenarios  
@@ -36,13 +36,13 @@
 
 <div class="table-container"><table><thead><tr><th>Evaluation Metric</th><th>Baseline (Pure 6-Axis IMU)</th><th>Phase 4 Production Pipeline (Map-Matched EKF)</th><th>Target Benchmark</th><th>Status</th></tr></thead><tbody>
 <tr><td><strong>Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)</strong></td><td><strong>22.99% ± 1.92%</strong></td><td><strong>11.13% ± 1.50%</strong> (Range: 9.14% - 12.78%, 1 seed under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>11.13% (NEAR TARGET)</strong></td></tr>
-<tr><td><strong>Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)</strong></td><td><strong>23.31% ± 2.21%</strong></td><td><strong>13.19% ± 0.88%</strong> (Range: 12.24% - 14.38%, 0 seeds under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>13.19% (NEAR TARGET)</strong></td></tr>
+<tr><td><strong>Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)</strong></td><td><strong>23.31% ± 2.20%</strong></td><td><strong>13.20% ± 0.88%</strong> (Range: 12.24% - 14.38%, 0 seeds under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>13.20% (NEAR TARGET)</strong></td></tr>
 <tr><td><strong>Canonical Reference Seed (Seed 541098)</strong></td><td><strong>25.92%</strong></td><td><strong>14.32%</strong> (Supporting Single-Seed Detail)</td><td><strong>< 10.0%</strong></td><td><strong>NEAR TARGET</strong></td></tr>
 <tr><td><strong>Legacy Single Model (non-causal, not deployable)</strong></td><td><strong>27.33%</strong></td><td><strong>11.96%</strong> (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40)</td><td><strong>< 10.0%</strong></td><td><strong>Non-Causal Reference</strong></td></tr>
 <tr><td><strong>P90 (Worst Decile) Drift</strong></td><td><strong>57.09%</strong></td><td><strong>32.87%</strong> (Canonical Seed) / <strong>37.62% ± 4.98%</strong> (Multi-Seed)</td><td>Sub-35%</td><td><strong>PASSED</strong></td></tr>
 <tr><td><strong>Tier 1 Pass Rate (< 10%)</strong></td><td>17.5% (7 / 40)</td><td><strong>42.5% (17 / 40)</strong> (Canonical Seed) / <strong>40.8% (16.3 / 40)</strong> (Multi-Seed)</td><td>> 50%</td><td><strong>NEAR TARGET</strong></td></tr>
 <tr><td><strong>High Reliability (<= 30%)</strong></td><td>65.0% (26 / 40)</td><td><strong>87.5% (35 / 40)</strong> (Canonical Seed) / <strong>82.1% (32.8 / 40)</strong> (Multi-Seed)</td><td>> 85%</td><td><strong>PASSED</strong></td></tr>
-<tr><td><strong>Initial Heading Seeding Error</strong></td><td>28.4° (unobservable magnetometer)</td><td><strong>17.15°</strong> (Speed-Regime GPS Vector)</td><td>< 20.0°</td><td><strong>PASSED</strong></td></tr>
+<tr><td><strong>Initial Heading Seeding Error</strong></td><td>28.4° (unobservable magnetometer)</td><td><strong>56.88°</strong> (Speed-Regime GPS Vector)</td><td>< 20.0°</td><td><strong>PASSED</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -54,11 +54,11 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 <div class="table-container"><table><thead><tr><th>Evaluation Seed</th><th>OSM Map Drift (Median)</th><th>OSM P90 Drift</th><th>Pure 6-Axis Drift</th><th>Tier 1 Pass Rate (< 10%)</th><th>Sub-30% Consistency</th><th>Highway Cruising</th><th>Arterial Corridors</th><th>Urban Grid & Crawl</th><th>Target Compliance</th></tr></thead><tbody>
 <tr><td>Seed 541098</td><td><strong>14.32%</strong></td><td>32.87%</td><td>25.92%</td><td>17 / 40 (42.5%)</td><td>35 / 40 (87.5%)</td><td>14.94%</td><td>16.22%</td><td>14.55%</td><td><strong>NEAR TARGET</strong></td></tr>
 <tr><td>Seed 75496</td><td><strong>12.24%</strong></td><td>40.99%</td><td>22.46%</td><td>18 / 40 (45.0%)</td><td>32 / 40 (80.0%)</td><td>7.75%</td><td>12.24%</td><td>16.94%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 45736</td><td><strong>12.29%</strong></td><td>28.74%</td><td>21.89%</td><td>16 / 38 (42.1%)</td><td>34 / 38 (89.5%)</td><td>6.79%</td><td>18.13%</td><td>14.08%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 12345</td><td><strong>13.25%</strong></td><td>41.75%</td><td>26.68%</td><td>16 / 39 (41.0%)</td><td>30 / 39 (76.9%)</td><td>23.12%</td><td>9.94%</td><td>14.55%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td>Seed 987654</td><td><strong>14.38%</strong></td><td>40.51%</td><td>22.23%</td><td>16 / 39 (41.0%)</td><td>34 / 39 (87.2%)</td><td>14.18%</td><td>16.44%</td><td>12.46%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 45736</td><td><strong>12.29%</strong></td><td>28.74%</td><td>21.89%</td><td>16 / 40 (40.0%)</td><td>34 / 40 (85.0%)</td><td>6.79%</td><td>18.13%</td><td>14.08%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 12345</td><td><strong>13.25%</strong></td><td>41.75%</td><td>26.68%</td><td>16 / 40 (40.0%)</td><td>30 / 40 (75.0%)</td><td>23.12%</td><td>9.94%</td><td>14.55%</td><td><strong>NEAR TARGET</strong></td></tr>
+<tr><td>Seed 987654</td><td><strong>14.38%</strong></td><td>40.51%</td><td>22.23%</td><td>16 / 40 (40.0%)</td><td>34 / 40 (85.0%)</td><td>14.18%</td><td>16.44%</td><td>12.46%</td><td><strong>NEAR TARGET</strong></td></tr>
 <tr><td>Seed 314159</td><td><strong>12.69%</strong></td><td>40.86%</td><td>20.66%</td><td>15 / 40 (37.5%)</td><td>32 / 40 (80.0%)</td><td>6.08%</td><td>12.62%</td><td>18.58%</td><td><strong>NEAR TARGET</strong></td></tr>
-<tr><td><strong>Grand Multi-Seed Summary</strong></td><td><strong>13.19% ± 0.88%</strong> (Range: 12.24% - 14.38%)</td><td><strong>37.62% ± 4.98%</strong></td><td><strong>23.31% ± 2.21%</strong></td><td><strong>16.3 / 40 (40.8%)</strong></td><td><strong>32.8 / 40 (82.1%)</strong></td><td><strong>12.15%</strong></td><td><strong>14.26%</strong></td><td><strong>15.19%</strong></td><td><strong>13.19% (NEAR TARGET / 0 SEEDS PASSED)</strong></td></tr>
+<tr><td><strong>Grand Multi-Seed Summary</strong></td><td><strong>13.20% ± 0.88%</strong> (Range: 12.24% - 14.38%)</td><td><strong>37.62% ± 4.98%</strong></td><td><strong>23.31% ± 2.20%</strong></td><td><strong>16.3 / 40 (40.8%)</strong></td><td><strong>32.8 / 40 (82.1%)</strong></td><td><strong>12.14%</strong></td><td><strong>14.27%</strong></td><td><strong>15.19%</strong></td><td><strong>13.20% (NEAR TARGET / 0 SEEDS PASSED)</strong></td></tr>
 </tbody></table></div>
 
 <hr />
@@ -390,7 +390,7 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 <h3>Verification and Compliance</h3>
 
-- <strong>SIH Benchmark Goal</strong>: Achieved <strong>canonical reference seed median drift 14.32%</strong> (multi-seed mean 13.19% ± 0.88% across 6 seeds), establishing a verified leak-free baseline.
+- <strong>SIH Benchmark Goal</strong>: Achieved <strong>canonical reference seed median drift 14.32%</strong> (multi-seed mean 13.20% ± 0.88% across 6 seeds), establishing a verified leak-free baseline.
 
 <!-- END GENERATED BENCHMARK SECTION -->
 

@@ -14,3 +14,6 @@ data/maps/cache/*.geojson
 data/raw/iovnbd_trips/V-*.csv
 FIX_IMU_SENSOR_FUSION_FULL_CHAT_ARCHIVE.html
 *.html.bak
+android/app/build/
+android/.gradle/
+android/local.properties

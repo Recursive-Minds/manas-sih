@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SIH IDR</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connected">Connected</string>
+    <string name="mount_reused">Mount: reused</string>
+    <string name="mount_calibrating">Mount: calibrating</string>
+    <string name="mount_locked">Mount: locked</string>
+    <string name="mount_changed">mount changed - drive turns</string>
+</resources>

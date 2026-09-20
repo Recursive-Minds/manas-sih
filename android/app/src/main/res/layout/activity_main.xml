@@ -1,0 +1,475 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <!-- Top App Header -->
+    <LinearLayout
+        android:id="@+id/headerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@color/panel_bg"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SIH 26168"
+            android:background="@color/accent_cyan"
+            android:textColor="@color/bg_dark"
+            android:textStyle="bold"
+            android:textSize="11sp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="3dp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="Intelligent Dead Reckoning"
+            android:textColor="@color/text_main"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/btnShareCsv"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="Share CSV"
+            android:textSize="10sp"
+            android:backgroundTint="@color/card_bg"
+            android:textColor="@color/accent_cyan"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/tvConnStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Disconnected"
+            android:textColor="@color/accent_amber"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Server Connection Card -->
+    <LinearLayout
+        android:id="@+id/cardConnection"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_bg"
+        android:orientation="horizontal"
+        android:padding="6dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout">
+
+        <EditText
+            android:id="@+id/etServerIp"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="3"
+            android:background="@drawable/edittext_bg"
+            android:hint="Server IP (192.168.1.5)"
+            android:textColor="@color/text_main"
+            android:textColorHint="@color/text_muted"
+            android:textSize="12sp"
+            android:paddingHorizontal="8dp"
+            android:inputType="text"
+            android:text="10.0.2.2" />
+
+        <EditText
+            android:id="@+id/etServerPort"
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/edittext_bg"
+            android:hint="Port"
+            android:textColor="@color/text_main"
+            android:textColorHint="@color/text_muted"
+            android:textSize="12sp"
+            android:paddingHorizontal="8dp"
+            android:inputType="number"
+            android:text="8765" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="6dp"
+            android:text="Connect"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:backgroundTint="@color/accent_blue"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+    <!-- Warm-Up Readiness Panel -->
+    <LinearLayout
+        android:id="@+id/panelWarmup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/panel_bg"
+        android:orientation="vertical"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/cardConnection">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvReadyHeadline"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="WARM-UP STATUS: WAITING FOR READY"
+                android:textColor="@color/accent_amber"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvStateBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WARMING UP"
+                android:textColor="@color/accent_emerald"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:background="@color/card_bg" />
+        </LinearLayout>
+
+        <!-- 4 Ready Condition Items -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp"
+            android:weightSum="4">
+
+            <TextView
+                android:id="@+id/tvCondGravity"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✗ Gravity"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvCondMount"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✗ turns: 0/8"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvCondBuffer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✗ Buffer 6s"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvCondAlpha"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="✗ Alpha"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvMountStatusDetail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mount: Initializing"
+            android:textColor="@color/accent_cyan"
+            android:textSize="11sp"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+
+    <!-- Control Buttons: START (disabled until ready), STOP, RESET -->
+    <LinearLayout
+        android:id="@+id/cardControlButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/card_bg"
+        android:orientation="horizontal"
+        android:padding="6dp"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/panelWarmup">
+
+        <Button
+            android:id="@+id/btnStart"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="START"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:enabled="false"
+            android:backgroundTint="#475569"
+            android:textColor="@color/white"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnStop"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="STOP"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:enabled="false"
+            android:backgroundTint="#475569"
+            android:textColor="@color/white"
+            android:layout_marginHorizontal="4dp" />
+
+        <Button
+            android:id="@+id/btnReset"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="RESET"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:backgroundTint="#334155"
+            android:textColor="@color/white"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- Real-time HUD Metrics Banner -->
+    <LinearLayout
+        android:id="@+id/cardMetrics"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/panel_bg"
+        android:orientation="vertical"
+        android:padding="8dp"
+        app:layout_constraintTop_toBottomOf="@id/cardControlButtons">
+
+        <!-- Row 1: Drift, Error, Max Error, Accuracy -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="4">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DRIFT %" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvDriftPct" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.00%" android:textColor="@color/accent_emerald" android:textStyle="bold" android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ERROR" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvHorizError" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0 m" android:textColor="@color/white" android:textStyle="bold" android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MAX ERROR" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvMaxError" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0 m" android:textColor="@color/white" android:textStyle="bold" android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GPS ACCURACY" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvGpsAccuracy" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="±5.0 m" android:textColor="@color/accent_cyan" android:textStyle="bold" android:textSize="14sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Row 2: Distance, Along/Cross Track, Speeds, Headings -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:weightSum="4">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="DIST DR/GNSS" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvDistances" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 / 0 m" android:textColor="@color/white" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="ALONG / CROSS" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvAlongCross" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0 / 0.0 m" android:textColor="@color/white" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SPEED DR/GPS" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvSpeeds" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.0 / 0.0" android:textColor="@color/white" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="HDG DR/GPS" android:textColor="@color/text_muted" android:textSize="9sp" />
+                <TextView android:id="@+id/tvHeadings" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0° / 0°" android:textColor="@color/white" android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Map View (osmdroid) -->
+    <org.osmdroid.views.MapView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toBottomOf="@id/cardMetrics"
+        app:layout_constraintBottom_toTopOf="@id/cardBottom" />
+
+    <!-- STOP Session Summary Card (Floating Overlay) -->
+    <LinearLayout
+        android:id="@+id/cardSummaryModal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:background="@color/card_bg"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cardMetrics"
+        app:layout_constraintBottom_toTopOf="@id/cardBottom">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SESSION EVALUATION SUMMARY"
+            android:textColor="@color/accent_cyan"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvSummaryDrift"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Drift: 0.00% (target &lt;10%)"
+                android:textColor="@color/accent_emerald"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvSummaryTier"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="City (20-50 km/h)"
+                android:textColor="@color/accent_cyan"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:background="@color/panel_bg" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvSummaryDetails"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Final Error: 0.0 m | Max Error: 0.0 m\nDuration: 0.0 s | Distance: 0.0 m\nAlong: 0.0 m | Cross: 0.0 m"
+            android:textColor="@color/text_main"
+            android:textSize="12sp"
+            android:lineSpacingExtra="4dp" />
+
+        <Button
+            android:id="@+id/btnDismissSummary"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="14dp"
+            android:text="DISMISS"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:backgroundTint="@color/accent_blue"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+    <!-- Bottom Bar -->
+    <LinearLayout
+        android:id="@+id/cardBottom"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:background="@color/panel_bg"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="CSV: ACTIVE"
+            android:textColor="@color/accent_emerald"
+            android:textStyle="bold"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tvSampleRate"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:text="IMU: 0 Hz | GPS: 0 Hz"
+            android:textColor="@color/text_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

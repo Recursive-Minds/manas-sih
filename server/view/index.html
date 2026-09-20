@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIH 26168 IDR Live Navigation Dashboard</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --panel-bg: rgba(16, 24, 40, 0.82);
+      --card-bg: rgba(23, 33, 56, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --tier-1: #10b981;
+      --tier-2: #f59e0b;
+      --tier-3: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      height: 64px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 1000;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+      color: #050b14;
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.2px;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-amber);
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.active {
+      background-color: var(--accent-emerald);
+    }
+
+    .status-dot.blackout {
+      background-color: var(--accent-rose);
+      box-shadow: 0 0 12px var(--accent-rose);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.2); }
+    }
+
+    .btn-action {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .btn-action:hover {
+      background: linear-gradient(135deg, #334155, #1e293b);
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
+    }
+
+    .btn-blackout {
+      background: linear-gradient(135deg, #dc2626, #991b1b);
+      border-color: #ef4444;
+    }
+
+    .btn-blackout:hover {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Main Container */
+    .dashboard-body {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #map {
+      flex: 1;
+      height: 100%;
+      width: 100%;
+      background: #060911;
+    }
+
+    /* HUD Floating Cards Overlay */
+    .hud-overlay {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      z-index: 900;
+    }
+
+    .hud-metrics-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      max-width: 1100px;
+    }
+
+    .metric-card {
+      pointer-events: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .metric-unit {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .tier-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .tier-1 { background: rgba(16, 185, 129, 0.15); color: var(--tier-1); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tier-2 { background: rgba(245, 158, 11, 0.15); color: var(--tier-2); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .tier-3 { background: rgba(244, 63, 94, 0.15); color: var(--tier-3); border: 1px solid rgba(244, 63, 94, 0.3); }
+
+    /* Map Legend */
+    .map-legend {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+      z-index: 900;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .legend-line {
+      width: 24px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    .legend-gnss { background: var(--accent-emerald); }
+    .legend-dr { background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="logo-badge">SIH 26168</div>
+      <div>
+        <div class="brand-title">Smartphone Intelligent Dead Reckoning</div>
+        <div class="brand-subtitle">High-Fidelity Sensor Fusion & Benchmark Evaluator</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <div class="status-badge" id="mountBadge">
+        <span class="status-dot"></span>
+        <span id="mountStatusText">Mount: Initializing</span>
+      </div>
+
+      <div class="status-badge" id="stateBadge">
+        <span class="status-dot active" id="stateDot"></span>
+        <span id="stateText">WARMING UP</span>
+      </div>
+
+      <button class="btn-action btn-blackout" id="btnToggleBlackout" onclick="toggleBlackout()">Trigger Blackout</button>
+      <button class="btn-action" onclick="resetNavigation()">Reset</button>
+    </div>
+  </header>
+
+  <div class="dashboard-body">
+    <div id="map"></div>
+
+    <div class="hud-overlay">
+      <div class="hud-metrics-row">
+        <div class="metric-card">
+          <div class="metric-label">Drift % (Benchmark Target &lt;10%)</div>
+          <div class="metric-value">
+            <span id="metricDrift">0.00</span><span class="metric-unit">%</span>
+            <span class="tier-badge tier-1" id="badgeTier" style="margin-left: 8px;">Tier-1</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Horizontal Error</div>
+          <div class="metric-value">
+            <span id="metricError">0.00</span><span class="metric-unit">m</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Along-Track / Cross-Track</div>
+          <div class="metric-value" style="font-size: 17px;">
+            <span id="metricAlong">0.0</span> / <span id="metricCross">0.0</span><span class="metric-unit">m</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Blackout Duration / Dist</div>
+          <div class="metric-value" style="font-size: 17px;">
+            <span id="metricElapsed">0.0</span><span class="metric-unit">s</span> | <span id="metricDrDist">0.0</span><span class="metric-unit">m</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">DR Speed / GNSS Speed</div>
+          <div class="metric-value" style="font-size: 17px;">
+            <span id="metricDrSpeed">0.0</span> / <span id="metricGnssSpeed">0.0</span><span class="metric-unit">m/s</span>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">DR Heading / GNSS Bearing</div>
+          <div class="metric-value" style="font-size: 17px;">
+            <span id="metricDrHdg">0.0</span>&deg; / <span id="metricGnssBrg">0.0</span>&deg;
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="map-legend">
+      <div class="legend-item">
+        <div class="legend-line legend-gnss"></div>
+        <span>Ground Truth GNSS</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line legend-dr"></div>
+        <span>Dead Reckoning (DR)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    // Initialize Map with dark tiles
+    const map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 16);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(map);
+
+    // Polylines
+    const gnssPolyline = L.polyline([], { color: '#10b981', weight: 4, opacity: 0.85 }).addTo(map);
+    const drPolyline = L.polyline([], { color: '#00f2fe', weight: 4, opacity: 0.95 }).addTo(map);
+
+    // Markers
+    const gnssMarker = L.circleMarker([0, 0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).addTo(map);
+    const drMarker = L.circleMarker([0, 0], { radius: 8, color: '#00f2fe', fillColor: '#ffffff', fillOpacity: 1, weight: 3 }).addTo(map);
+    let blackoutMarker = null;
+
+    let hasCentered = false;
+    let isBlackoutActive = false;
+
+    // WebSocket Client
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/client`;
+    let ws = null;
+
+    function connectWs() {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => console.log('Connected to server WebSocket');
+      ws.onclose = () => setTimeout(connectWs, 1500);
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'hud_update') {
+          handleHudUpdate(msg);
+        }
+      };
+    }
+    connectWs();
+
+    function handleHudUpdate(data) {
+      // 1. Update State & Mount status
+      document.getElementById('mountStatusText').innerText = data.mount_status || 'Mount: Active';
+      const stateText = document.getElementById('stateText');
+      const stateDot = document.getElementById('stateDot');
+      const btnBlackout = document.getElementById('btnToggleBlackout');
+
+      isBlackoutActive = (data.state === 'BLACKOUT');
+      stateText.innerText = data.state;
+      if (isBlackoutActive) {
+        stateDot.className = 'status-dot blackout';
+        btnBlackout.innerText = 'Stop Blackout';
+        btnBlackout.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+      } else {
+        stateDot.className = 'status-dot active';
+        btnBlackout.innerText = 'Trigger Blackout';
+        btnBlackout.style.background = 'linear-gradient(135deg, #dc2626, #991b1b)';
+      }
+
+      // 2. Update Metrics HUD
+      const m = data.metrics || {};
+      document.getElementById('metricDrift').innerText = (m.drift_pct !== undefined) ? m.drift_pct.toFixed(2) : '0.00';
+      document.getElementById('metricError').innerText = (m.horizontal_error_m !== undefined) ? m.horizontal_error_m.toFixed(2) : '0.00';
+      document.getElementById('metricAlong').innerText = (m.along_track_m !== undefined) ? m.along_track_m.toFixed(1) : '0.0';
+      document.getElementById('metricCross').innerText = (m.cross_track_m !== undefined) ? m.cross_track_m.toFixed(1) : '0.0';
+      document.getElementById('metricElapsed').innerText = (m.elapsed_s !== undefined) ? m.elapsed_s.toFixed(1) : '0.0';
+      document.getElementById('metricDrDist').innerText = (m.dr_dist_m !== undefined) ? m.dr_dist_m.toFixed(1) : '0.0';
+      document.getElementById('metricDrSpeed').innerText = (m.dr_speed_mps !== undefined) ? m.dr_speed_mps.toFixed(1) : '0.0';
+      document.getElementById('metricGnssSpeed').innerText = (m.gnss_speed_mps !== undefined) ? m.gnss_speed_mps.toFixed(1) : '0.0';
+      document.getElementById('metricDrHdg').innerText = (m.dr_heading_deg !== undefined) ? m.dr_heading_deg.toFixed(0) : '0';
+      document.getElementById('metricGnssBrg').innerText = (m.gnss_bearing_deg !== undefined) ? m.gnss_bearing_deg.toFixed(0) : '0';
+
+      const tierBadge = document.getElementById('badgeTier');
+      const tierStr = m.tier || 'Tier-1 (<10%)';
+      tierBadge.innerText = tierStr.split(' ')[0];
+      tierBadge.className = 'tier-badge ' + (tierStr.includes('Tier-1') ? 'tier-1' : tierStr.includes('Tier-2') ? 'tier-2' : 'tier-3');
+
+      // 3. Update Map Tracks
+      if (data.gnss_pos && data.gnss_pos.lat && data.gnss_pos.lon) {
+        const gLatLon = [data.gnss_pos.lat, data.gnss_pos.lon];
+        gnssPolyline.addLatLng(gLatLon);
+        gnssMarker.setLatLng(gLatLon);
+        if (!hasCentered) {
+          map.setView(gLatLon, 17);
+          hasCentered = true;
+        }
+      }
+
+      if (data.dr_pos && data.dr_pos.lat && data.dr_pos.lon) {
+        const drLatLon = [data.dr_pos.lat, data.dr_pos.lon];
+        drPolyline.addLatLng(drLatLon);
+        drMarker.setLatLng(drLatLon);
+      }
+    }
+
+    function toggleBlackout() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const nextCmd = isBlackoutActive ? 'stop_blackout' : 'start_blackout';
+      ws.send(JSON.stringify({ type: 'control', command: nextCmd }));
+    }
+
+    function resetNavigation() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: 'control', command: 'reset' }));
+      gnssPolyline.setLatLngs([]);
+      drPolyline.setLatLngs([]);
+      if (blackoutMarker) {
+        map.removeLayer(blackoutMarker);
+        blackoutMarker = null;
+      }
+    }
+  </script>
+</body>
+</html>

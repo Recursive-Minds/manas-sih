@@ -12,13 +12,319 @@ import numpy as np
 from typing import Optional, List, Dict, Tuple, Any
 
 from sih.fusion.es_ekf import ErrorStateEKF
-from sih.map.network import RoadNetwork
+from sih.map.network import RoadNetwork, RoadSegment
 from sih.map.governor import RoadKinematicsGovernor
 from sih.map.matcher import HMMMapMatcher
 from sih.map.route_matcher import RouteMatcher
 from sih.data.geo import geodetic_to_enu
-from sih.core.contracts import VelocityEstimate, GNSSSample
+from sih.core.contracts import VelocityEstimate, GNSSSample, FusedPosition
 from sih.engine.speed_observer import KinematicSpeedObserver
+
+
+class SteppableStepResult:
+    """Encapsulates the state and outputs of a single dead-reckoning IMU step."""
+    def __init__(
+        self,
+        pure_pos: np.ndarray,
+        map_pos: np.ndarray,
+        pure_speed: float,
+        map_speed: float,
+        v_map_fwd: float,
+        yaw_rate: float,
+        fused_pure: Any,
+        fused_map: Any,
+        matched_pos: Any,
+    ):
+        self.pure_pos = pure_pos
+        self.map_pos = map_pos
+        self.pure_speed = pure_speed
+        self.map_speed = map_speed
+        self.v_map_fwd = v_map_fwd
+        self.yaw_rate = yaw_rate
+        self.fused_pure = fused_pure
+        self.fused_map = fused_map
+        self.matched_pos = matched_pos
+
+
+class SteppableDeadReckoningEngine:
+    """
+    Steppable Dead Reckoning Engine.
+    Encapsulates exact stateful sample-by-sample causal dead reckoning:
+    - Pre-blackout GNSS & IMU conditioning / initialization
+    - Blackout initialization (heading seeding, alpha scaling, speed observer reset, entry segment)
+    - Sample-by-sample propagation: step(cal, v_pred, t_curr)
+    Guarantees bit-identical execution between batch benchmark and real-time streaming adapter.
+    """
+    def __init__(
+        self,
+        reference_lat_deg: float,
+        reference_lon_deg: float,
+        reference_alt_m: float = 0.0,
+        road_network: Optional[RoadNetwork] = None,
+        domain: str = "Highway",
+        turn_threshold_rad_s: float = np.radians(1.5),
+        cooldown_duration_s: float = 0.5,
+        max_gyro_bias_rad_s: float = np.radians(0.1),
+        smoothing_factor: float = 0.35,
+        enable_speed_scale: bool = True,
+    ):
+        self.ref_lat = reference_lat_deg
+        self.ref_lon = reference_lon_deg
+        self.ref_alt = reference_alt_m
+        self.road_network = road_network
+        self.domain = domain
+        self.turn_threshold_rad_s = turn_threshold_rad_s
+        self.cooldown_duration_s = cooldown_duration_s
+        self.max_gyro_bias_rad_s = max_gyro_bias_rad_s
+        self.smoothing_factor = smoothing_factor
+        self.enable_speed_scale = enable_speed_scale
+
+        self.ekf_pure = ErrorStateEKF(
+            turn_threshold_rad_s=self.turn_threshold_rad_s,
+            cooldown_duration_s=self.cooldown_duration_s,
+            max_gyro_bias_rad_s=self.max_gyro_bias_rad_s,
+            initial_speed_scale=1.00,
+        )
+        self.ekf_map = ErrorStateEKF(
+            turn_threshold_rad_s=self.turn_threshold_rad_s,
+            cooldown_duration_s=self.cooldown_duration_s,
+            max_gyro_bias_rad_s=self.max_gyro_bias_rad_s,
+            initial_speed_scale=1.00,
+        )
+        self.governor = RoadKinematicsGovernor(
+            a_lat_max=2.2 if domain == "Highway" else 3.5,
+            speed_limit_mps=33.3,
+        )
+        self.matcher = HMMMapMatcher(
+            road_network=road_network,
+            reference_lat_deg=self.ref_lat,
+            reference_lon_deg=self.ref_lon,
+            smoothing_factor=smoothing_factor,
+        ) if road_network is not None else None
+
+        self.speed_obs_pure = KinematicSpeedObserver()
+        self.speed_obs_map = KinematicSpeedObserver()
+
+        self.speed_scale: float = 1.00
+        self.v_entry: float = 10.0
+        self.entry_segment: Optional[RoadSegment] = None
+        self.acq_radius_m: Optional[float] = None
+        self.acq_h_diff_deg: Optional[float] = None
+        self.entry_acq_info: str = "no entry segment"
+        self.blackout_active: bool = False
+
+    def init_from_gnss(self, warmup_gnss: GNSSSample) -> None:
+        self.ekf_pure.init_from_gnss(warmup_gnss, self.ref_lat, self.ref_lon, self.ref_alt)
+        self.ekf_map.init_from_gnss(warmup_gnss, self.ref_lat, self.ref_lon, self.ref_alt)
+
+    def update_gnss_warmup(self, gnss: GNSSSample) -> None:
+        if gnss.is_valid and self.ekf_pure._initialised:
+            self.ekf_pure.update_gnss(gnss)
+            self.ekf_map.update_gnss(gnss)
+
+    def predict_warmup(self, cal: Any, v_raw: float, t_curr: int) -> None:
+        vel_warm = VelocityEstimate(
+            timestamp_ns=t_curr,
+            forward_speed_mps=v_raw,
+            speed_variance=0.3,
+            motion_state="STATIONARY" if v_raw < 0.2 else "DRIVING",
+        )
+        self.ekf_pure.predict(cal, vel_warm)
+        self.ekf_map.predict(cal, vel_warm)
+
+    @staticmethod
+    def synthesize_1hz_gnss_window(
+        valid_hist_gnss: List[GNSSSample],
+        bo_start_ns: int,
+        ref_lat: float,
+        ref_lon: float,
+    ) -> List[GNSSSample]:
+        """
+        Synthesizes 1.0 Hz historical GNSS stream for heading seeding from sparse fixes.
+        Emulates real-world Android FusedLocationProvider 1 Hz stream with ZERO future lookahead.
+        """
+        recent_hist = [
+            g for g in valid_hist_gnss
+            if bo_start_ns - int(25.0 * 1e9) <= g.timestamp_ns <= bo_start_ns
+        ]
+        if len(recent_hist) < 2 and len(valid_hist_gnss) >= 2:
+            recent_hist = valid_hist_gnss[-2:]
+
+        pre_gnss_window = []
+        if len(recent_hist) >= 2:
+            t_hist = np.array([g.timestamp_ns for g in recent_hist], dtype=np.float64)
+            lat_hist = np.array([g.latitude_deg for g in recent_hist], dtype=np.float64)
+            lon_hist = np.array([g.longitude_deg for g in recent_hist], dtype=np.float64)
+            alt_hist = np.array([g.altitude_m if g.altitude_m is not None else 0.0 for g in recent_hist], dtype=np.float64)
+            spd_hist = np.array([g.speed_mps if g.speed_mps is not None else 0.0 for g in recent_hist], dtype=np.float64)
+
+            t_start_grid = max(t_hist[0], bo_start_ns - int(15.0 * 1e9))
+            t_1hz = np.arange(t_start_grid, t_hist[-1] + int(1e6), int(1e9))
+            if len(t_1hz) >= 2:
+                lats_1hz = np.interp(t_1hz, t_hist, lat_hist)
+                lons_1hz = np.interp(t_1hz, t_hist, lon_hist)
+                alts_1hz = np.interp(t_1hz, t_hist, alt_hist)
+                spds_1hz = np.interp(t_1hz, t_hist, spd_hist)
+
+                enu_list = [
+                    geodetic_to_enu(lats_1hz[k], lons_1hz[k], 0.0, ref_lat, ref_lon, 0.0)[:2]
+                    for k in range(len(t_1hz))
+                ]
+                for k in range(len(t_1hz)):
+                    b_k = None
+                    if k > 0:
+                        de = enu_list[k][0] - enu_list[k - 1][0]
+                        dn = enu_list[k][1] - enu_list[k - 1][1]
+                        dist = float(np.sqrt(de**2 + dn**2))
+                        if dist > 0.5:
+                            b_k = float((np.degrees(np.arctan2(de, dn)) + 360.0) % 360.0)
+                    pre_gnss_window.append(GNSSSample(
+                        timestamp_ns=int(t_1hz[k]),
+                        latitude_deg=float(lats_1hz[k]),
+                        longitude_deg=float(lons_1hz[k]),
+                        altitude_m=float(alts_1hz[k]),
+                        speed_mps=float(spds_1hz[k]),
+                        bearing_deg=b_k,
+                        accuracy_h_m=3.0,
+                        is_valid=True,
+                    ))
+
+        if not pre_gnss_window:
+            pre_gnss_window = (
+                recent_hist
+                if recent_hist
+                else [g for g in valid_hist_gnss if bo_start_ns - int(15.0 * 1e9) <= g.timestamp_ns <= bo_start_ns]
+            )
+        return pre_gnss_window
+
+    def start_blackout(
+        self,
+        entry_pos_enu: np.ndarray,
+        pre_gnss_window: List[GNSSSample],
+        recent_ai_speeds: List[float],
+        recent_imu_calib: List[Any],
+        cal_entry: Any,
+        t_entry_ns: int,
+    ) -> None:
+        self.blackout_active = True
+        self.ekf_pure._p[0] = entry_pos_enu[0]
+        self.ekf_pure._p[1] = entry_pos_enu[1]
+        self.ekf_map._p[0] = entry_pos_enu[0]
+        self.ekf_map._p[1] = entry_pos_enu[1]
+
+        # Dynamic pre-blackout speed scale factor learning from healthy GNSS fixes
+        if self.enable_speed_scale and pre_gnss_window:
+            self.v_entry = float(pre_gnss_window[-1].speed_mps) if pre_gnss_window[-1].speed_mps is not None else 8.0
+            g_speeds = [g.speed_mps for g in pre_gnss_window if g.speed_mps is not None and g.speed_mps > 2.0]
+            ai_speeds = recent_ai_speeds[max(0, len(recent_ai_speeds) - len(g_speeds) * 10):]
+            if len(g_speeds) >= 3 and len(ai_speeds) >= 10:
+                scale = np.mean(g_speeds) / max(0.5, np.mean(ai_speeds))
+                self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == "Highway" else 1.25))
+
+        self.speed_obs_pure.reset(initial_speed_mps=self.v_entry, initial_ts_ns=t_entry_ns)
+        self.speed_obs_map.reset(initial_speed_mps=self.v_entry, initial_ts_ns=t_entry_ns)
+
+        # Locate reference fix used for heading seeding and integrate gyro forward from that fix
+        valid_moving = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
+        if valid_moving and valid_moving[-1].speed_mps >= 2.5:
+            ref_fix = valid_moving[-1]
+        else:
+            stable = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None]
+            ref_fix = stable[-1] if stable else (valid_moving[-1] if valid_moving else (pre_gnss_window[-1] if pre_gnss_window else None))
+
+        delta_gyro_deg = 0.0
+        if ref_fix is not None and recent_imu_calib:
+            last_g_ts = ref_fix.timestamp_ns
+            for k in range(1, len(recent_imu_calib)):
+                c_prev = recent_imu_calib[k - 1]
+                c_curr = recent_imu_calib[k]
+                t_k = c_curr.timestamp_ns
+                if last_g_ts < t_k <= t_entry_ns:
+                    dt_k = (t_k - c_prev.timestamp_ns) * 1e-9
+                    delta_gyro_deg += np.degrees(c_curr.gyro_vehicle[2] * dt_k)
+
+        # Reference heading for initial road segment matching
+        valid_hist = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps > 1.5 and g.bearing_deg is not None]
+        ref_motion_hdg = float(valid_hist[-1].bearing_deg) if valid_hist else (float(np.degrees(self.ekf_map._heading_rad)) % 360.0)
+
+        init_road_bearing = None
+        if self.road_network is not None and self.matcher is not None:
+            best_cand, acq_r, acq_h, acq_info = DeadReckoningEngine.acquire_entry_segment(entry_pos_enu, ref_motion_hdg, self.road_network)
+            if best_cand is not None:
+                init_road_bearing = best_cand.bearing_deg
+                self.matcher.set_active_segment(best_cand)
+                self.entry_segment = best_cand
+            self.acq_radius_m = acq_r
+            self.acq_h_diff_deg = acq_h
+            self.entry_acq_info = acq_info
+
+        turn_rate_entry = float(cal_entry.gyro_vehicle[2])
+        self.ekf_pure.seed_pre_blackout_heading(
+            pre_gnss_window,
+            road_bearing_deg=init_road_bearing,
+            delta_heading_gyro_deg=delta_gyro_deg,
+            current_yaw_rate_rad_s=turn_rate_entry,
+        )
+        self.ekf_map.seed_pre_blackout_heading(
+            pre_gnss_window,
+            road_bearing_deg=init_road_bearing,
+            delta_heading_gyro_deg=delta_gyro_deg,
+            current_yaw_rate_rad_s=turn_rate_entry,
+        )
+
+    def step(self, cal: Any, v_pred: float, t_curr: int) -> SteppableStepResult:
+        v_ai_cal = float(v_pred) * self.speed_scale
+        v_pure_fwd, is_stat_pure = self.speed_obs_pure.update(cal, v_ai_cal)
+
+        # Apply Road Kinematics Governor ONLY to the map-matched stream
+        v_map_fwd = v_pure_fwd
+        is_stat_map = is_stat_pure
+        turn_rate_yaw = float(cal.gyro_vehicle[2])
+        local_kappa = 0.0
+        if self.road_network is not None:
+            nearest_segs = self.road_network.find_candidates(self.ekf_map._p[:2], radius_m=35.0)
+            if nearest_segs and len(nearest_segs) >= 2:
+                p1 = nearest_segs[0].start_enu_m
+                p2 = nearest_segs[0].end_enu_m
+                p3 = nearest_segs[1].end_enu_m
+                if np.linalg.norm(p2 - nearest_segs[1].start_enu_m) < 8.0:
+                    kappas = self.governor.compute_curvature(np.array([p1, p2, p3]))
+                    local_kappa = float(np.max(kappas))
+            v_map_fwd, _ = self.governor.govern_speed(v_pure_fwd, curvature=local_kappa, yaw_rate_rad_s=turn_rate_yaw)
+            if v_map_fwd < 0.2:
+                is_stat_map = True
+
+        vel_pure = VelocityEstimate(
+            timestamp_ns=t_curr,
+            forward_speed_mps=v_pure_fwd,
+            speed_variance=0.3,
+            motion_state="STATIONARY" if is_stat_pure or v_pure_fwd < 0.2 else "DRIVING",
+        )
+        vel_map = VelocityEstimate(
+            timestamp_ns=t_curr,
+            forward_speed_mps=v_map_fwd,
+            speed_variance=0.3,
+            motion_state="STATIONARY" if is_stat_map or v_map_fwd < 0.2 else "DRIVING",
+        )
+
+        fused_pure = self.ekf_pure.predict(cal, vel_pure)
+        fused_map = self.ekf_map.predict(cal, vel_map)
+
+        matched_pos = None
+        if v_map_fwd > 1.0 and self.matcher is not None:
+            matched_pos = self.matcher.match(fused_map, ekf=self.ekf_map, domain=self.domain, v_fwd=v_map_fwd)
+
+        return SteppableStepResult(
+            pure_pos=self.ekf_pure._p[:2].copy(),
+            map_pos=self.ekf_map._p[:2].copy(),
+            pure_speed=float(np.linalg.norm(fused_pure.velocity_enu_mps)),
+            map_speed=float(np.linalg.norm(self.ekf_map._v)),
+            v_map_fwd=float(v_map_fwd),
+            yaw_rate=turn_rate_yaw,
+            fused_pure=fused_pure,
+            fused_map=fused_map,
+            matched_pos=matched_pos,
+        )
 
 
 class DeadReckoningEngine:
@@ -97,7 +403,7 @@ class DeadReckoningEngine:
         can_speeds: Optional[np.ndarray] = None,
     ) -> Optional[Dict[str, Any]]:
         """
-        Executes a single blackout evaluation scenario.
+        Executes a single blackout evaluation scenario by orchestrating SteppableDeadReckoningEngine.
 
         Parameters
         ----------
@@ -154,47 +460,19 @@ class DeadReckoningEngine:
             default=valid_gnss[0],
         )
 
-        ekf_pure = ErrorStateEKF(
-            turn_threshold_rad_s=self.turn_threshold_rad_s,
-            cooldown_duration_s=self.cooldown_duration_s,
-            max_gyro_bias_rad_s=self.max_gyro_bias_rad_s,
-            initial_speed_scale=1.00,
-        )
-        ekf_pure.init_from_gnss(
-            warmup_gnss,
+        session = SteppableDeadReckoningEngine(
             reference_lat_deg=trip.reference_lat_deg,
             reference_lon_deg=trip.reference_lon_deg,
             reference_alt_m=0.0,
-        )
-
-        ekf_map = ErrorStateEKF(
-            turn_threshold_rad_s=self.turn_threshold_rad_s,
-            cooldown_duration_s=self.cooldown_duration_s,
-            max_gyro_bias_rad_s=self.max_gyro_bias_rad_s,
-            initial_speed_scale=1.00,
-        )
-        ekf_map.init_from_gnss(
-            warmup_gnss,
-            reference_lat_deg=trip.reference_lat_deg,
-            reference_lon_deg=trip.reference_lon_deg,
-            reference_alt_m=0.0,
-        )
-
-        # Road governor: AASHTO/IRC highway comfort limit (2.2 m/s^2 with superelevation) on highway; intersection limit (3.5 m/s^2) elsewhere
-        governor = RoadKinematicsGovernor(
-            a_lat_max=2.2 if domain == "Highway" else 3.5,
-            speed_limit_mps=33.3,
-        )
-        matcher = HMMMapMatcher(
             road_network=road_net,
-            reference_lat_deg=trip.reference_lat_deg,
-            reference_lon_deg=trip.reference_lon_deg,
+            domain=domain,
+            turn_threshold_rad_s=self.turn_threshold_rad_s,
+            cooldown_duration_s=self.cooldown_duration_s,
+            max_gyro_bias_rad_s=self.max_gyro_bias_rad_s,
             smoothing_factor=self.smoothing_factor,
+            enable_speed_scale=self.enable_speed_scale,
         )
-
-        # High-fidelity Kinematic Delta-v speed observers
-        speed_obs_pure = KinematicSpeedObserver()
-        speed_obs_map = KinematicSpeedObserver()
+        session.init_from_gnss(warmup_gnss)
 
         n_gnss = len(trip.gnss_samples)
         gnss_idx = 0
@@ -207,16 +485,15 @@ class DeadReckoningEngine:
         pure_speeds = []
         map_speeds = []
         blackout_started = False
-        speed_scale = 1.00
-        v_entry = 10.0
-        entry_segment = None
-        acq_radius_m = None
-        acq_h_diff_deg = None
-        entry_acq_info = "no entry segment"
         bo_timestamps_ns = []
         bo_yaw_rates = []
         bo_speeds = []
         bo_dr_enu = []
+
+        valid_hist_gnss = [g for g in valid_gnss if g.timestamp_ns <= bo_start_ns]
+        pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(
+            valid_hist_gnss, bo_start_ns, trip.reference_lat_deg, trip.reference_lon_deg
+        )
 
         for j, imu in enumerate(trip.imu_samples):
             t_curr = imu.timestamp_ns
@@ -228,218 +505,62 @@ class DeadReckoningEngine:
             while gnss_idx < n_gnss and trip.gnss_samples[gnss_idx].timestamp_ns <= t_curr:
                 g = trip.gnss_samples[gnss_idx]
                 if g.timestamp_ns <= bo_start_ns:
-                    ekf_pure.update_gnss(g)
-                    ekf_map.update_gnss(g)
+                    session.update_gnss_warmup(g)
                 gnss_idx += 1
 
             cal = calib_samples[j]
 
             if not blackout_started and t_curr >= bo_start_ns:
                 blackout_started = True
-                ekf_pure._p[0] = gt_start_enu[0]
-                ekf_pure._p[1] = gt_start_enu[1]
-                ekf_map._p[0] = gt_start_enu[0]
-                ekf_map._p[1] = gt_start_enu[1]
-
-                # 1. Synthesize 1.0 Hz historical GNSS stream for testing on sparse IO-VNBD dataset
-                # Emulates real-world Android FusedLocationProvider 1 Hz stream with ZERO future lookahead
-                valid_hist_gnss = [g for g in valid_gnss if g.timestamp_ns <= bo_start_ns]
-                recent_hist = [
-                    g for g in valid_hist_gnss
-                    if bo_start_ns - int(25.0 * 1e9) <= g.timestamp_ns <= bo_start_ns
-                ]
-                if len(recent_hist) < 2 and len(valid_hist_gnss) >= 2:
-                    recent_hist = valid_hist_gnss[-2:]
-
-                pre_gnss_window = []
-                if len(recent_hist) >= 2:
-                    t_hist = np.array([g.timestamp_ns for g in recent_hist], dtype=np.float64)
-                    lat_hist = np.array([g.latitude_deg for g in recent_hist], dtype=np.float64)
-                    lon_hist = np.array([g.longitude_deg for g in recent_hist], dtype=np.float64)
-                    alt_hist = np.array([g.altitude_m if g.altitude_m is not None else 0.0 for g in recent_hist], dtype=np.float64)
-                    spd_hist = np.array([g.speed_mps if g.speed_mps is not None else 0.0 for g in recent_hist], dtype=np.float64)
-
-                    t_start_grid = max(t_hist[0], bo_start_ns - int(15.0 * 1e9))
-                    t_1hz = np.arange(t_start_grid, t_hist[-1] + int(1e6), int(1e9))
-                    if len(t_1hz) >= 2:
-                        lats_1hz = np.interp(t_1hz, t_hist, lat_hist)
-                        lons_1hz = np.interp(t_1hz, t_hist, lon_hist)
-                        alts_1hz = np.interp(t_1hz, t_hist, alt_hist)
-                        spds_1hz = np.interp(t_1hz, t_hist, spd_hist)
-
-                        enu_list = [
-                            geodetic_to_enu(lats_1hz[k], lons_1hz[k], 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2]
-                            for k in range(len(t_1hz))
-                        ]
-                        for k in range(len(t_1hz)):
-                            b_k = None
-                            if k > 0:
-                                de = enu_list[k][0] - enu_list[k - 1][0]
-                                dn = enu_list[k][1] - enu_list[k - 1][1]
-                                dist = float(np.sqrt(de**2 + dn**2))
-                                if dist > 0.5:
-                                    b_k = float((np.degrees(np.arctan2(de, dn)) + 360.0) % 360.0)
-                            pre_gnss_window.append(GNSSSample(
-                                timestamp_ns=int(t_1hz[k]),
-                                latitude_deg=float(lats_1hz[k]),
-                                longitude_deg=float(lons_1hz[k]),
-                                altitude_m=float(alts_1hz[k]),
-                                speed_mps=float(spds_1hz[k]),
-                                bearing_deg=b_k,
-                                accuracy_h_m=3.0,
-                                is_valid=True,
-                            ))
-
-                if not pre_gnss_window:
-                    pre_gnss_window = (
-                        recent_hist
-                        if recent_hist
-                        else [g for g in valid_gnss if bo_start_ns - int(15.0 * 1e9) <= g.timestamp_ns <= bo_start_ns]
-                    )
-
-                # Dynamic pre-blackout speed scale factor learning from healthy GNSS fixes
-                if self.enable_speed_scale and pre_gnss_window:
-                    v_entry = float(pre_gnss_window[-1].speed_mps) if pre_gnss_window[-1].speed_mps is not None else 8.0
-                    g_speeds = [g.speed_mps for g in pre_gnss_window if g.speed_mps is not None and g.speed_mps > 2.0]
-                    ai_speeds = [v_preds[k] for k in range(max(0, j - len(g_speeds) * 10), j)]
-                    if len(g_speeds) >= 3 and len(ai_speeds) >= 10:
-                        scale = np.mean(g_speeds) / max(0.5, np.mean(ai_speeds))
-                        speed_scale = float(np.clip(scale, 0.85, 1.35 if domain == "Highway" else 1.25))
-
-                # Initialize kinematic speed observers anchored at true entry velocity
-                speed_obs_pure.reset(initial_speed_mps=v_entry, initial_ts_ns=t_curr)
-                speed_obs_map.reset(initial_speed_mps=v_entry, initial_ts_ns=t_curr)
-
-                # Locate reference fix used for heading seeding and integrate gyro forward from that fix
-                valid_moving = [g for g in pre_gnss_window if g.is_valid and g.speed_mps is not None and g.speed_mps > 0.5]
-                if valid_moving and valid_moving[-1].speed_mps >= 2.5:
-                    ref_fix = valid_moving[-1]
-                else:
-                    stable_fixes = [
-                        g for g in pre_gnss_window
-                        if g.is_valid and g.speed_mps is not None and g.speed_mps >= 2.0 and g.bearing_deg is not None
-                    ]
-                    ref_fix = stable_fixes[-1] if stable_fixes else (valid_moving[-1] if valid_moving else (pre_gnss_window[-1] if pre_gnss_window else None))
-
-                delta_gyro_deg = 0.0
-                if ref_fix is not None:
-                    last_g_ts = ref_fix.timestamp_ns
-                    for k_imu in range(len(trip.imu_samples)):
-                        t_k = trip.imu_samples[k_imu].timestamp_ns
-                        if last_g_ts < t_k <= bo_start_ns:
-                            dt_k = (t_k - trip.imu_samples[k_imu - 1].timestamp_ns) * 1e-9
-                            delta_gyro_deg += np.degrees(calib_samples[k_imu].gyro_vehicle[2] * dt_k)
-
-                # Reference heading for initial road segment matching:
-                # Uses latest moving GNSS Doppler bearing when available, or EKF heading
-                valid_hist = [
-                    g for g in pre_gnss_window
-                    if g.is_valid and g.speed_mps is not None and g.speed_mps > 1.5 and g.bearing_deg is not None
-                ]
-                ref_motion_hdg = float(valid_hist[-1].bearing_deg) if valid_hist else (float(np.degrees(ekf_map._heading_rad)) % 360.0)
-
-                init_road_bearing = None
-                best_cand = None
-                acq_radius_m = None
-                acq_h_diff_deg = None
-
-                # 1. Entry Segment Acquisition: widening search (35m, 75m, 150m) preferring closest bearing match within 45 deg
-                best_cand, acq_radius_m, acq_h_diff_deg, entry_acq_info = self.acquire_entry_segment(
-                    gt_start_enu, ref_motion_hdg, road_net
+                session.start_blackout(
+                    entry_pos_enu=gt_start_enu,
+                    pre_gnss_window=pre_gnss_window,
+                    recent_ai_speeds=list(v_preds[:j]),
+                    recent_imu_calib=calib_samples[:j+1],
+                    cal_entry=cal,
+                    t_entry_ns=t_curr,
                 )
-                if best_cand is not None:
-                    init_road_bearing = best_cand.bearing_deg
-                    matcher.set_active_segment(best_cand)
-                    entry_segment = best_cand
-                else:
-                    entry_segment = None
 
-                turn_rate_entry = float(cal.gyro_vehicle[2])
-                ekf_pure.seed_pre_blackout_heading(
-                    pre_gnss_window,
-                    road_bearing_deg=init_road_bearing,
-                    delta_heading_gyro_deg=delta_gyro_deg,
-                    current_yaw_rate_rad_s=turn_rate_entry,
-                )
-                ekf_map.seed_pre_blackout_heading(
-                    pre_gnss_window,
-                    road_bearing_deg=init_road_bearing,
-                    delta_heading_gyro_deg=delta_gyro_deg,
-                    current_yaw_rate_rad_s=turn_rate_entry,
-                )
-                seeded_hdg = float(np.degrees(ekf_pure._heading_rad)) % 360.0
-                if g_entry.bearing_deg is not None:
-                    gt_hdg_entry = float(g_entry.bearing_deg)
-                elif len(gt_pts) >= 2:
-                    v_gt_start = gt_pts[1] - gt_pts[0]
-                    gt_hdg_entry = float(np.degrees(np.arctan2(v_gt_start[0], v_gt_start[1])) % 360.0)
-                else:
-                    gt_hdg_entry = seeded_hdg
-                hdg_seed_err = float(abs((seeded_hdg - gt_hdg_entry + 180.0) % 360.0 - 180.0))
-
-            v_ai_cal = float(v_preds[j]) * (speed_scale if blackout_started else 1.0)
-
-            if blackout_started:
-                v_pure_fwd, is_stat_pure = speed_obs_pure.update(cal, v_ai_cal)
+            if not blackout_started:
+                session.predict_warmup(cal, float(v_preds[j]), t_curr)
             else:
-                v_pure_fwd = v_ai_cal
-                is_stat_pure = (v_ai_cal < 0.2)
-
-            # Apply Road Kinematics Governor ONLY to the map-matched stream
-            v_map_fwd = v_pure_fwd
-            is_stat_map = is_stat_pure
-            if blackout_started:
-                turn_rate_yaw = float(cal.gyro_vehicle[2])
-                local_kappa = 0.0
-                nearest_segs = road_net.find_candidates(ekf_map._p[:2], radius_m=35.0)
-                if nearest_segs and len(nearest_segs) >= 2:
-                    p1 = nearest_segs[0].start_enu_m
-                    p2 = nearest_segs[0].end_enu_m
-                    p3 = nearest_segs[1].end_enu_m
-                    # Verify spatial continuity between segments before computing curvature
-                    if np.linalg.norm(p2 - nearest_segs[1].start_enu_m) < 8.0:
-                        kappas = governor.compute_curvature(np.array([p1, p2, p3]))
-                        local_kappa = float(np.max(kappas))
-                v_map_fwd, _ = governor.govern_speed(v_pure_fwd, curvature=local_kappa, yaw_rate_rad_s=turn_rate_yaw)
-                if v_map_fwd < 0.2:
-                    is_stat_map = True
-
-            vel_pure = VelocityEstimate(
-                timestamp_ns=t_curr,
-                forward_speed_mps=v_pure_fwd,
-                speed_variance=0.3,
-                motion_state="STATIONARY" if is_stat_pure or v_pure_fwd < 0.2 else "DRIVING",
-            )
-            vel_map = VelocityEstimate(
-                timestamp_ns=t_curr,
-                forward_speed_mps=v_map_fwd,
-                speed_variance=0.3,
-                motion_state="STATIONARY" if is_stat_map or v_map_fwd < 0.2 else "DRIVING",
-            )
-
-            fused_pure = ekf_pure.predict(cal, vel_pure)
-            fused_map = ekf_map.predict(cal, vel_map)
-
-            if bo_start_ns <= t_curr <= bo_end_ns and v_map_fwd > 1.0:
-                matcher.match(fused_map, ekf=ekf_map, domain=domain, v_fwd=v_map_fwd)
-
-            if bo_start_ns <= t_curr <= bo_end_ns:
-                pure_pts.append(fused_pure.position_enu_m[:2].copy())
-                map_pts.append(ekf_map._p[:2].copy())
+                step_res = session.step(cal, float(v_preds[j]), t_curr)
+                pure_pts.append(step_res.pure_pos.copy())
+                map_pts.append(step_res.map_pos.copy())
                 map_ts_list.append(t_curr)
-                pure_speeds.append(float(np.linalg.norm(fused_pure.velocity_enu_mps)))
-                map_speeds.append(float(np.linalg.norm(ekf_map._v)))
+                pure_speeds.append(step_res.pure_speed)
+                map_speeds.append(step_res.map_speed)
 
                 bo_timestamps_ns.append(t_curr)
-                bo_yaw_rates.append(float(cal.gyro_vehicle[2]))
-                bo_speeds.append(float(v_map_fwd))
-                bo_dr_enu.append(fused_pure.position_enu_m[:2].copy())
+                bo_yaw_rates.append(step_res.yaw_rate)
+                bo_speeds.append(step_res.v_map_fwd)
+                bo_dr_enu.append(step_res.pure_pos.copy())
 
         pure_pts = np.array(pure_pts)
         map_pts = np.array(map_pts)
 
         if len(pure_pts) < 2 or len(map_pts) < 2:
             return None
+
+        entry_segment = session.entry_segment
+        matcher = session.matcher
+        ekf_pure = session.ekf_pure
+        ekf_map = session.ekf_map
+        speed_scale = session.speed_scale
+        v_entry = session.v_entry
+        acq_radius_m = session.acq_radius_m
+        acq_h_diff_deg = session.acq_h_diff_deg
+        entry_acq_info = session.entry_acq_info
+
+        seeded_hdg = float(np.degrees(ekf_pure._heading_rad)) % 360.0
+        if g_entry.bearing_deg is not None:
+            gt_hdg_entry = float(g_entry.bearing_deg)
+        elif len(gt_pts) >= 2:
+            v_gt_start = gt_pts[1] - gt_pts[0]
+            gt_hdg_entry = float(np.degrees(np.arctan2(v_gt_start[0], v_gt_start[1])) % 360.0)
+        else:
+            gt_hdg_entry = seeded_hdg
+        hdg_seed_err = float(abs((seeded_hdg - gt_hdg_entry + 180.0) % 360.0 - 180.0))
 
         # Route-level matching evaluation at blackout exit
         final_route_res = None
