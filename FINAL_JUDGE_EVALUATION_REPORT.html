@@ -23,7 +23,7 @@
 <h1>Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion</h1>
 <h2>Final Judge Evaluation & Architectural Benchmark Report</h2>
 
-<strong>Generated:</strong> 2026-09-20 05:28:06 UTC  
+<strong>Generated:</strong> 2026-09-20 05:42:21 UTC  
 <strong>Headline Benchmark Result (Held-Out Seeds):</strong> <strong>11.13% ± 1.50%</strong> median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
 <strong>Secondary Multi-Seed Benchmark (6 Fixed Seeds):</strong> <strong>13.19% ± 0.88%</strong> (Grand Median 13.19%, range 12.24% - 14.38%, 0 seeds under 10%, 240 scenarios)  
 <strong>Canonical Reference Seed 541098:</strong> <strong>14.32%</strong> Median Drift (Supporting Single-Seed Detail)  
@@ -168,10 +168,10 @@ During extensive architectural auditing, seven specific integrity defects, causa
      - <strong>Physical Under-Prediction Analysis (> 50 km/h)</strong>:
        1. *Vibration Decoupling Hypothesis*: On smooth asphalt at high speed, vehicle suspension and tire compliance attenuate chassis vibrations, decoupling high-frequency IMU vibration from longitudinal forward velocity.
        2. *Training Data Imbalance Hypothesis*: The dataset contains only ~2,752 samples (10.3%) at > 50 km/h, compared to ~24,021 samples (89.7%) at <= 50 km/h. MSE loss optimization naturally biases predictions toward the heavily represented low/mid-speed regimes.
-     - *Pre-Blackout Dynamic Anchoring*: The Bayesian MoE speed estimator dynamically anchors its pre-blackout scale factor against the last valid GNSS Doppler fixes prior to outage entry (<code>alpha_gnss</code>), compensating for this vibration saturation in production dead reckoning.
-   - <strong>Speed Scale Ratio Reconciliation (0.831 vs 0.99 / 1.01)</strong>:
-     - <strong>0.831 (Out-of-Sample Test Set Scale)</strong>: Computed by <code>scripts/evaluate_speed_bands.py</code> across all 26,773 out-of-sample test samples (Part 3 [80%–100%] of S-M, S-S2, S-S1, and full 100% test drives of S-S3a [CAN GT] and S-S4 [GNSS Doppler GT]). S-S2 arterial stop-and-go (0.806) and S-S4 arterial cruising (0.792) pull the aggregate test scale to 0.831.
-     - <strong>1.010 (Validation Split Scale at Checkpoint Selection)</strong>: Computed in <code>scripts/train_can_moe.py</code> exclusively on the validation split (Part 2 [60%–80%] of training trips S-M, S-S2, S-S1; 10,049 windows) where balanced speed samples yielded <code>sum(v_pred)/sum(v_gt) = 1.010</code>. The earlier mention of '0.99' in draft summaries was a reporting error referring to the mid-band test scale (0.958) and validation scale (1.01).
+     - *Band B Low-Pass Attenuation*: Band B is defined over [1.5, 4.5] Hz. Because accelerometer inputs are pre-filtered by the 2nd-order Butterworth low-pass filter at 3.5 Hz (-3 dB cutoff, -40 dB/decade roll-off), spectral energy in the upper region of Band B above 3.5 Hz (3.5 to 4.5 Hz) is attenuated by the filter envelope.
+   - <strong>Out-of-Sample Speed Scale Gap & Alpha Compensation</strong>:
+     - *Validation Scale (1.010) vs Test Scale (0.831)*: In <code>scripts/train_can_moe.py</code>, the validation split (Part 2: 60%–80% of training trips) achieved a scale ratio of <strong>1.010</strong>. Out-of-sample evaluation across the full 5-trip test set in <code>scripts/evaluate_speed_bands.py</code> yields an aggregate scale ratio of <strong>0.831</strong> (26,773 samples; S-S2 at 0.806, S-S4 at 0.792).
+     - *Alpha Compensation*: The dynamic pre-blackout speed scaling factor <code>alpha_gnss</code> (<code>mean(v_GPS) / mean(v_AI)</code> estimated over the 20 seconds prior to blackout entry) is the operational component designed to measure and compensate for this out-of-sample scale gap during outages.
    - <strong>Mobile Edge Latency</strong>:
      - TorchScript mobile model CPU latency: <strong>1.84 ms on laptop CPU; not measured on phone</strong>.
 

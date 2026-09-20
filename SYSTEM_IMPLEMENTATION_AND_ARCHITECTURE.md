@@ -543,10 +543,10 @@ During extensive architectural auditing, seven specific integrity defects, causa
      - **Physical Under-Prediction Analysis (> 50 km/h)**:
        1. *Vibration Decoupling Hypothesis*: On smooth asphalt at high speed, vehicle suspension and tire compliance attenuate chassis vibrations, decoupling high-frequency IMU vibration from longitudinal forward velocity.
        2. *Training Data Imbalance Hypothesis*: The dataset contains only ~2,752 samples (10.3%) at > 50 km/h, compared to ~24,021 samples (89.7%) at <= 50 km/h. MSE loss optimization naturally biases predictions toward the heavily represented low/mid-speed regimes.
-     - *Pre-Blackout Dynamic Anchoring*: The Bayesian MoE speed estimator dynamically anchors its pre-blackout scale factor against the last valid GNSS Doppler fixes prior to outage entry (`alpha_gnss`), compensating for this vibration saturation in production dead reckoning.
-   - **Speed Scale Ratio Reconciliation (0.831 vs 0.99 / 1.01)**:
-     - **0.831 (Out-of-Sample Test Set Scale)**: Computed by `scripts/evaluate_speed_bands.py` across all 26,773 out-of-sample test samples (Part 3 [80%–100%] of S-M, S-S2, S-S1, and full 100% test drives of S-S3a [CAN GT] and S-S4 [GNSS Doppler GT]). S-S2 arterial stop-and-go (0.806) and S-S4 arterial cruising (0.792) pull the aggregate test scale to 0.831.
-     - **1.010 (Validation Split Scale at Checkpoint Selection)**: Computed in `scripts/train_can_moe.py` exclusively on the validation split (Part 2 [60%–80%] of training trips S-M, S-S2, S-S1; 10,049 windows) where balanced speed samples yielded `sum(v_pred)/sum(v_gt) = 1.010`. The earlier mention of '0.99' in draft summaries was a reporting error referring to the mid-band test scale (0.958) and validation scale (1.01).
+     - *Band B Low-Pass Attenuation*: Band B is defined over [1.5, 4.5] Hz. Because accelerometer inputs are pre-filtered by the 2nd-order Butterworth low-pass filter at 3.5 Hz (-3 dB cutoff, -40 dB/decade roll-off), spectral energy in the upper region of Band B above 3.5 Hz (3.5 to 4.5 Hz) is attenuated by the filter envelope.
+   - **Out-of-Sample Speed Scale Gap & Alpha Compensation**:
+     - *Validation Scale (1.010) vs Test Scale (0.831)*: In `scripts/train_can_moe.py`, the validation split (Part 2: 60%–80% of training trips) achieved a scale ratio of **1.010**. Out-of-sample evaluation across the full 5-trip test set in `scripts/evaluate_speed_bands.py` yields an aggregate scale ratio of **0.831** (26,773 samples; S-S2 at 0.806, S-S4 at 0.792).
+     - *Alpha Compensation*: The dynamic pre-blackout speed scaling factor `alpha_gnss` (`mean(v_GPS) / mean(v_AI)` estimated over the 20 seconds prior to blackout entry) is the operational component designed to measure and compensate for this out-of-sample scale gap during outages.
    - **Mobile Edge Latency**:
      - TorchScript mobile model CPU latency: **1.84 ms on laptop CPU; not measured on phone**.
 
