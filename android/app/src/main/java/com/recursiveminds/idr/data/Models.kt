@@ -21,6 +21,7 @@ data class GnssPoint(
 
 data class SensorBatch(
     @SerializedName("type") val type: String = "sensor_batch",
+    @SerializedName("source") val source: String = "device",
     @SerializedName("state") val state: String,
     @SerializedName("timestamp_ns") val timestampNs: Long,
     @SerializedName("imu") val imu: List<ImuPoint>,
@@ -29,7 +30,20 @@ data class SensorBatch(
 
 data class ControlMessage(
     @SerializedName("type") val type: String = "control",
-    @SerializedName("command") val command: String
+    @SerializedName("command") val command: String,
+    @SerializedName("scenario_id") val scenarioId: Int? = null,
+    @SerializedName("speed") val speed: Double? = null
+)
+
+data class BenchmarkScenario(
+    @SerializedName("id") val id: Int,
+    @SerializedName("trip") val trip: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("env") val env: String,
+    @SerializedName("duration_s") val durationS: Double,
+    @SerializedName("distance_m") val distanceM: Double,
+    @SerializedName("target_drift_pct") val targetDriftPct: Double = 10.0,
+    @SerializedName("split") val split: String = "20% Held-Out Test Set"
 )
 
 data class PositionPoint(
@@ -90,6 +104,8 @@ data class WarmupStatus(
 data class HudUpdate(
     @SerializedName("type") val type: String,
     @SerializedName("state") val state: String,
+    @SerializedName("benchmark_active") val benchmarkActive: Boolean = false,
+    @SerializedName("benchmark_scenario") val benchmarkScenario: Int? = null,
     @SerializedName("mount_status") val mountStatus: String,
     @SerializedName("warmup") val warmup: WarmupStatus?,
     @SerializedName("dr_pos") val drPos: PositionPoint?,

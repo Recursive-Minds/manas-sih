@@ -29,10 +29,11 @@ from sih.data.geo import geodetic_to_enu
 from server.engine_adapter import EngineAdapterStageB
 
 
-def run_quick_parity():
+def run_quick_parity(raw_mode: bool = False):
+    mode_str = "RAW INPUT MODE (adapter computes mount + features + AI speed)" if raw_mode else "ENGINE PARITY MODE (exact component comparison)"
     print("=" * 80)
     print("QUICK PARITY CHECK: S-S3a (Mixed Domain) - 5 Canonical Scenarios")
-    print("Batch Engine vs Streaming EngineAdapterStageB")
+    print(f"Batch Engine vs Streaming EngineAdapterStageB [{mode_str}]")
     print("=" * 80)
 
     # 1. Load Trip S-S3a
@@ -43,7 +44,7 @@ def run_quick_parity():
 
     # 2. Calibrations, Road Network, AI Velocities
     calibs = calibrate_stream(trip, min_samples=30)
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, norm_mean, norm_std, model_type = load_ai_model(device)
     v_preds = predict_velocities(model, calibs, norm_mean, norm_std, device, model_type=model_type)
     rnet, rpts = load_trip_road_network(trip, map_source="osm", cache_dir="data/maps/cache")
@@ -71,22 +72,28 @@ def run_quick_parity():
     matched_scenarios = []
     print("\nLocating canonical scenarios in S-S3a...")
     for tgt in targets:
-        best_diff = 999.0
         best_g = None
-        dur_ns = int(tgt["dur"] * 1e9)
+        best_diff = float("inf")
+
         for g in cand_gnss:
-            t_start = g.timestamp_ns
-            t_end = t_start + dur_ns
-            bo_g = [gx for gx in trip.gnss_samples if t_start <= gx.timestamp_ns <= t_end and gx.is_valid]
-            if len(bo_g) < 2:
+            bo_start_ns = g.timestamp_ns
+            bo_end_ns = bo_start_ns + int(tgt["dur"] * 1e9)
+            bo_gnss = [x for x in trip.gnss_samples if bo_start_ns <= x.timestamp_ns <= bo_end_ns and x.is_valid]
+            if len(bo_gnss) < 3:
                 continue
-            pts = [geodetic_to_enu(gx.latitude_deg, gx.longitude_deg, 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2] for gx in bo_g]
-            dist = float(np.sum(np.linalg.norm(np.diff(np.array(pts), axis=0), axis=1)))
+
+            pts = [
+                geodetic_to_enu(x.latitude_deg, x.longitude_deg, 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2]
+                for x in bo_gnss
+            ]
+            pts = np.array(pts)
+            dist = float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+
             diff = abs(dist - tgt["dist"])
             if diff < best_diff:
                 best_diff = diff
                 best_g = g
-                if diff < 0.5:
+                if diff < 1.0:
                     break
 
         if best_diff < 5.0 and best_g is not None:
@@ -116,7 +123,7 @@ def run_quick_parity():
 
         bo_start_ns = entry_g.timestamp_ns
         bo_end_ns = bo_start_ns + int(tgt["dur"] * 1e9)
-        warmup_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(30.0 * 1e9))
+        warmup_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(60.0 * 1e9))
 
         # 1. Warm-up MountCalibrator alignment up to bo_start_ns
         calib_mount = MountCalibrator(min_samples=30)
@@ -138,8 +145,12 @@ def run_quick_parity():
             road_network=rnet,
             domain="Mixed",
             saved_alignment=saved_align,
-            model=None,
+            model=model if raw_mode else None,
+            norm_mean=norm_mean if raw_mode else None,
+            norm_std=norm_std if raw_mode else None,
+            device=device if raw_mode else None,
             decimate_gnss_for_seeding=False,
+            lock_saved_alignment=True,
         )
 
         valid_gnss = [g for g in trip.gnss_samples if g.is_valid and g.timestamp_ns <= bo_start_ns]
@@ -173,7 +184,10 @@ def run_quick_parity():
                 adapter.set_blackout(True, entry_gnss=entry_g)
 
             # Feed IMU sample
-            fused = adapter.on_imu(imu, override_speed=v_preds[j], pre_calibrated=calibs[j])
+            if raw_mode:
+                fused = adapter.on_imu(imu)
+            else:
+                fused = adapter.on_imu(imu, override_speed=v_preds[j], pre_calibrated=calibs[j])
 
             if adapter.blackout_started and fused is not None:
                 stream_pts.append(adapter.ekf._p[:2].copy())
@@ -215,7 +229,8 @@ def run_quick_parity():
         traj_diffs = np.hypot(s_interp_e - b_interp_e, s_interp_n - b_interp_n)
         max_traj_diff = float(np.max(traj_diffs))
 
-        passed = endpoint_diff < 0.01
+        thresh = 5.0 if raw_mode else 0.01
+        passed = endpoint_diff < thresh
         status = "PASS" if passed else "FAIL"
         if tgt["id"] == 26:
             sc26_passed = passed
@@ -224,13 +239,19 @@ def run_quick_parity():
 
         print(f"Scenario #{tgt['id']:<4} | {batch_err:6.2f} m    | {stage_b_err:6.2f} m     | {endpoint_diff:8.4f} m      | {max_traj_diff:8.4f} m      | {status}")
 
+    thresh_str = "<5m" if raw_mode else "<0.01m"
     print("-" * 95)
-    print(f"Scenario #26 Passed (<0.01m): {sc26_passed}")
-    print(f"All Scenarios Passed (<0.01m): {all_passed}")
+    print(f"Scenario #26 Passed ({thresh_str}): {sc26_passed}")
+    print(f"All Scenarios Passed ({thresh_str}): {all_passed}")
     print("=" * 80)
     return sc26_passed and all_passed
 
 
 if __name__ == "__main__":
-    success = run_quick_parity()
+    import argparse
+    parser = argparse.ArgumentParser(description="Quick Parity Check: Batch vs Streaming EngineAdapterStageB")
+    parser.add_argument("--raw", action="store_true", help="Run in raw-input mode (adapter computes mount + features + AI speeds)")
+    args = parser.parse_args()
+
+    success = run_quick_parity(raw_mode=args.raw)
     sys.exit(0 if success else 1)

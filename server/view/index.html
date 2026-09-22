@@ -303,7 +303,7 @@
         <span id="stateText">WARMING UP</span>
       </div>
 
-      <button class="btn-action btn-blackout" id="btnToggleBlackout" onclick="toggleBlackout()">Trigger Blackout</button>
+      <button class="btn-action btn-blackout" id="btnToggleBlackout" onclick="toggleBlackout()" disabled style="opacity: 0.5; cursor: not-allowed; background: #475569;">Warming Up (Not Ready)</button>
       <button class="btn-action" onclick="resetNavigation()">Reset</button>
     </div>
   </header>
@@ -377,10 +377,9 @@
     const map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 16);
     L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 20
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
     }).addTo(map);
 
     // Polylines
@@ -394,6 +393,7 @@
 
     let hasCentered = false;
     let isBlackoutActive = false;
+    let isReadyForBlackout = false;
 
     // WebSocket Client
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -421,15 +421,22 @@
       const btnBlackout = document.getElementById('btnToggleBlackout');
 
       isBlackoutActive = (data.state === 'BLACKOUT');
+      isReadyForBlackout = !!(data.warmup && data.warmup.is_ready);
       stateText.innerText = data.state;
       if (isBlackoutActive) {
         stateDot.className = 'status-dot blackout';
         btnBlackout.innerText = 'Stop Blackout';
         btnBlackout.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        btnBlackout.disabled = false;
+        btnBlackout.style.opacity = '1.0';
+        btnBlackout.style.cursor = 'pointer';
       } else {
-        stateDot.className = 'status-dot active';
-        btnBlackout.innerText = 'Trigger Blackout';
-        btnBlackout.style.background = 'linear-gradient(135deg, #dc2626, #991b1b)';
+        stateDot.className = isReadyForBlackout ? 'status-dot active' : 'status-dot waiting';
+        btnBlackout.innerText = isReadyForBlackout ? 'Trigger Blackout' : 'Warming Up (Not Ready)';
+        btnBlackout.disabled = !isReadyForBlackout;
+        btnBlackout.style.background = isReadyForBlackout ? 'linear-gradient(135deg, #dc2626, #991b1b)' : '#475569';
+        btnBlackout.style.opacity = isReadyForBlackout ? '1.0' : '0.5';
+        btnBlackout.style.cursor = isReadyForBlackout ? 'pointer' : 'not-allowed';
       }
 
       // 2. Update Metrics HUD
@@ -470,6 +477,7 @@
 
     function toggleBlackout() {
       if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!isBlackoutActive && !isReadyForBlackout) return;
       const nextCmd = isBlackoutActive ? 'stop_blackout' : 'start_blackout';
       ws.send(JSON.stringify({ type: 'control', command: nextCmd }));
     }

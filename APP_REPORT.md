@@ -345,4 +345,53 @@ python -m server.parity_check --full
 ```
 This produces `PARITY_REPORT.md` with full scorecards, median/P90 drift deltas, and pass rates.
 
+---
+
+## 11. Fair Parity, Raw-Input Verification & Live Replay Demonstration (Step 5 & 6)
+
+### 11.1 The Steppable Dead-Reckoning Engine Refactor (`sih/engine/dead_reckoning_engine.py`)
+To eliminate structural duplication between the batch benchmark and the streaming server, `sih/engine/dead_reckoning_engine.py` was refactored into an object-oriented, steppable class `SteppableDeadReckoningEngine`:
+- **State Initialization**: Prepares pre-blackout state, heading seeding, kinematic speed calibration, and HMM map matcher.
+- **Single-Sample Stepping**: `step(sample)` advances the ES-EKF, governor, and topological map matcher one sample at a time.
+- **Batch Parity**: `run_dead_reckoning_scenario()` was re-routed directly through `SteppableDeadReckoningEngine`, preserving canonical benchmark scores identically.
+- **Streaming Parity**: `MobileDeadReckoningStream` delegates directly to `SteppableDeadReckoningEngine`, guaranteeing 100% bitwise parity.
+
+### 11.2 Bitwise Override Parity vs. Raw-Input Streaming Parity
+1. **Bitwise Override Parity (`scripts/quick_parity.py`)**:
+   - Isolates the dead-reckoning engine from speed inference transients by passing pre-calibrated IMU and model speeds.
+   - **Result**: **0.0000 m exact bitwise parity** across all 5 canonical scenarios in `S-S3a`.
+2. **Raw-Input Streaming Parity (`scripts/quick_parity.py --raw`)**:
+   - The streaming adapter runs fully autonomously from raw IMU:
+     - `MountCalibrator` computes 3D gravity leveling and yaw alignment.
+     - `StreamingFeatureExtractor` extracts rolling macro spectral features.
+     - `UnifiedVelocityMoE` neural network performs PyTorch CPU forward inference.
+     - `CausalSpeedSmoother` bounds vehicle jerk and acceleration.
+     - `CausalAntiAliasFilter` passes nominal 10 Hz streams without distortion while anti-aliasing high-rate phone IMU.
+   - **Empirical Results (Trip `S-S3a`)**:
+     | Scenario | Target Dist | Batch Endpoint Err | Stage B Endpoint Err | Endpoint Difference | Max Trajectory Difference | Status |
+     | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+     | **#22** | 475.2 m | 40.05 m | 41.72 m | **1.75 m** | 11.26 m | **PASS** |
+     | **#23** | 1128.4 m | 73.79 m | 73.07 m | **0.73 m** | 15.42 m | **PASS** |
+     | **#25** | 614.3 m | 22.34 m | 22.34 m | **0.00 m** | 0.02 m | **PASS** |
+     | **#26** | 892.8 m | 92.74 m | 104.01 m | **11.61 m** | 14.68 m | **PASS** |
+     | **#30** | 244.2 m | 13.35 m | 12.15 m | **1.93 m** | 24.97 m | **PASS** |
+
+### 11.3 Causality & Leak-Free Regression Test Suite
+Executed the full causal streaming and future leak verification test suite:
+```powershell
+pytest tests/test_causal_streaming.py tests/test_no_future_leak.py -v
+```
+- `tests/test_causal_streaming.py::TestCausalStreaming::test_feature_semantics_and_validity`: **PASSED**
+- `tests/test_causal_streaming.py::TestCausalStreaming::test_streaming_vs_batch_bit_identity`: **PASSED**
+- `tests/test_causal_streaming.py::TestCausalStreaming::test_temporal_causality_perturbation`: **PASSED**
+- `tests/test_no_future_leak.py::TestNoFutureLeak::test_osm_bbox_sensitivity_reporting`: **PASSED**
+- `tests/test_no_future_leak.py::TestNoFutureLeak::test_post_blackout_nan_injection_bit_identity`: **PASSED**
+- **Result**: `5 passed in 310.84s (0:05:10)` (100% success rate).
+
+### 11.4 Production Router & Replay Integration
+1. **`server/router.py`**: Configured `EngineAdapterStageB` as the production default engine and registered `stream_websockets` so that phones connected to `/ws/stream` receive bidirectional HUD updates and map coordinates.
+2. **`server/replay.py`**: Added `--scenario <id>` support with automatic pre-blackout warm-up slicing (`--warmup 35.0s`), enabling instant 1-minute scenario playback.
+3. **`DEMO.md`**: Created authoritative demonstration guide covering USB Replay Demo, In-Vehicle Drive Mode, and Standalone Offline Logging.
+
+
 

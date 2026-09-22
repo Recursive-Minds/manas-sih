@@ -59,15 +59,17 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
     val isConnected = AtomicBoolean(false)
     val isBlackout = AtomicBoolean(false)
 
-    // CSV logging: ALWAYS ON
+    // CSV logging: explicit Start/Stop controlled by user
     private var csvFile: File? = null
     private var csvWriter: FileWriter? = null
+    val isCsvRecording = AtomicBoolean(false)
 
     // Callbacks to Activity
     var onHudUpdateListener: ((HudUpdate) -> Unit)? = null
     var onConnectionStateChanged: ((Boolean) -> Unit)? = null
     var onSensorRateUpdate: ((Int, Int) -> Unit)? = null
     var onLocalGnssUpdate: ((GnssPoint) -> Unit)? = null
+    var onCsvStateChanged: ((recording: Boolean, filePath: String?) -> Unit)? = null
 
     // Diagnostics
     private var imuCount = 0
@@ -90,7 +92,7 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
-        initCsvLogging()
+        // Do NOT auto-start CSV — user controls it explicitly via REC button
         registerSensors()
         startBatchDispatcher()
     }
@@ -130,12 +132,32 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         }
 
         try {
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                1000L,
-                0.0f,
-                this
-            )
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    1000L,
+                    0.0f,
+                    this
+                )
+            }
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    1000L,
+                    0.0f,
+                    this
+                )
+            }
+
+            // Immediately emit best last known location on startup
+            val lastGps = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+            val lastNet = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val bestLast = when {
+                lastGps != null && lastNet != null -> if (lastGps.time >= lastNet.time) lastGps else lastNet
+                lastGps != null -> lastGps
+                else -> lastNet
+            }
+            bestLast?.let { onLocationChanged(it) }
         } catch (e: SecurityException) {
             Log.e("IDRService", "Location permission missing: ${e.message}")
         }
@@ -181,7 +203,7 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
             speedMps = if (location.hasSpeed()) location.speed else null,
             bearingDeg = if (location.hasBearing()) location.bearing else null,
             accuracyHM = if (location.hasAccuracy()) location.accuracy else 5.0f,
-            isValid = location.hasSpeed() && location.accuracy <= 30.0f
+            isValid = location.accuracy <= 50.0f
         )
         gnssQueue.offer(gnss)
         gnssCount++
@@ -201,14 +223,17 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         disconnectServer()
 
         val wsUrl = "ws://$serverIp:$port/ws/stream"
+        Log.i("IDRService", "Attempting WebSocket connection to: $wsUrl")
         val request = Request.Builder().url(wsUrl).build()
 
         okHttpClient = OkHttpClient.Builder()
+            .proxy(java.net.Proxy.NO_PROXY)
             .readTimeout(0, TimeUnit.MILLISECONDS)
             .build()
 
         webSocket = okHttpClient?.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.i("IDRService", "WebSocket connection opened successfully!")
                 isConnected.set(true)
                 scope.launch(Dispatchers.Main) {
                     onConnectionStateChanged?.invoke(true)
@@ -227,6 +252,7 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.i("IDRService", "WebSocket closed: code=$code reason=$reason")
                 isConnected.set(false)
                 scope.launch(Dispatchers.Main) {
                     onConnectionStateChanged?.invoke(false)
@@ -234,6 +260,7 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.e("IDRService", "WebSocket onFailure: ${t.message}", t)
                 isConnected.set(false)
                 scope.launch(Dispatchers.Main) {
                     onConnectionStateChanged?.invoke(false)
@@ -264,6 +291,29 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         sendControl("reset")
     }
 
+    val isMuted = AtomicBoolean(false)
+
+    fun setSensorStreamingMuted(muted: Boolean) {
+        isMuted.set(muted)
+        Log.i("IDRService", "Sensor streaming muted=$muted")
+    }
+
+    fun startBenchmark(scenarioId: Int, speed: Double) {
+        setSensorStreamingMuted(true)
+        val msg = ControlMessage(
+            command = "start_benchmark",
+            scenarioId = scenarioId,
+            speed = speed
+        )
+        webSocket?.send(gson.toJson(msg))
+    }
+
+    fun stopBenchmark() {
+        val msg = ControlMessage(command = "stop_benchmark")
+        webSocket?.send(gson.toJson(msg))
+        setSensorStreamingMuted(false)
+    }
+
     private fun sendControl(command: String) {
         val msg = ControlMessage(command = command)
         webSocket?.send(gson.toJson(msg))
@@ -285,9 +335,10 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
                     gnssQueue.poll()?.let { gnssList.add(it) }
                 }
 
-                if (imuList.isNotEmpty() || gnssList.isNotEmpty()) {
+                if ((imuList.isNotEmpty() || gnssList.isNotEmpty()) && !isMuted.get()) {
                     val stateStr = if (isBlackout.get()) "BLACKOUT" else "WARMING_UP"
                     val batch = SensorBatch(
+                        source = "device",
                         state = stateStr,
                         timestampNs = System.nanoTime(),
                         imu = imuList,
@@ -314,16 +365,39 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         }
     }
 
-    private fun initCsvLogging() {
+    fun startCsvRecording() {
+        if (isCsvRecording.get()) return
         try {
             val dir = getExternalFilesDir(null) ?: filesDir
-            val file = File(dir, "idr_telemetry_${System.currentTimeMillis()}.csv")
+            val ts = System.currentTimeMillis()
+            val file = File(dir, "idr_telemetry_$ts.csv")
             csvFile = file
             csvWriter = FileWriter(file)
             csvWriter?.append("type,timestamp_ns,val1,val2,val3,val4,val5,val6\n")
             csvWriter?.flush()
+            isCsvRecording.set(true)
+            Log.i("IDRService", "CSV recording started: ${file.absolutePath}")
+            scope.launch(Dispatchers.Main) {
+                onCsvStateChanged?.invoke(true, file.absolutePath)
+            }
         } catch (e: Exception) {
-            Log.e("IDRService", "Error initializing CSV: ${e.message}")
+            Log.e("IDRService", "Error starting CSV recording: ${e.message}")
+        }
+    }
+
+    fun stopCsvRecording() {
+        if (!isCsvRecording.get()) return
+        try {
+            csvWriter?.flush()
+            csvWriter?.close()
+            csvWriter = null
+            isCsvRecording.set(false)
+            Log.i("IDRService", "CSV recording stopped. File: ${csvFile?.absolutePath}")
+            scope.launch(Dispatchers.Main) {
+                onCsvStateChanged?.invoke(false, csvFile?.absolutePath)
+            }
+        } catch (e: Exception) {
+            Log.e("IDRService", "Error stopping CSV recording: ${e.message}")
         }
     }
 
@@ -336,12 +410,14 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
     }
 
     private fun logImuToCsv(imu: ImuPoint) {
+        if (!isCsvRecording.get()) return
         try {
             csvWriter?.append("IMU,${imu.timestampNs},${imu.accel[0]},${imu.accel[1]},${imu.accel[2]},${imu.gyro[0]},${imu.gyro[1]},${imu.gyro[2]}\n")
         } catch (e: Exception) {}
     }
 
     private fun logGnssToCsv(gnss: GnssPoint) {
+        if (!isCsvRecording.get()) return
         try {
             csvWriter?.append("GNSS,${gnss.timestampNs},${gnss.latitudeDeg},${gnss.longitudeDeg},${gnss.altitudeM},${gnss.speedMps ?: 0.0},${gnss.bearingDeg ?: 0.0},${gnss.accuracyHM}\n")
             csvWriter?.flush()

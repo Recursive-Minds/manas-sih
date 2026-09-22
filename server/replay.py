@@ -21,7 +21,7 @@ import time
 import json
 import asyncio
 import argparse
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 import numpy as np
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -37,14 +37,25 @@ def build_sensor_batches(
     batch_interval_s: float = 0.10,
     blackout_start_s: float = 30.0,
     blackout_duration_s: float = 45.0,
+    exact_bo_start_ns: Optional[int] = None,
+    exact_bo_end_ns: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
     """
     Chunks a TripSequence into chronological 100 ms JSON-serializable sensor batches.
     Labels each batch as 'WARMING_UP' or 'BLACKOUT'.
     """
     t0_ns = trip.imu_samples[0].timestamp_ns
-    bo_start_ns = t0_ns + int(blackout_start_s * 1e9)
-    bo_end_ns = bo_start_ns + int(blackout_duration_s * 1e9)
+    if exact_bo_start_ns is None:
+        exact_bo_start_ns = getattr(trip, "exact_bo_start_ns", None)
+    if exact_bo_end_ns is None:
+        exact_bo_end_ns = getattr(trip, "exact_bo_end_ns", None)
+
+    if exact_bo_start_ns is not None:
+        bo_start_ns = exact_bo_start_ns
+        bo_end_ns = exact_bo_end_ns or (bo_start_ns + int(blackout_duration_s * 1e9))
+    else:
+        bo_start_ns = t0_ns + int(blackout_start_s * 1e9)
+        bo_end_ns = bo_start_ns + int(blackout_duration_s * 1e9)
 
     batch_interval_ns = int(batch_interval_s * 1e9)
     batches: List[Dict[str, Any]] = []
@@ -58,6 +69,11 @@ def build_sensor_batches(
 
     while i_idx < n_i:
         curr_window_end_ns = curr_window_start_ns + batch_interval_ns
+        # Boundary snapping for exact blackout alignment
+        if curr_window_start_ns < bo_start_ns < curr_window_end_ns:
+            curr_window_end_ns = bo_start_ns
+        elif curr_window_start_ns < bo_end_ns < curr_window_end_ns:
+            curr_window_end_ns = bo_end_ns
         imu_batch = []
         while i_idx < n_i and trip.imu_samples[i_idx].timestamp_ns < curr_window_end_ns:
             im = trip.imu_samples[i_idx]
@@ -89,6 +105,7 @@ def build_sensor_batches(
         if imu_batch or gnss_batch:
             batches.append({
                 "type": "sensor_batch",
+                "source": "replay",
                 "state": state_str,
                 "timestamp_ns": curr_window_start_ns,
                 "imu": imu_batch,
@@ -285,13 +302,122 @@ def load_any_trip(file_path: str, trip_id: Optional[str] = None) -> TripSequence
     return GenericDataLoader().load_file(file_path, trip_id=trip_id)
 
 
+def slice_scenario(
+    trip: TripSequence, scenario_id: int, warmup_s: float = 60.0
+) -> Tuple[TripSequence, float, float]:
+    """
+    Slices a TripSequence to replay a canonical benchmark scenario with a clean warm-up interval.
+    Loads exact start/end timestamps from server/scenarios_canonical.json for any of the 40 scenarios.
+    """
+    from sih.data.geo import geodetic_to_enu
+
+    canonical_json = os.path.join(ROOT_DIR, "server", "scenarios_canonical.json")
+    spec = None
+    if os.path.exists(canonical_json):
+        try:
+            with open(canonical_json, "r", encoding="utf-8") as f:
+                sc_list = json.load(f)
+            spec = next((s for s in sc_list if s["scenario_id"] == scenario_id), None)
+        except Exception as e:
+            print(f"[Replay] Error loading canonical scenarios: {e}")
+
+    if spec is not None:
+        bo_start_ns = int(spec["t_start_ns"])
+        bo_end_ns = int(spec["t_end_ns"])
+        bo_dur = float(spec["duration_s"])
+        dist_m = float(spec["gt_dist_m"])
+
+        slice_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_s * 1e9))
+        actual_warmup_s = (bo_start_ns - slice_start_ns) * 1e-9
+        slice_end_ns = bo_end_ns + int(5.0 * 1e9)
+
+        sub_imu = [im for im in trip.imu_samples if slice_start_ns <= im.timestamp_ns <= slice_end_ns]
+        sub_gnss = [g for g in trip.gnss_samples if slice_start_ns <= g.timestamp_ns <= slice_end_ns]
+
+        sliced_trip = TripSequence(
+            trip_id=f"{trip.trip_id}_sc{scenario_id}",
+            imu_samples=sub_imu,
+            gnss_samples=sub_gnss,
+            reference_lat_deg=trip.reference_lat_deg,
+            reference_lon_deg=trip.reference_lon_deg,
+            reference_alt_m=trip.reference_alt_m,
+            total_gnss_distance_m=dist_m,
+            duration_s=(slice_end_ns - slice_start_ns) * 1e-9,
+        )
+        setattr(sliced_trip, "exact_bo_start_ns", bo_start_ns)
+        setattr(sliced_trip, "exact_bo_end_ns", bo_end_ns)
+        return sliced_trip, actual_warmup_s, bo_dur
+
+    # Fallback to distance matching for legacy targets
+    target_specs = {
+        22: {"dur": 45.0, "dist": 475.2},
+        23: {"dur": 75.0, "dist": 1128.4},
+        25: {"dur": 45.0, "dist": 614.3},
+        26: {"dur": 75.0, "dist": 892.8},
+        30: {"dur": 60.0, "dist": 244.2},
+    }
+    legacy_spec = target_specs.get(scenario_id)
+    if legacy_spec is None:
+        raise ValueError(f"Unknown scenario #{scenario_id}. Must be 1-40.")
+
+    cand_gnss = [
+        g for g in trip.gnss_samples
+        if g.is_valid and g.speed_mps is not None and g.speed_mps >= 1.0 and g.bearing_deg is not None
+    ]
+    best_g = None
+    best_diff = float("inf")
+    for g in cand_gnss:
+        bo_start_ns = g.timestamp_ns
+        bo_end_ns = bo_start_ns + int(legacy_spec["dur"] * 1e9)
+        bo_gnss = [x for x in trip.gnss_samples if bo_start_ns <= x.timestamp_ns <= bo_end_ns and x.is_valid]
+        if len(bo_gnss) < 3:
+            continue
+        pts = [
+            geodetic_to_enu(x.latitude_deg, x.longitude_deg, 0.0, trip.reference_lat_deg, trip.reference_lon_deg, 0.0)[:2]
+            for x in bo_gnss
+        ]
+        pts = np.array(pts)
+        dist = float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+        diff = abs(dist - legacy_spec["dist"])
+        if diff < best_diff:
+            best_diff = diff
+            best_g = g
+
+    if best_g is None:
+        raise RuntimeError(f"Could not locate scenario #{scenario_id} in trip {trip.trip_id}")
+
+    bo_start_ns = best_g.timestamp_ns
+    slice_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_s * 1e9))
+    actual_warmup_s = (bo_start_ns - slice_start_ns) * 1e-9
+    slice_end_ns = bo_start_ns + int(legacy_spec["dur"] * 1e9) + int(5.0 * 1e9)
+
+    sub_imu = [im for im in trip.imu_samples if slice_start_ns <= im.timestamp_ns <= slice_end_ns]
+    sub_gnss = [g for g in trip.gnss_samples if slice_start_ns <= g.timestamp_ns <= slice_end_ns]
+
+    sliced_trip = TripSequence(
+        trip_id=f"{trip.trip_id}_sc{scenario_id}",
+        imu_samples=sub_imu,
+        gnss_samples=sub_gnss,
+        reference_lat_deg=trip.reference_lat_deg,
+        reference_lon_deg=trip.reference_lon_deg,
+        reference_alt_m=trip.reference_alt_m,
+        total_gnss_distance_m=legacy_spec["dist"],
+        duration_s=(slice_end_ns - slice_start_ns) * 1e-9,
+    )
+    setattr(sliced_trip, "exact_bo_start_ns", bo_start_ns)
+    setattr(sliced_trip, "exact_bo_end_ns", bo_start_ns + int(legacy_spec["dur"] * 1e9))
+    return sliced_trip, actual_warmup_s, legacy_spec["dur"]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Trip Replay Streamer for Smartphone IDR")
-    parser.add_argument("--trip", default="S-M", help="Trip name (e.g. S-M, S-S1) or CSV path")
-    parser.add_argument("--blackout-start", type=float, default=30.0, help="Blackout start offset (seconds)")
-    parser.add_argument("--blackout-duration", type=float, default=45.0, help="Blackout duration (seconds)")
+    parser.add_argument("--trip", default="S-S3a", help="Trip name (e.g. S-S3a, S-M) or CSV path")
+    parser.add_argument("--scenario", type=int, default=None, help="Canonical scenario ID to replay (e.g. 22, 23, 25, 26, 30)")
+    parser.add_argument("--warmup", type=float, default=35.0, help="Warmup duration in seconds before blackout (default 35s)")
+    parser.add_argument("--blackout-start", type=float, default=30.0, help="Blackout start offset in seconds (if not using --scenario)")
+    parser.add_argument("--blackout-duration", type=float, default=45.0, help="Blackout duration in seconds (if not using --scenario)")
     parser.add_argument("--speed", type=float, default=1.0, help="Playback speed multiplier (0 = max speed)")
-    parser.add_argument("--server", default="ws://localhost:8765/ws/stream", help="WebSocket server URL")
+    parser.add_argument("--server", default="ws://127.0.0.1:8765/ws/stream", help="WebSocket server URL")
     args = parser.parse_args()
 
     trip_path = args.trip
@@ -306,11 +432,19 @@ def main():
     trip = load_any_trip(trip_path)
     print(f"Loaded {len(trip.imu_samples)} IMU samples and {len(trip.gnss_samples)} GNSS fixes.")
 
+    if args.scenario is not None:
+        print(f"Slicing Scenario #{args.scenario} with {args.warmup}s warmup...")
+        trip, bo_start, bo_dur = slice_scenario(trip, args.scenario, warmup_s=args.warmup)
+        print(f"Scenario #{args.scenario} ready: warmup={bo_start:.1f}s, blackout={bo_dur:.1f}s")
+    else:
+        bo_start = args.blackout_start
+        bo_dur = args.blackout_duration
+
     batches = build_sensor_batches(
         trip=trip,
         batch_interval_s=0.10,
-        blackout_start_s=args.blackout_start,
-        blackout_duration_s=args.blackout_duration,
+        blackout_start_s=bo_start,
+        blackout_duration_s=bo_dur,
     )
     print(f"Built {len(batches)} 100 ms batches.")
 

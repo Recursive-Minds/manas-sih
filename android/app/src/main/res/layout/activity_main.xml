@@ -38,13 +38,25 @@
             android:textStyle="bold" />
 
         <Button
-            android:id="@+id/btnShareCsv"
+            android:id="@+id/btnBenchmarkSuite"
             android:layout_width="wrap_content"
             android:layout_height="36dp"
-            android:text="Share CSV"
+            android:text="BENCHMARK"
             android:textSize="10sp"
-            android:backgroundTint="@color/card_bg"
-            android:textColor="@color/accent_cyan"
+            android:textStyle="bold"
+            android:backgroundTint="@color/accent_amber"
+            android:textColor="@color/bg_dark"
+            android:layout_marginEnd="6dp" />
+
+        <Button
+            android:id="@+id/btnCsvMode"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:text="CSV REC"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:backgroundTint="@color/card_border"
+            android:textColor="@color/accent_emerald"
             android:layout_marginEnd="6dp" />
 
         <TextView
@@ -80,7 +92,7 @@
             android:textSize="12sp"
             android:paddingHorizontal="8dp"
             android:inputType="text"
-            android:text="10.0.2.2" />
+            android:text="127.0.0.1" />
 
         <EditText
             android:id="@+id/etServerPort"
@@ -109,6 +121,208 @@
             android:textColor="@color/white" />
     </LinearLayout>
 
+    <!-- CSV Recording Mode Card (collapsible, shown by btnCsvMode) -->
+    <LinearLayout
+        android:id="@+id/cardCsvRecording"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#0F2027"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cardConnection">
+
+        <!-- Title row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="CSV SENSOR RECORDING"
+                android:textColor="@color/accent_cyan"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvCsvRecBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● IDLE"
+                android:textColor="@color/text_muted"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:background="@color/panel_bg" />
+        </LinearLayout>
+
+        <!-- File path label -->
+        <TextView
+            android:id="@+id/tvCsvFilePath"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="No file recorded yet"
+            android:textColor="@color/text_muted"
+            android:textSize="10sp"
+            android:singleLine="true"
+            android:ellipsize="start" />
+
+        <!-- Buttons row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical">
+
+            <Button
+                android:id="@+id/btnCsvRecord"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="⏺ START REC"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/accent_rose"
+                android:textColor="@color/white"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnCsvStop"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="⏹ STOP"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:enabled="false"
+                android:backgroundTint="#475569"
+                android:textColor="@color/white"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btnCsvShare"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:text="↗ SHARE"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:enabled="false"
+                android:backgroundTint="#475569"
+                android:textColor="@color/white" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Records raw IMU + GPS to CSV for offline analysis on laptop"
+            android:textColor="@color/text_muted"
+            android:textSize="9sp" />
+    </LinearLayout>
+
+
+    <LinearLayout
+        android:id="@+id/cardBenchmark"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#19223A"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cardCsvRecording">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="20% HELD-OUT TEST BENCHMARK"
+                android:textColor="@color/accent_amber"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvBenchmarkBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ZERO LEAKAGE"
+                android:textColor="@color/accent_emerald"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:background="@color/panel_bg" />
+        </LinearLayout>
+
+        <!-- Scenario Selector Dropdown -->
+        <Spinner
+            android:id="@+id/spinnerScenarios"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="6dp"
+            android:background="@drawable/edittext_bg"
+            android:popupBackground="@color/card_bg" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Speed:"
+                android:textColor="@color/text_muted"
+                android:textSize="11sp"
+                android:layout_marginEnd="6dp" />
+
+            <Spinner
+                android:id="@+id/spinnerSpeed"
+                android:layout_width="85dp"
+                android:layout_height="36dp"
+                android:background="@drawable/edittext_bg"
+                android:popupBackground="@color/card_bg" />
+
+            <Button
+                android:id="@+id/btnRunBenchmark"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="RUN BENCHMARK"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/accent_emerald"
+                android:textColor="@color/bg_dark" />
+
+            <Button
+                android:id="@+id/btnCloseBenchmark"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
+                android:text="X"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/card_border"
+                android:textColor="@color/text_main" />
+        </LinearLayout>
+    </LinearLayout>
+
     <!-- Warm-Up Readiness Panel -->
     <LinearLayout
         android:id="@+id/panelWarmup"
@@ -117,7 +331,7 @@
         android:background="@color/panel_bg"
         android:orientation="vertical"
         android:padding="8dp"
-        app:layout_constraintTop_toBottomOf="@id/cardConnection">
+        app:layout_constraintTop_toBottomOf="@id/cardBenchmark">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -379,6 +593,7 @@
         android:orientation="vertical"
         android:padding="16dp"
         android:visibility="gone"
+        android:elevation="30dp"
         app:layout_constraintTop_toBottomOf="@id/cardMetrics"
         app:layout_constraintBottom_toTopOf="@id/cardBottom">
 
@@ -454,10 +669,11 @@
         app:layout_constraintBottom_toBottomOf="parent">
 
         <TextView
+            android:id="@+id/tvCsvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="CSV: ACTIVE"
-            android:textColor="@color/accent_emerald"
+            android:text="CSV: IDLE"
+            android:textColor="@color/text_muted"
             android:textStyle="bold"
             android:textSize="11sp" />
 

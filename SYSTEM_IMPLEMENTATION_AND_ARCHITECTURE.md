@@ -632,11 +632,11 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #03 | S-M (Highway) | 75s | 1174.6m | 29.52% | **7.20%** | +22.32% | [View 3-Panel Plot](artifacts/map_scenario_03_s_m_highway_75s.png) |
 | #04 | S-M (Highway) | 45s | 326.7m | 25.87% | **18.19%** | +7.68% | [View 3-Panel Plot](artifacts/map_scenario_04_s_m_highway_45s.png) |
 | #05 | S-M (Highway) | 75s | 288.6m | 28.70% | **4.65%** | +24.05% | [View 3-Panel Plot](artifacts/map_scenario_05_s_m_highway_75s.png) |
-| #06 | S-M (Highway) | 30s | 427.1m | 7.11% | **1.19%** | +5.92% | [View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png) |
-| #07 | S-M (Highway) | 60s | 603.3m | 39.51% | **20.77%** | +18.74% | [View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png) |
+| #06 | S-M (Highway) | 30s | 427.1m | 7.10% | **1.19%** | +5.92% | [View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png) |
+| #07 | S-M (Highway) | 60s | 603.3m | 39.50% | **20.77%** | +18.73% | [View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png) |
 | #08 | S-M (Highway) | 60s | 314.7m | 39.63% | **14.13%** | +25.50% | [View 3-Panel Plot](artifacts/map_scenario_08_s_m_highway_60s.png) |
 | #09 | S-S2 (Arterial) | 75s | 872.1m | 107.41% | **91.02%** | +16.39% | [View 3-Panel Plot](artifacts/map_scenario_09_s_s2_arterial_75s.png) |
-| #10 | S-S2 (Arterial) | 30s | 245.7m | 47.14% | **17.65%** | +29.49% | [View 3-Panel Plot](artifacts/map_scenario_10_s_s2_arterial_30s.png) |
+| #10 | S-S2 (Arterial) | 30s | 245.7m | 47.00% | **17.65%** | +29.35% | [View 3-Panel Plot](artifacts/map_scenario_10_s_s2_arterial_30s.png) |
 | #11 | S-S2 (Arterial) | 60s | 435.6m | 15.07% | **2.43%** | +12.64% | [View 3-Panel Plot](artifacts/map_scenario_11_s_s2_arterial_60s.png) |
 | #12 | S-S2 (Arterial) | 45s | 262.0m | 29.27% | **25.41%** | +3.85% | [View 3-Panel Plot](artifacts/map_scenario_12_s_s2_arterial_45s.png) |
 | #13 | S-S2 (Arterial) | 45s | 331.6m | 21.78% | **2.19%** | +19.59% | [View 3-Panel Plot](artifacts/map_scenario_13_s_s2_arterial_45s.png) |
@@ -644,29 +644,29 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #15 | S-S1 (Urban) | 45s | 399.7m | 21.05% | **19.49%** | +1.56% | [View 3-Panel Plot](artifacts/map_scenario_15_s_s1_urban_45s.png) |
 | #16 | S-S1 (Urban) | 30s | 200.5m | 13.81% | **9.62%** | +4.19% | [View 3-Panel Plot](artifacts/map_scenario_16_s_s1_urban_30s.png) |
 | #17 | S-S1 (Urban) | 75s | 102.8m | 21.63% | **22.25%** | +-0.61% | [View 3-Panel Plot](artifacts/map_scenario_17_s_s1_urban_75s.png) |
-| #18 | S-S1 (Urban) | 45s | 98.9m | 60.66% | **5.76%** | +54.90% | [View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_45s.png) |
+| #18 | S-S1 (Urban) | 45s | 98.9m | 60.64% | **5.76%** | +54.88% | [View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_45s.png) |
 | #19 | S-S1 (Urban) | 30s | 361.8m | 10.92% | **6.95%** | +3.97% | [View 3-Panel Plot](artifacts/map_scenario_19_s_s1_urban_30s.png) |
-| #20 | S-S1 (Urban) | 60s | 135.1m | 76.53% | **28.53%** | +47.99% | [View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_60s.png) |
+| #20 | S-S1 (Urban) | 60s | 135.1m | 76.54% | **28.53%** | +48.01% | [View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_60s.png) |
 | #21 | S-S3a (Mixed) | 30s | 325.9m | 25.98% | **25.29%** | +0.69% | [View 3-Panel Plot](artifacts/map_scenario_21_s_s3a_mixed_30s.png) |
 | #22 | S-S3a (Mixed) | 45s | 475.2m | 3.35% | **2.81%** | +0.54% | [View 3-Panel Plot](artifacts/map_scenario_22_s_s3a_mixed_45s.png) |
 | #23 | S-S3a (Mixed) | 75s | 1128.4m | 6.81% | **6.54%** | +0.27% | [View 3-Panel Plot](artifacts/map_scenario_23_s_s3a_mixed_75s.png) |
-| #24 | S-S3a (Mixed) | 30s | 603.9m | 22.85% | **20.45%** | +2.41% | [View 3-Panel Plot](artifacts/map_scenario_24_s_s3a_mixed_30s.png) |
+| #24 | S-S3a (Mixed) | 30s | 603.9m | 22.85% | **20.45%** | +2.40% | [View 3-Panel Plot](artifacts/map_scenario_24_s_s3a_mixed_30s.png) |
 | #25 | S-S3a (Mixed) | 45s | 614.3m | 4.26% | **3.64%** | +0.62% | [View 3-Panel Plot](artifacts/map_scenario_25_s_s3a_mixed_45s.png) |
 | #26 | S-S3a (Mixed) | 75s | 892.8m | 9.77% | **10.39%** | +-0.62% | [View 3-Panel Plot](artifacts/map_scenario_26_s_s3a_mixed_75s.png) |
 | #27 | S-S3a (Mixed) | 60s | 591.9m | 14.11% | **14.00%** | +0.11% | [View 3-Panel Plot](artifacts/map_scenario_27_s_s3a_mixed_60s.png) |
 | #28 | S-S3a (Mixed) | 45s | 374.5m | 26.14% | **3.12%** | +23.01% | [View 3-Panel Plot](artifacts/map_scenario_28_s_s3a_mixed_45s.png) |
 | #29 | S-S3a (Mixed) | 30s | 164.3m | 47.74% | **4.33%** | +43.41% | [View 3-Panel Plot](artifacts/map_scenario_29_s_s3a_mixed_30s.png) |
-| #30 | S-S3a (Mixed) | 60s | 244.2m | 6.82% | **5.47%** | +1.35% | [View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_60s.png) |
+| #30 | S-S3a (Mixed) | 60s | 244.2m | 6.81% | **5.47%** | +1.34% | [View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_60s.png) |
 | #31 | S-S4 (Arterial) | 45s | 490.9m | 9.13% | **8.77%** | +0.36% | [View 3-Panel Plot](artifacts/map_scenario_31_s_s4_arterial_45s.png) |
-| #32 | S-S4 (Arterial) | 75s | 610.9m | 26.29% | **23.87%** | +2.42% | [View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_75s.png) |
+| #32 | S-S4 (Arterial) | 75s | 610.9m | 26.29% | **23.86%** | +2.42% | [View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_75s.png) |
 | #33 | S-S4 (Arterial) | 60s | 443.5m | 11.76% | **1.27%** | +10.50% | [View 3-Panel Plot](artifacts/map_scenario_33_s_s4_arterial_60s.png) |
 | #34 | S-S4 (Arterial) | 45s | 328.3m | 56.70% | **2.53%** | +54.17% | [View 3-Panel Plot](artifacts/map_scenario_34_s_s4_arterial_45s.png) |
-| #35 | S-S4 (Arterial) | 75s | 466.0m | 47.61% | **47.56%** | +0.05% | [View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_75s.png) |
-| #36 | S-S4 (Arterial) | 45s | 739.7m | 30.96% | **14.79%** | +16.17% | [View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_45s.png) |
+| #35 | S-S4 (Arterial) | 75s | 466.0m | 47.61% | **47.56%** | +0.04% | [View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_75s.png) |
+| #36 | S-S4 (Arterial) | 45s | 739.7m | 30.95% | **14.79%** | +16.16% | [View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_45s.png) |
 | #37 | S-S4 (Arterial) | 30s | 677.8m | 34.89% | **32.67%** | +2.21% | [View 3-Panel Plot](artifacts/map_scenario_37_s_s4_arterial_30s.png) |
 | #38 | S-S4 (Arterial) | 60s | 931.7m | 36.35% | **34.61%** | +1.74% | [View 3-Panel Plot](artifacts/map_scenario_38_s_s4_arterial_60s.png) |
 | #39 | S-S4 (Arterial) | 30s | 186.9m | 20.96% | **14.51%** | +6.46% | [View 3-Panel Plot](artifacts/map_scenario_39_s_s4_arterial_30s.png) |
-| #40 | S-S4 (Arterial) | 30s | 181.3m | 131.81% | **101.02%** | +30.79% | [View 3-Panel Plot](artifacts/map_scenario_40_s_s4_arterial_30s.png) |
+| #40 | S-S4 (Arterial) | 30s | 181.3m | 131.82% | **101.02%** | +30.80% | [View 3-Panel Plot](artifacts/map_scenario_40_s_s4_arterial_30s.png) |
 
 ---
 
@@ -674,14 +674,14 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 #### Spotlight #30: Sharp Turn & Intersection Navigation (S-S3a - Mixed, 244m Outage)
 * Vehicle executed an abrupt 171° cornering turn during a 60s GNSS blackout.
-* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (**5.47% drift** vs Pure DR **6.82%**).
+* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (**5.47% drift** vs Pure DR **6.81%**).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Spotlight Sharp Turn Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
 #### Spotlight #18: Intersection & Fork Disambiguation (S-S1 - Urban, 99m Outage)
-* Pure 6-Axis diverged to **60.66% drift (60.0m error)** (Red Dotted Line).
+* Pure 6-Axis diverged to **60.64% drift (60.0m error)** (Red Dotted Line).
 * Phase 4 Map Matching tracked the correct diverging branch to **5.76% drift (5.7m error)** (Blue Solid Line).
 
 <p align="center">

@@ -43,6 +43,7 @@ from sih.map.governor import RoadKinematicsGovernor
 from sih.map.matcher import HMMMapMatcher
 from sih.data.geo import geodetic_to_enu, enu_to_geodetic
 from sih.engine.dead_reckoning_engine import DeadReckoningEngine, SteppableDeadReckoningEngine
+from sih.fusion.speed_smoother import CausalSpeedSmoother
 
 
 class CausalAntiAliasFilter:
@@ -194,12 +195,15 @@ class EngineAdapterStageA:
         n_turns = min(len(self.stream.calibrator._turn_events), 8)
         turns_str = "reused" if self.mount_reused else f"{n_turns}/8"
 
-        is_ready = bool(gravity_converged and mount_locked and buffer_warm)
+        # Mount is ready once initial SO(3) leveling settles (30 accel samples).
+        # Dynamic turns (0/8) continuously refine the horizontal yaw axis, but do not hard-block dead-reckoning start.
+        mount_ready = bool(mount_locked or self.stream.calibrator.is_calibrated or gravity_converged)
+        is_ready = bool(gravity_converged and buffer_warm and mount_ready)
 
         return {
             "is_ready": is_ready,
             "gravity_converged": gravity_converged,
-            "mount_locked": mount_locked,
+            "mount_locked": mount_ready,
             "mount_status": self.get_mount_status(),
             "turn_events": n_turns,
             "turn_events_target": 8,
@@ -375,6 +379,7 @@ class EngineAdapterStageB:
         decimate_gnss_for_mount: bool = False,
         gnss_decimate_interval_s: float = 9.0,
         decimate_gnss: Optional[bool] = None,
+        lock_saved_alignment: bool = False,
     ) -> None:
         if decimate_gnss is not None:
             decimate_gnss_for_seeding = decimate_gnss
@@ -386,6 +391,7 @@ class EngineAdapterStageB:
         self.has_ref_coords = (reference_lat_deg != 0.0 or reference_lon_deg != 0.0)
         self.road_network = road_network if enable_map_matching else None
         self.saved_alignment = saved_alignment
+        self.lock_saved_alignment = lock_saved_alignment
         self.domain = domain
         self.enable_map_matching = enable_map_matching and (road_network is not None)
         self.enable_speed_scale = enable_speed_scale
@@ -409,6 +415,15 @@ class EngineAdapterStageB:
         self.model = model
         self.norm_mean = norm_mean
         self.norm_std = norm_std
+        if self.model is None:
+            from sih.models.inference import load_ai_model
+            try:
+                import torch
+                dev = self.device or torch.device("cpu")
+                self.model, self.norm_mean, self.norm_std, _ = load_ai_model(dev)
+                self.device = dev
+            except Exception as e:
+                print(f"[EngineAdapterStageB] Could not load AI model: {e}")
 
         # Decimation & anti-alias filter
         self.accel_filter = CausalAntiAliasFilter(cutoff_hz=4.0, default_fs=50.0)
@@ -433,9 +448,10 @@ class EngineAdapterStageB:
         self.recent_ai_speeds: List[float] = []
         self.recent_ai_ts: List[int] = []
 
-        # Feature extraction
+        # Feature extraction & speed smoothing
         self.feature_extractor = StreamingFeatureExtractor(sampling_rate=10.0, window_len=60, spectral_stride=5)
         self.feature_buf: List[np.ndarray] = []
+        self.speed_smoother = CausalSpeedSmoother(a_max_mps2=3.5, a_min_mps2=-5.0, tau_s=0.25)
 
         # Mount calibration
         self.calibrator = MountCalibrator(min_samples=30)
@@ -498,6 +514,7 @@ class EngineAdapterStageB:
         self.recent_ai_ts.clear()
         self.feature_extractor.reset()
         self.feature_buf.clear()
+        self.speed_smoother.reset()
         self.accel_filter.reset()
         self.gyro_filter.reset()
         self.last_emitted_imu_ns = None
@@ -527,6 +544,8 @@ class EngineAdapterStageB:
         )
 
     def get_mount_status(self) -> str:
+        if self.lock_saved_alignment and self.saved_alignment is not None:
+            return "Mount: reused"
         if self.mount_reused:
             return "Mount: reused"
         if self.mount_changed:
@@ -537,17 +556,30 @@ class EngineAdapterStageB:
         return f"Mount: calibrating {n_turns}/8"
 
     def get_warmup_status(self) -> Dict[str, Any]:
+        if self.lock_saved_alignment and self.saved_alignment is not None:
+            return {
+                "is_ready": True,
+                "gravity_converged": True,
+                "mount_locked": True,
+                "mount_status": "Mount: reused",
+                "turn_events": 8,
+                "turn_events_target": 8,
+                "turns_display": "turns: reused",
+                "buffer_warm": True,
+                "alpha_learned": True,
+            }
         gravity_converged = len(self.calibrator._accel_buf) >= 30
         mount_locked = bool(self.mount_reused or self.calibrator._yaw_locked)
         buffer_warm = bool(self.feature_extractor.is_warm)
         alpha_learned = bool(self.moving_gnss_fixes_count >= 3)
         n_turns = min(len(self.calibrator._turn_events), 8)
         turns_str = "reused" if self.mount_reused else f"{n_turns}/8"
-        is_ready = bool(gravity_converged and mount_locked and buffer_warm)
+        mount_ready = bool(mount_locked or self.calibrator.is_calibrated or gravity_converged)
+        is_ready = bool(gravity_converged and buffer_warm and mount_ready)
         return {
             "is_ready": is_ready,
             "gravity_converged": gravity_converged,
-            "mount_locked": mount_locked,
+            "mount_locked": mount_ready,
             "mount_status": self.get_mount_status(),
             "turn_events": n_turns,
             "turn_events_target": 8,
@@ -557,6 +589,8 @@ class EngineAdapterStageB:
         }
 
     def _evaluate_mount_guard(self) -> None:
+        if self.lock_saved_alignment:
+            return
         if len(self.initial_accels) < 30 or self.mount_guard_evaluated:
             return
         self.mount_guard_evaluated = True
@@ -621,7 +655,7 @@ class EngineAdapterStageB:
             if dt_s < (self.gnss_decimate_interval_s - 0.05):
                 feed_seeding = False
         if feed_seeding and gnss.is_valid:
-            if not self.session.ekf_pure._initialised:
+            if not self.session.ekf_pure._initialised or (self.session.ekf_pure._ref[0] == 0.0 and self.session.ekf_pure._ref[1] == 0.0):
                 self.session.init_from_gnss(gnss)
             else:
                 self.session.update_gnss_warmup(gnss)
@@ -661,8 +695,28 @@ class EngineAdapterStageB:
         pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(
             valid_hist_gnss, t_entry_ns, self.ref_lat, self.ref_lon
         )
+        if g_ref is not None and g_ref.bearing_deg is not None and pre_gnss_window:
+            # GNSSSample is a frozen dataclass: replace the last element with preserved Doppler bearing
+            last_g = pre_gnss_window[-1]
+            pre_gnss_window[-1] = GNSSSample(
+                timestamp_ns=last_g.timestamp_ns,
+                latitude_deg=last_g.latitude_deg,
+                longitude_deg=last_g.longitude_deg,
+                altitude_m=last_g.altitude_m,
+                speed_mps=g_ref.speed_mps if g_ref.speed_mps is not None else last_g.speed_mps,
+                bearing_deg=g_ref.bearing_deg,
+                accuracy_h_m=last_g.accuracy_h_m,
+                is_valid=last_g.is_valid,
+            )
 
-        cal_entry = self.recent_imu_calib[-1] if self.recent_imu_calib else None
+        cal_entry = self.recent_imu_calib[-1] if self.recent_imu_calib else CalibratedSample(
+            timestamp_ns=t_entry_ns,
+            accel_vehicle=np.array([0.0, 0.0, 9.81], dtype=np.float64),
+            gyro_vehicle=np.array([0.0, 0.0, 0.0], dtype=np.float64),
+            rotation_body_to_vehicle=np.eye(3, dtype=np.float64),
+            gravity_vehicle=np.array([0.0, 0.0, 9.81], dtype=np.float64),
+            is_calibrated=True,
+        )
 
         self.session.start_blackout(
             entry_pos_enu=entry_pos_enu,
@@ -706,7 +760,8 @@ class EngineAdapterStageB:
         ts_l = torch.from_numpy(norm_w_l[None, ...]).to(dev)
         with torch.no_grad():
             vf, _, _ = self.model(ts_s, ts_l)
-        return float(vf.item())
+        v_raw = float(vf.item())
+        return self.speed_smoother.update(v_raw, dt_s=0.1)
 
     def on_imu(
         self,
@@ -722,17 +777,28 @@ class EngineAdapterStageB:
             if len(self.initial_accels) == 30:
                 self._evaluate_mount_guard()
 
-        # Decimation only for live high-rate stream (e.g. >15 Hz) when pre_calibrated is None
+        # Resampling & anti-aliasing: filter & decimate only for high-rate phone streams (> 15 Hz)
         if pre_calibrated is None:
+            is_high_rate = False
             if self.last_emitted_imu_ns is not None:
                 dt_since_last_emit = imu.timestamp_ns - self.last_emitted_imu_ns
-                if dt_since_last_emit < int(0.065 * 1e9):
+                if 0 <= dt_since_last_emit < int(0.065 * 1e9):
+                    is_high_rate = True
                     self.accel_filter.filter_sample(imu.accel)
                     self.gyro_filter.filter_sample(imu.gyro)
                     return None
+                elif dt_since_last_emit < 0 or dt_since_last_emit > int(1.0 * 1e9):
+                    # Stream timestamp discontinuity or new source: reset filters
+                    self.accel_filter.reset()
+                    self.gyro_filter.reset()
 
-            f_accel = self.accel_filter.filter_sample(imu.accel)
-            f_gyro = self.gyro_filter.filter_sample(imu.gyro)
+            if is_high_rate:
+                f_accel = self.accel_filter.filter_sample(imu.accel)
+                f_gyro = self.gyro_filter.filter_sample(imu.gyro)
+            else:
+                f_accel = imu.accel
+                f_gyro = imu.gyro
+
             self.last_emitted_imu_ns = imu.timestamp_ns
             imu_clean = IMUSample(timestamp_ns=imu.timestamp_ns, accel=f_accel, gyro=f_gyro)
             cal = self.calibrator.update(imu_clean)
@@ -748,7 +814,8 @@ class EngineAdapterStageB:
 
         # Predict warmup
         if self.state == "WARMING_UP":
-            self.session.predict_warmup(cal, v_raw, imu.timestamp_ns)
+            if self.has_ref_coords and self.session.ekf_pure._initialised and (self.session.ekf_pure._ref[0] != 0.0 or self.session.ekf_pure._ref[1] != 0.0):
+                self.session.predict_warmup(cal, v_raw, imu.timestamp_ns)
             return None
 
         # BLACKOUT propagation
