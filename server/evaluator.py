@@ -108,11 +108,12 @@ class LiveEvaluator:
         self.latest_metrics = LiveMetrics()
         self.last_completed_summary: Optional[Dict[str, Any]] = None
 
-    def reset(self) -> None:
-        self.ref_lat = 0.0
-        self.ref_lon = 0.0
-        self.ref_alt = 0.0
-        self.has_ref = False
+    def reset(self, keep_ref: bool = False) -> None:
+        if not keep_ref:
+            self.ref_lat = 0.0
+            self.ref_lon = 0.0
+            self.ref_alt = 0.0
+            self.has_ref = False
         self.gnss_fixes.clear()
         self.gnss_enu_history.clear()
         self.dr_fused.clear()
@@ -128,6 +129,13 @@ class LiveEvaluator:
         self.latest_gnss_accuracy_m = 5.0
         self.latest_metrics = LiveMetrics()
         self.last_completed_summary = None
+
+    def set_reference(self, ref_lat: float, ref_lon: float, ref_alt: float = 0.0) -> None:
+        """Sets geodetic origin for ENU conversion."""
+        self.ref_lat = ref_lat
+        self.ref_lon = ref_lon
+        self.ref_alt = ref_alt
+        self.has_ref = (ref_lat != 0.0 or ref_lon != 0.0)
 
     def start_blackout(self, timestamp_ns: Optional[int] = None) -> None:
         """Triggers the start of GNSS blackout evaluation."""

@@ -180,8 +180,13 @@ class NavigationRouter:
         if clear_trip:
             self.loaded_trip = None
             self.current_trip_name = ""
+            self.ref_lat = 0.0
+            self.ref_lon = 0.0
+            self.ref_alt = 0.0
+            self.evaluator.reset(keep_ref=False)
+        else:
+            self.evaluator.reset(keep_ref=(self.ref_lat != 0.0 or self.ref_lon != 0.0))
         self.engine.reset()
-        self.evaluator.reset()
 
     async def broadcast_hud(self) -> None:
         recipients = list(self.client_websockets | self.stream_websockets)
@@ -337,29 +342,29 @@ class NavigationRouter:
                     calib_m.observe_gnss(t.gnss_samples[idx_g])
                     idx_g += 1
                 calib_m.update(im)
-            saved_align = calib_m.alignment
-            rnet, _ = load_trip_road_network(t, map_source="osm", cache_dir="data/maps/cache")
+            self.saved_alignment = calib_m.alignment
+            self.road_network, _ = load_trip_road_network(t, map_source="osm", cache_dir="data/maps/cache")
 
-            trip_domain = "Mixed" if "S-S3" in trip_name else ("Highway" if "S-M" in trip_name else "Arterial")
-            self.engine = EngineAdapterStageB(
-                reference_lat_deg=self.ref_lat,
-                reference_lon_deg=self.ref_lon,
-                reference_alt_m=self.ref_alt,
-                road_network=rnet,
-                saved_alignment=saved_align,
-                domain=trip_domain,
-                model=self.ai_model,
-                norm_mean=self.norm_mean,
-                norm_std=self.norm_std,
-                device=self.device,
-                decimate_gnss_for_seeding=False,
-                lock_saved_alignment=True,
-            )
-            self.evaluator = LiveEvaluator(
-                ref_lat=self.ref_lat,
-                ref_lon=self.ref_lon,
-                ref_alt=self.ref_alt,
-            )
+        trip_domain = "Mixed" if "S-S3" in trip_name else ("Highway" if "S-M" in trip_name else "Arterial")
+        self.engine = EngineAdapterStageB(
+            reference_lat_deg=self.ref_lat,
+            reference_lon_deg=self.ref_lon,
+            reference_alt_m=self.ref_alt,
+            road_network=self.road_network,
+            saved_alignment=self.saved_alignment,
+            domain=trip_domain,
+            model=self.ai_model,
+            norm_mean=self.norm_mean,
+            norm_std=self.norm_std,
+            device=self.device,
+            decimate_gnss_for_seeding=False,
+            lock_saved_alignment=True,
+        )
+        self.evaluator = LiveEvaluator(
+            ref_lat=self.ref_lat,
+            ref_lon=self.ref_lon,
+            ref_alt=self.ref_alt,
+        )
 
         self.benchmark_active = True
         self.is_preloaded_trip = True
@@ -384,11 +389,6 @@ class NavigationRouter:
         from server.replay import slice_scenario, build_sensor_batches
         from sih.calibration.mount import MountCalibrator
 
-        # Reset session metrics without clearing loaded trip
-        self.engine.reset()
-        self.evaluator.reset()
-        self.state = "WARMING_UP"
-
         sliced_trip, bo_start, bo_dur = slice_scenario(self.loaded_trip, scenario_id, warmup_s=30.0)
         bo_start_ns = getattr(sliced_trip, "exact_bo_start_ns", int(bo_start * 1e9))
 
@@ -403,11 +403,19 @@ class NavigationRouter:
                 calib_sc.observe_gnss(self.loaded_trip.gnss_samples[idx_g])
                 idx_g += 1
             calib_sc.update(im)
-        if calib_sc.alignment and calib_sc.alignment.is_calibrated:
-            self.engine.saved_alignment = calib_sc.alignment
-            self.engine.calibrator._alignment = calib_sc.alignment
+        align_to_use = calib_sc.alignment if (calib_sc.alignment and calib_sc.alignment.is_calibrated) else self.saved_alignment
+
+        # Clean reset of engine and evaluator for replay, PRESERVING identical reference coords
+        self.engine.saved_alignment = align_to_use
+        self.engine.reset()
+        if align_to_use is not None and align_to_use.is_calibrated:
+            self.engine.calibrator._alignment = align_to_use
             self.engine.calibrator._yaw_locked = True
             self.engine.mount_reused = True
+
+        self.evaluator.reset(keep_ref=True)
+        self.evaluator.set_reference(self.ref_lat, self.ref_lon, self.ref_alt)
+        self.state = "WARMING_UP"
 
         # Seed initial EKF fix from the first valid sample in the warm-up window
         valid_gnss = [g for g in sliced_trip.gnss_samples if g.is_valid]
@@ -470,6 +478,10 @@ class NavigationRouter:
         self.benchmark_active = False
         self.is_preloaded_trip = False
         self.current_benchmark_scenario = None
+        self.current_trip_name = ""
+        self.ref_lat = 0.0
+        self.ref_lon = 0.0
+        self.ref_alt = 0.0
         # Deload benchmark: restore engine back to live mode with unlocked saved alignment
         self.engine = EngineAdapterStageB(
             reference_lat_deg=0.0,
