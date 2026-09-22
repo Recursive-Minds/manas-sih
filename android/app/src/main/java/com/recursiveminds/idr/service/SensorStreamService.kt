@@ -298,6 +298,14 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
         Log.i("IDRService", "Sensor streaming muted=$muted")
     }
 
+    fun prepareBenchmark(scenarioId: Int) {
+        val msg = ControlMessage(
+            command = "prepare_benchmark",
+            scenarioId = scenarioId
+        )
+        webSocket?.send(gson.toJson(msg))
+    }
+
     fun startBenchmark(scenarioId: Int, speed: Double) {
         setSensorStreamingMuted(true)
         val msg = ControlMessage(

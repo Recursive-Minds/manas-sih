@@ -172,12 +172,14 @@ class NavigationRouter:
         else:
             self.evaluator.stop_blackout()
 
-    def reset(self) -> None:
+    def reset(self, clear_trip: bool = False) -> None:
         self.state = "WARMING_UP"
         self.benchmark_active = False
         self.is_preloaded_trip = False
         self.current_benchmark_scenario = None
-        self.loaded_trip = None
+        if clear_trip:
+            self.loaded_trip = None
+            self.current_trip_name = ""
         self.engine.reset()
         self.evaluator.reset()
 
@@ -285,26 +287,25 @@ class NavigationRouter:
             gyr = im_dict["gyro"]
             imu = IMUSample(
                 timestamp_ns=int(im_dict["timestamp_ns"]),
-                accel=np.array(acc, dtype=np.float64),
-                gyro=np.array(gyr, dtype=np.float64),
+                accel=np.array([float(acc[0]), float(acc[1]), float(acc[2])], dtype=np.float64),
+                gyro=np.array([float(gyr[0]), float(gyr[1]), float(gyr[2])], dtype=np.float64),
             )
             fused = self.engine.on_imu(imu)
             if fused is not None:
                 self.evaluator.on_dr(fused)
 
-        # Broadcast update to web and mobile clients
+        # 4. Broadcast updated HUD state to phone and web dashboard
         await self.broadcast_hud()
 
-    async def start_benchmark(self, scenario_id: int, speed: float = 2.0) -> Dict[str, Any]:
-        """Loads and begins streaming the requested canonical benchmark scenario."""
-        if self.benchmark_task and not self.benchmark_task.done():
-            self.benchmark_task.cancel()
-
+    async def prepare_benchmark(self, scenario_id: int = 30) -> Dict[str, Any]:
+        """
+        Preloads scenario trip, road network, and alignment when benchmark suite is opened.
+        Immediately activates benchmark warmup ticks ('✓ Bench-Calib', '✓ Gravity', etc.).
+        """
         if scenario_id <= 0:
             import random
             real_scenarios = [s["id"] for s in SCENARIOS_META if s["id"] > 0]
             scenario_id = random.choice(real_scenarios) if real_scenarios else 30
-            print(f"[Benchmark] Selected random scenario #{scenario_id}")
 
         meta = next((s for s in SCENARIOS_META if s["id"] == scenario_id), None)
         if meta is None:
@@ -315,12 +316,12 @@ class NavigationRouter:
         if not os.path.exists(trip_path):
             return {"status": "error", "message": f"Trip CSV {trip_path} not found"}
 
-        from server.replay import load_any_trip, slice_scenario, build_sensor_batches
+        from server.replay import load_any_trip
         from sih.map.network import load_trip_road_network
         from sih.calibration.mount import MountCalibrator
 
         if self.current_trip_name != trip_name or self.loaded_trip is None:
-            print(f"[Benchmark] Loading trip {trip_name} and OSM road network...")
+            print(f"[Benchmark] Preloading trip {trip_name} and OSM road network for Scenario #{scenario_id}...")
             t = load_any_trip(trip_path)
             self.loaded_trip = t
             self.current_trip_name = trip_name
@@ -360,7 +361,34 @@ class NavigationRouter:
                 ref_alt=self.ref_alt,
             )
 
-        self.reset()
+        self.benchmark_active = True
+        self.is_preloaded_trip = True
+        self.current_benchmark_scenario = scenario_id
+        await self.broadcast_hud()
+        return {"status": "ok", "scenario_id": scenario_id, "trip": trip_name}
+
+    async def start_benchmark(self, scenario_id: int = 30, speed: float = 2.0) -> Dict[str, Any]:
+        """
+        Orchestrates scenario replay: loads trip, aligns mount, slices blackout, and streams batches.
+        """
+        if self.benchmark_task and not self.benchmark_task.done():
+            self.benchmark_task.cancel()
+
+        prep_res = await self.prepare_benchmark(scenario_id=scenario_id)
+        if prep_res.get("status") == "error":
+            return prep_res
+
+        scenario_id = prep_res["scenario_id"]
+        trip_name = prep_res["trip"]
+
+        from server.replay import slice_scenario, build_sensor_batches
+        from sih.calibration.mount import MountCalibrator
+
+        # Reset session metrics without clearing loaded trip
+        self.engine.reset()
+        self.evaluator.reset()
+        self.state = "WARMING_UP"
+
         sliced_trip, bo_start, bo_dur = slice_scenario(self.loaded_trip, scenario_id, warmup_s=30.0)
         bo_start_ns = getattr(sliced_trip, "exact_bo_start_ns", int(bo_start * 1e9))
 
@@ -375,7 +403,7 @@ class NavigationRouter:
                 calib_sc.observe_gnss(self.loaded_trip.gnss_samples[idx_g])
                 idx_g += 1
             calib_sc.update(im)
-        if calib_sc.alignment.is_calibrated:
+        if calib_sc.alignment and calib_sc.alignment.is_calibrated:
             self.engine.saved_alignment = calib_sc.alignment
             self.engine.calibrator._alignment = calib_sc.alignment
             self.engine.calibrator._yaw_locked = True
@@ -434,17 +462,37 @@ class NavigationRouter:
             self.benchmark_active = False
             self.is_preloaded_trip = False
             self.current_benchmark_scenario = None
-            self.loaded_trip = None
             await self.broadcast_hud()
 
     async def stop_benchmark(self) -> Dict[str, Any]:
         if self.benchmark_task and not self.benchmark_task.done():
             self.benchmark_task.cancel()
         self.benchmark_active = False
+        self.is_preloaded_trip = False
         self.current_benchmark_scenario = None
-        self.reset()
+        # Deload benchmark: restore engine back to live mode with unlocked saved alignment
+        self.engine = EngineAdapterStageB(
+            reference_lat_deg=0.0,
+            reference_lon_deg=0.0,
+            reference_alt_m=0.0,
+            road_network=None,
+            saved_alignment=None,
+            domain="Mixed",
+            model=self.ai_model,
+            norm_mean=self.norm_mean,
+            norm_std=self.norm_std,
+            device=self.device,
+            decimate_gnss_for_seeding=False,
+            lock_saved_alignment=False,
+        )
+        self.evaluator = LiveEvaluator(
+            ref_lat=0.0,
+            ref_lon=0.0,
+            ref_alt=0.0,
+        )
+        self.state = "WARMING_UP"
         await self.broadcast_hud()
-        return {"status": "ok", "message": "Benchmark stopped"}
+        return {"status": "ok", "message": "Benchmark stopped and deloaded"}
 
 
 def json_response_cors(data: Any, status: int = 200) -> web.Response:
@@ -478,6 +526,17 @@ async def api_benchmark_start_handler(request: web.Request) -> web.Response:
 async def api_benchmark_stop_handler(request: web.Request) -> web.Response:
     router: NavigationRouter = request.app["router"]
     res = await router.stop_benchmark()
+    return json_response_cors(res)
+
+
+async def api_benchmark_prepare_handler(request: web.Request) -> web.Response:
+    router: NavigationRouter = request.app["router"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    scenario_id = int(body.get("scenario_id", 30))
+    res = await router.prepare_benchmark(scenario_id=scenario_id)
     return json_response_cors(res)
 
 
@@ -549,6 +608,9 @@ async def ws_client_handler(request: web.Request) -> web.WebSocketResponse:
                     router.set_blackout(False)
                 elif cmd == "reset":
                     router.reset()
+                elif cmd == "prepare_benchmark":
+                    sc_id = int(data.get("scenario_id", 30))
+                    await router.prepare_benchmark(scenario_id=sc_id)
                 elif cmd == "start_benchmark":
                     sc_id = int(data.get("scenario_id", 30))
                     spd = float(data.get("speed", 2.0))
@@ -583,6 +645,9 @@ async def ws_stream_handler(request: web.Request) -> web.WebSocketResponse:
                         router.set_blackout(False)
                     elif cmd == "reset":
                         router.reset()
+                    elif cmd == "prepare_benchmark":
+                        sc_id = int(data.get("scenario_id", 30))
+                        await router.prepare_benchmark(scenario_id=sc_id)
                     elif cmd == "start_benchmark":
                         sc_id = int(data.get("scenario_id", 30))
                         spd = float(data.get("speed", 2.0))
@@ -604,6 +669,7 @@ def create_app(router: Optional[NavigationRouter] = None) -> web.Application:
     app.router.add_get("/api/scenarios", api_scenarios_handler)
     app.router.add_post("/api/benchmark/start", api_benchmark_start_handler)
     app.router.add_post("/api/benchmark/stop", api_benchmark_stop_handler)
+    app.router.add_post("/api/benchmark/prepare", api_benchmark_prepare_handler)
     app.router.add_get("/ws/client", ws_client_handler)
     app.router.add_get("/ws/stream", ws_stream_handler)
     app.router.add_get(r"/tiles/{z:\d+}/{x:\d+}/{y:\d+}.png", tile_handler)

@@ -265,19 +265,32 @@ class MainActivity : AppCompatActivity() {
         btnBenchmarkSuite.setOnClickListener {
             if (cardBenchmark.visibility == View.VISIBLE) {
                 cardBenchmark.visibility = View.GONE
+                // User closed benchmark: deload benchmark mode
+                streamService?.stopBenchmark()
+                currentMode = AppMode.LIVE_DRIVE
+                tvBenchmarkBadge.text = "LIVE SENSORS"
+                tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
             } else {
                 cardBenchmark.visibility = View.VISIBLE
-                // Hide CSV panel when benchmark panel opens
                 cardCsvRecording.visibility = View.GONE
+                // User opened benchmark: prepare scenario and load ticks!
+                val scItem = benchmarkScenarioList.getOrNull(spinnerScenarios.selectedItemPosition)
+                    ?: benchmarkScenarioList.firstOrNull { it.id == 30 }
+                    ?: benchmarkScenarioList[0]
+                val scId = if (scItem.id > 0) scItem.id else 30
+                currentMode = AppMode.BENCHMARK_EVALUATION
+                tvBenchmarkBadge.text = "PRELOADING #${scId}..."
+                tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_amber))
+                streamService?.prepareBenchmark(scId)
             }
         }
 
         btnCloseBenchmark.setOnClickListener {
             cardBenchmark.visibility = View.GONE
-            if (currentMode == AppMode.BENCHMARK_EVALUATION) {
-                streamService?.stopBenchmark()
-                currentMode = AppMode.LIVE_DRIVE
-            }
+            streamService?.stopBenchmark()
+            currentMode = AppMode.LIVE_DRIVE
+            tvBenchmarkBadge.text = "LIVE SENSORS"
+            tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
         }
 
         btnRunBenchmark.setOnClickListener {
@@ -456,6 +469,21 @@ class MainActivity : AppCompatActivity() {
         val speedAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, speeds)
         speedAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerSpeed.adapter = speedAdapter
+
+        spinnerScenarios.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (cardBenchmark.visibility == View.VISIBLE) {
+                    val scItem = benchmarkScenarioList.getOrNull(position)
+                    if (scItem != null) {
+                        val scId = if (scItem.id > 0) scItem.id else 30
+                        tvBenchmarkBadge.text = "PRELOADING #${scId}..."
+                        tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_amber))
+                        streamService?.prepareBenchmark(scId)
+                    }
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
     }
 
     private fun initMap() {
@@ -668,31 +696,35 @@ class MainActivity : AppCompatActivity() {
         // Benchmark mode badge tracking
         if (hud.benchmarkActive) {
             currentMode = AppMode.BENCHMARK_EVALUATION
-            tvBenchmarkBadge.text = "REPLAYING #${hud.benchmarkScenario ?: 30}"
-            tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
-            btnRunBenchmark.text = "REPLAYING..."
-            btnRunBenchmark.isEnabled = false
+            val scId = hud.benchmarkScenario ?: 30
+            if (isInBlackout || (latestMetrics != null && latestMetrics?.isBlackout == true)) {
+                tvBenchmarkBadge.text = "REPLAYING #$scId"
+                tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
+                btnRunBenchmark.text = "REPLAYING..."
+                btnRunBenchmark.isEnabled = false
+            } else {
+                tvBenchmarkBadge.text = "BENCHMARK #$scId READY"
+                tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
+                btnRunBenchmark.text = "RUN BENCHMARK"
+                btnRunBenchmark.isEnabled = true
+            }
 
             // Synchronize scenario spinner if triggered externally
-            hud.benchmarkScenario?.let { scId ->
-                val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
-                if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
-                    spinnerScenarios.setSelection(targetPos)
-                }
+            val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
+            if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
+                spinnerScenarios.setSelection(targetPos)
             }
         } else {
             btnRunBenchmark.text = "RUN BENCHMARK"
             btnRunBenchmark.isEnabled = true
-            if (currentMode == AppMode.BENCHMARK_EVALUATION) {
-                // Benchmark just finished — transition cleanly back to LIVE_DRIVE
+            if (currentMode == AppMode.BENCHMARK_EVALUATION && cardBenchmark.visibility != View.VISIBLE) {
+                // Benchmark closed or stopped — transition cleanly back to LIVE_DRIVE
                 currentMode = AppMode.LIVE_DRIVE
-                tvBenchmarkBadge.text = "EVALUATION DONE"
+                tvBenchmarkBadge.text = "LIVE SENSORS"
                 tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
-                // Clear benchmark map tracks so they don't persist on the live map
                 gnssPolyline.actualPoints.clear()
                 drPolyline.actualPoints.clear()
                 mapView.invalidate()
-                // Re-center on phone's real location
                 hasCenteredMap = false
             }
         }
