@@ -172,7 +172,7 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/train_interval_lam0.5_s42.json`
   - `logs/round1/train_interval_lam1.0_s42.json`
   - `logs/round1/train_interval_lam2.0_s42.json`
-- **Commit Hash**: Pending commit (`round1: T6 training and evaluation results`).
+- **Commit Hash**: `27f725c`
 
 
 
