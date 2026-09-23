@@ -69,6 +69,22 @@ class TestRound1Flags(unittest.TestCase):
         self.assertEqual(b["r1_anchors"], 1)
         self.assertLess(b["map_err_m"], a["map_err_m"])
 
+    def test_t10_default_bounds_are_bit_identical(self):
+        same = run(self.drive, {"scale_level": {"enabled": True}})
+        np.testing.assert_array_equal(same["map_pts"], self.base["map_pts"])
+        self.assertTrue(np.isfinite(same["r1_scale_raw"]))
+
+    def test_t10_wider_clip_fixes_saturated_scale(self):
+        # needs scale ~0.74, baseline clips at 0.85. scale_fix=engine mimics real data, where the
+        # autopsy showed the EKF's own speed scale stays at ~1.0 (the synthetic EKF learns it).
+        d = make_drive(ai_gain=1.35)
+        base = run(d, {"scale_fix": {"source": "engine"}})
+        wide = run(d, {"scale_fix": {"source": "engine"}, "scale_level": {"enabled": True, "lo": 0.6, "hi": 1.6}})
+        self.assertAlmostEqual(base["r1_scale_engine"], 0.85, places=3)
+        self.assertLess(wide["map_err_m"], base["map_err_m"])
+        hist = run(d, {"scale_level": {"enabled": True, "lo": 0.6, "hi": 1.6, "source": "history"}})
+        self.assertAlmostEqual(hist["r1_scale_history"], 1 / 1.35, delta=0.03)
+
     def test_every_flag_runs(self):
         for cfg in ({"gyro_scale": {"enabled": True}}, {"online_calib": {"enabled": True}},
                     {"speed_mode": {"mode": "hold_entry"}}, {"speed_mode": {"mode": "entry_offset_decay"}},

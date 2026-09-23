@@ -44,6 +44,7 @@ class Round1EngineHooks:
         self.v_ai_entry = 0.0
         self.t_entry_ns = 0
         self._last_t: Optional[int] = None
+        self.history_ratio: Optional[float] = None
 
     @classmethod
     def create(cls, domain: str, cfg: Optional[Round1Config] = None) -> Optional["Round1EngineHooks"]:
@@ -64,10 +65,30 @@ class Round1EngineHooks:
             self.gyro_scale = float(self.gyro_info["scale"])
         if self.band is not None:
             self.band.fit(hist)
+        if self.cfg.scale_level.enabled and self.cfg.scale_level.source != "entry":
+            lvl = self.band if self.band is not None else BandSpeedCalibrator(self.cfg.online_calib)
+            if lvl is not self.band:
+                lvl.fit(hist)
+            r = lvl.info.get("r_all") if lvl.fitted else None
+            self.history_ratio = float(r) if r is not None else None
         if self.stop is not None:
             self.stop.learn_idle_level(hist.gnss_ts_ns, hist.gnss_speed, hist.imu_ts_ns, hist.accel)
 
     def on_blackout_start(self, engine: Any, recent_ai_speeds: List[float], t_entry_ns: int) -> None:
+        # T10 scale level / clip bounds (needs engine.speed_scale_raw from edit E9)
+        sl = self.cfg.scale_level
+        self.scale_raw = getattr(engine, "speed_scale_raw", None)
+        if sl.enabled:
+            raw = self.scale_raw
+            if sl.source == "history" and self.history_ratio is not None:
+                raw = self.history_ratio
+            elif sl.source == "blend" and self.history_ratio is not None and raw is not None:
+                raw = (1.0 - sl.w_history) * raw + sl.w_history * self.history_ratio
+            elif sl.source == "blend" and raw is None:
+                raw = self.history_ratio
+            if raw is not None:
+                hi = sl.hi_highway if self.domain == "Highway" else sl.hi
+                engine.speed_scale = float(np.clip(raw, sl.lo, hi))
         # T9 diagnostics + fix for the double speed-scale
         self.scale_engine = float(engine.speed_scale)
         self.scale_ekf = float(engine.ekf_map._speed_scale)
@@ -136,6 +157,8 @@ class Round1EngineHooks:
         s: Dict[str, Any] = {"r1_config": self.cfg.name, "r1_gyro_scale": self.gyro_scale,
                              "r1_scale_engine": round(getattr(self, "scale_engine", float("nan")), 4),
                              "r1_scale_ekf": round(getattr(self, "scale_ekf", float("nan")), 4),
+                             "r1_scale_raw": float("nan") if getattr(self, "scale_raw", None) is None else round(self.scale_raw, 4),
+                             "r1_scale_history": float("nan") if self.history_ratio is None else round(self.history_ratio, 4),
                              "r1_scale_effective": round(getattr(self, "scale_engine", float("nan"))
                                                          * getattr(self, "scale_ekf", float("nan")), 4)}
         if self.gyro_info:

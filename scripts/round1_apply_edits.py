@@ -80,6 +80,10 @@ EDITS = [
      "        if session.r1 is not None:\n"
      "            result.update(session.r1.summary())\n"
      "        return result\n"),
+    (ENGINE, "E9 raw speed scale (T10)",
+     "                self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == \"Highway\" else 1.25))\n",
+     "                self.speed_scale_raw = float(scale)  # [ROUND1] T10: unclipped ratio, read by hooks only\n"
+     "                self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == \"Highway\" else 1.25))\n"),
     # ---------------- T1 pointer (Kotlin) ------------------------------------------------
     (KOTLIN, "K1 live GNSS marker",
      "                                vehicleMarker?.rotation = gnss.bearingDeg\n",

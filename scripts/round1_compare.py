@@ -59,6 +59,12 @@ def main() -> None:
             ceil = df["domain"].map(lambda d: 1.35 if d == "Highway" else 1.25)
             print(f"{side}: speed scale median {s.median():.3f} | at clip ceiling {(s >= ceil - 1e-3).mean():.1%} "
                   f"| at floor 0.85 {(s <= 0.851).mean():.1%}")
+        if "r1_scale_raw" in df.columns and df["r1_scale_raw"].notna().any():
+            r = df["r1_scale_raw"].dropna()
+            print(f"{side}: RAW (unclipped) scale p10 {r.quantile(0.1):.3f} | median {r.median():.3f} | p90 {r.quantile(0.9):.3f} "
+                  f"| outside [0.85, 1.25] {((r < 0.85) | (r > 1.25)).mean():.1%}")
+        if "r1_scale_ekf" in df.columns:
+            print(f"{side}: EKF internal speed scale median {df['r1_scale_ekf'].median():.3f} (should be ~1.0)")
 
 
 if __name__ == "__main__":

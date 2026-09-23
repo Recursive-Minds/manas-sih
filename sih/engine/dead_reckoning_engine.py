@@ -224,6 +224,7 @@ class SteppableDeadReckoningEngine:
             ai_speeds = recent_ai_speeds[max(0, len(recent_ai_speeds) - len(g_speeds) * 10):]
             if len(g_speeds) >= 3 and len(ai_speeds) >= 10:
                 scale = np.mean(g_speeds) / max(0.5, np.mean(ai_speeds))
+                self.speed_scale_raw = float(scale)  # [ROUND1] T10: unclipped ratio, read by hooks only
                 self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == "Highway" else 1.25))
 
         self.speed_obs_pure.reset(initial_speed_mps=self.v_entry, initial_ts_ns=t_entry_ns)

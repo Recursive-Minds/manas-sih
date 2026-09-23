@@ -1,5 +1,5 @@
 """
-Round-1 feature flags (T3, T4, T5, T7, T8, T9).
+Round-1 feature flags (T3, T4, T5, T7, T8, T9, T10).
 
 Every flag defaults to OFF. With all flags OFF the engine must run bit-identically
 to the pre-round-1 baseline (checked by scripts/round1_eval.py --assert-parity).
@@ -81,6 +81,18 @@ class JunctionAnchorParams:        # T8
 
 
 @dataclass
+class ScaleLevelParams:            # T10
+    # Pre-blackout speed scale (GNSS / AI). Baseline clips it to [0.85, 1.25] (1.35 on
+    # Highway); the ablation showed ~45 % of scenarios sitting on a clip bound.
+    enabled: bool = False
+    lo: float = 0.85
+    hi: float = 1.25
+    hi_highway: float = 1.35
+    source: str = "entry"          # "entry" (baseline 15 s ratio) | "history" (180 s GNSS-distance ratio) | "blend"
+    w_history: float = 0.5         # blend weight of the history ratio
+
+
+@dataclass
 class SpeedScaleFixParams:         # T9
     # Blackout speed reaching the EKF is  v_ai * engine.speed_scale * ekf._speed_scale.
     # Both factors are learned from the SAME pre-blackout GNSS/AI ratio, so the
@@ -96,6 +108,7 @@ class Round1Config:
     diagnostics: bool = False      # hooks active but behaviour unchanged (extra result keys only)
     history_s: float = 180.0       # pre-blackout history used by T3/T4/T7 learners
     scale_fix: SpeedScaleFixParams = field(default_factory=SpeedScaleFixParams)
+    scale_level: ScaleLevelParams = field(default_factory=ScaleLevelParams)
     stop: StopDetectorParams = field(default_factory=StopDetectorParams)
     gyro_scale: GyroScaleParams = field(default_factory=GyroScaleParams)
     speed_mode: SpeedModeParams = field(default_factory=SpeedModeParams)
@@ -106,6 +119,7 @@ class Round1Config:
         return not (
             self.diagnostics
             or self.scale_fix.source != "both"
+            or self.scale_level.enabled
             or self.stop.enabled
             or self.gyro_scale.enabled
             or self.speed_mode.mode != "ai"
@@ -114,7 +128,8 @@ class Round1Config:
         )
 
     def needs_history(self) -> bool:
-        return self.stop.enabled or self.gyro_scale.enabled or self.online_calib.enabled
+        return (self.stop.enabled or self.gyro_scale.enabled or self.online_calib.enabled
+                or (self.scale_level.enabled and self.scale_level.source != "entry"))
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -125,6 +140,7 @@ class Round1Config:
         sections = {
             "stop": cfg.stop, "gyro_scale": cfg.gyro_scale, "speed_mode": cfg.speed_mode,
             "online_calib": cfg.online_calib, "junction": cfg.junction, "scale_fix": cfg.scale_fix,
+            "scale_level": cfg.scale_level,
         }
         for k, v in d.items():
             if k in sections and isinstance(v, dict):
@@ -141,6 +157,8 @@ class Round1Config:
                 raise KeyError(f"Unknown round1 key {k}")
         if cfg.speed_mode.mode not in ("ai", "hold_entry", "entry_offset_decay"):
             raise ValueError(f"Unknown speed_mode.mode {cfg.speed_mode.mode}")
+        if cfg.scale_level.source not in ("entry", "history", "blend"):
+            raise ValueError(f"Unknown scale_level.source {cfg.scale_level.source}")
         if cfg.scale_fix.source not in ("both", "engine", "ekf"):
             raise ValueError(f"Unknown scale_fix.source {cfg.scale_fix.source}")
         return cfg
