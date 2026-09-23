@@ -221,7 +221,7 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/step9_compare_combo_t7_t8.log`
   - `logs/round1/train_interval_lam0.5_s7.json`
   - `logs/round1/train_interval_lam0.5_s123.json`
-- **Commit Hash**: Pending commit (`round1: step 9 verification and combination results`).
+- **Commit Hash**: `7032a39`
 
 
 
