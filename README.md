@@ -1226,21 +1226,21 @@ The screenshots below show the production IDR app running on a real Android devi
 
 <p align="center">
   <img src="artifacts/app_screen_benchmark_drawer.png" width="280" alt="Benchmark Drawer Closed" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_benchmark_drawer_open.png" width="280" alt="Benchmark Drawer Open" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_replaying_30.png" width="280" alt="Replaying Scenario 30" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_benchmark_drawer_open.png" width="280" alt="Benchmark Drawer Open with Scenario 15" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_dropdown_list.png" width="280" alt="Scenario Dropdown List" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
 </p>
 
-*Left: Benchmark badge in top bar. Centre: Scenario selector with speed multiplier dropdown (1x / 2x / 5x). Right: REPLAYING Scenario #30 (S-S3a Mixed, 244m blackout, 5.47% drift).*
+*Left: Benchmark badge in top bar. Centre: Scenario #15 Urban (S-S1, 45s, 399m) preloaded with all warmup ticks green and RUN BENCHMARK ready. Right: Full scenario dropdown showing all canonical scenarios with drift percentages.*
 
 #### Benchmark Replay & Results
 
 <p align="center">
-  <img src="artifacts/app_screen_scenario30_check.png" width="280" alt="Scenario 30 Running" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_scenario30_done.png" width="280" alt="Scenario 30 Complete" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_scenario30_summary.png" width="280" alt="Scenario 30 Summary" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_replaying_15.png" width="280" alt="Scenario 15 Replaying" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_scenario15_done.png" width="280" alt="Scenario 15 Complete" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_scenario15_summary.png" width="280" alt="Scenario 15 Summary" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
 </p>
 
-*Scenario #30 replay in progress (left), completed (centre), and final error scorecard summary overlay (right). Drift 5.47% — TIER-1 PASS.*
+*Scenario #15 Urban (S-S1) replay — benchmark replaying mid-blackout (left), post-replay map with DR track (centre), and SESSION EVALUATION SUMMARY overlay showing Drift 18.74%, Final Error 74.9m, City 20-50 km/h classification (right).*
 
 #### CSV Recording Card
 
