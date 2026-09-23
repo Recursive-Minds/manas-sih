@@ -74,6 +74,23 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/step3_apply_edits.log`
   - `logs/round1/step3_pytest_post_patch.log`
   - `logs/round1/step3_parity.log`
-- **Commit Hash**: Pending commit (`round1: apply marked edits and pass parity`).
+- **Commit Hash**: `82332d7`
+
+---
+
+### Step 4: Worst-Scenario Autopsy (T2)
+- **Start Time**: 2026-09-23 20:03:31 +05:30
+- **End Time**: 2026-09-23 20:05:05 +05:30
+- **Command**: `python scripts/round1_autopsy.py --seed 541098 --ids 9 40 35 --worst 5 2>&1 | Tee-Object -FilePath "logs\round1\step4_autopsy.log"`
+- **Purpose**: Decompose error sources (speed scale, stop creep, heading cross-track) and inspect T9 double scale factor on Seed 541098.
+- **Exit Code**: 0
+- **Log Path**: `logs/round1/step4_autopsy.log`
+- **Key Numbers**:
+  - Seed median drift: 14.32% over 40 scenarios.
+  - Worst 5 scenarios: #40 (101.0%), #9 (91.0%), #35 (47.6%), #38 (34.6%), #37 (32.7%).
+  - Main causes: All top 5 driven by SPEED/SCALE error.
+  - Double speed-scale check (T9): Median engine scale 1.201, median effective scale 1.201 (0.0% difference, does not differ by >2%).
+- **Commit Hash**: Pending commit (`round1: autopsy results`).
+
 
 
