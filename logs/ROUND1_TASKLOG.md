@@ -174,6 +174,19 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/train_interval_lam2.0_s42.json`
 - **Commit Hash**: `27f725c`
 
+---
+
+### Step 7: Android Build Verification
+- **Start Time**: 2026-09-23 20:56:50 +05:30
+- **End Time**: 2026-09-23 21:05:23 +05:30
+- **Command**: `cmd.exe /c "gradlew.bat assembleDebug"` (in `android/`)
+- **Purpose**: Verify Android build and compilation of marked Kotlin marker-rotation edits.
+- **Exit Code**: 0
+- **Log Path**: `logs/round1/step7_assembleDebug.log`
+- **Key Numbers**: BUILD SUCCESSFUL in 8m 32s (38 actionable tasks: 5 executed, 33 up-to-date).
+- **Commit Hash**: Pending commit (`round1: android build verified`).
+
+
 
 
 
