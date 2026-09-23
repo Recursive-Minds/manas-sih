@@ -223,6 +223,34 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/train_interval_lam0.5_s123.json`
 - **Commit Hash**: `7032a39`
 
+---
+
+### Step 10: T10 Evaluation, Recipe Selection & Multi-Seed Validation
+- **Start Time**: 2026-09-23 22:23:00 +05:30
+- **End Time**: 2026-09-23 23:06:00 +05:30
+- **Summary**:
+  1. Addon C installed (`sih_round1c_addon.zip`): verified exact files, applied edit `E9 raw speed scale (T10)`, passed 15 round-1 unit tests, and verified bit-exact parity with `parity2` (`max diff = 5.68e-14`).
+  2. Paired comparisons from existing CSVs:
+     - `t7_band` on top of T6: 83 better vs 64 worse overall, 42 better vs 28 worse on unseen trips (median delta -0.01 pp, mean delta -0.77 pp, unseen median 9.92%).
+     - `t7_t8` on top of `t7_band`: 20 better vs 11 worse overall, 15 better vs 5 worse on unseen trips (sign-test p = 0.041).
+  3. T10 evaluation on T6 s42 model and base model:
+     - Verified EKF internal speed scale median is 1.000 across all runs.
+     - Confirmed that widening speed scale clip bounds (`t7_clip_wide`, `t7_clip_xwide`) degrades performance significantly (+2.00 pp to +4.14 pp mean regressions), proving default clip bounds `[0.85, 1.25]` protect against noise.
+  4. Final recipe evaluation (`t7_t8` with T6 lam=0.5):
+     - s42: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46.2%, unseen median 9.92%
+     - s7: median 11.10%, mean 10.87 +- 2.33%, p90 42.0%, T1 47.5%, unseen median 9.30%
+     - s123: median 12.48%, mean 12.14 +- 2.41%, p90 41.8%, T1 45.8%, unseen median 9.62%
+     - 3-Model Average: median 11.63%, mean 11.28%, p90 42.3%, T1 46.5%, unseen median 9.61%
+- **Log Paths**:
+  - `logs/round1/step10_parity2.log`
+  - `logs/round1/step10_t10_t6s42.log`
+  - `logs/round1/step10_t10_base.log`
+  - `logs/round1/step10_final_s42.log`
+  - `logs/round1/step10_final_s7.log`
+  - `logs/round1/step10_final_s123.log`
+- **Commit Hash**: Pending commit (`round1: step 10 final recipe multi-seed validation`).
+
+
 
 
 
