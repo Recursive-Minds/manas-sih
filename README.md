@@ -1185,6 +1185,72 @@ adb reverse tcp:8765 tcp:8765
   - Tap **BENCHMARK SUITE** in the top bar to open the drawer.
   - Select any canonical held-out scenario (e.g. Scenario #30, #22, #26) and choose replay speed (1.0x, 2.0x, 5.0x).
   - The app automatically mutes physical desk phone sensors to prevent real-world coordinate contamination, runs the benchmark drive through the causal dead-reckoning engine, and displays the final error scorecard and trajectory.
+  - **Clean Deload on Close**: Closing the benchmark drawer resets all warmup ticks (Gravity, Mount, Buffer, Alpha) and restores the engine to live drive mode, preventing benchmark state from contaminating real sensor operation.
+
+#### 4. Engineering Fixes & Hardening (Recent)
+
+| Fix | Description |
+| :--- | :--- |
+| **Coordinate Origin Desynchronization Fix** | `LiveEvaluator` and `EngineAdapterStageB` now share the same geodetic reference point, eliminating the `ref_lat/lon = 0,0` reset bug that caused thousands-of-meters Euclidean error during benchmark replay. |
+| **Benchmark Deload on Drawer Close** | `stop_benchmark()` in `server/router.py` now creates a fresh `EngineAdapterStageB` instance (`lock_saved_alignment=False`, `saved_alignment=None`) and broadcasts a reset HUD, so all four Android app warmup ticks correctly clear to ✗ when the drawer is closed. |
+| **Non-Blocking Warmup Gate** | The START button no longer hard-blocks on the 0/8 turn counter — gravity + 6s buffer is sufficient to begin dead-reckoning, with mount refinement happening continuously during live driving. |
+| **Benchmark Trip Slicing Fix** | Scenario trip slicing (`slice_scenario`) was corrected to use the exact blackout start timestamp, preventing warmup data from leaking into the blackout window. |
+
+---
+
+### 19.6 Live Android App Screenshots
+
+The screenshots below show the production IDR app running on a real Android device. All UI elements are functional and correspond to the modes described in Section 19.5.
+
+#### Startup & Connection
+
+<p align="center">
+  <img src="artifacts/app_screen_initial.png" width="280" alt="App Initial Screen" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_connected.png" width="280" alt="App Connected to Server" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_live_ready.png" width="280" alt="App Warmup Ready" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+</p>
+
+*Left: Initial cold-start screen. Centre: Connected to IDR Python server via USB ADB tunnel. Right: All four warmup conditions satisfied — engine ready to start dead-reckoning.*
+
+#### Live Map & Location Tracking
+
+<p align="center">
+  <img src="artifacts/app_screen_live_fullmap.png" width="280" alt="Full Map View" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_live_location.png" width="280" alt="Live Location on Map" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_live_final.png" width="280" alt="Dead Reckoning Live" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+</p>
+
+*Real-time OSMDroid map with vehicle marker, GNSS track (green), and dead-reckoning track (blue/amber) overlaid.*
+
+#### Benchmark Suite Drawer
+
+<p align="center">
+  <img src="artifacts/app_screen_benchmark_drawer.png" width="280" alt="Benchmark Drawer Closed" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_benchmark_drawer_open.png" width="280" alt="Benchmark Drawer Open" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_replaying_30.png" width="280" alt="Replaying Scenario 30" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+</p>
+
+*Left: Benchmark badge in top bar. Centre: Scenario selector with speed multiplier dropdown (1x / 2x / 5x). Right: REPLAYING Scenario #30 (S-S3a Mixed, 244m blackout, 5.47% drift).*
+
+#### Benchmark Replay & Results
+
+<p align="center">
+  <img src="artifacts/app_screen_scenario30_check.png" width="280" alt="Scenario 30 Running" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_scenario30_done.png" width="280" alt="Scenario 30 Complete" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_scenario30_summary.png" width="280" alt="Scenario 30 Summary" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+</p>
+
+*Scenario #30 replay in progress (left), completed (centre), and final error scorecard summary overlay (right). Drift 5.47% — TIER-1 PASS.*
+
+#### CSV Recording Card
+
+<p align="center">
+  <img src="artifacts/app_screen_live_clean_reset.png" width="280" alt="Clean Reset State" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_dropdown_open.png" width="280" alt="Scenario Dropdown Open" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_dropdown_list.png" width="280" alt="Scenario Dropdown List" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+</p>
+
+*Clean post-reset live drive state (left), scenario spinner open (centre), and full scenario list showing all 25 canonical scenarios with drift percentages (right).*
 
 ---
 

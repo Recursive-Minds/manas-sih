@@ -1035,3 +1035,17 @@ Meeting the official SIH target can appear "suspiciously good" at a glance. Howe
 - **What is generalizable**: The 15-state EKF formulation, closed-loop Non-Holonomic Constraints (NHC), online SO(3) accelerometer gravity leveling, causal kinematic speed smoothing, and directed topological successor graph represent principled physical and geometric navigation algorithms that apply to any road vehicle and smartphone IMU.
 - **What requires careful deployment**: The pre-blackout speed scaling factor alpha and topological curve gate threshold (110 deg) were tuned to balance highway curves against urban intersection branching. On highly dense grid networks with tight acute alleyways, advanced multi-hypothesis particle filtering (MHT) provides greater fork resilience than single-hypothesis topological scoring.
 
+---
+
+### 14.5 Recent Engineering Hardening Fixes
+
+The following post-submission engineering fixes were applied to resolve production defects discovered during live device testing and benchmark validation:
+
+| Fix | Files Affected | Root Cause | Resolution |
+| :--- | :--- | :--- | :--- |
+| **Coordinate Origin Desynchronization** | `server/router.py`, `server/evaluator.py` | `LiveEvaluator.reset()` unconditionally zeroed `ref_lat/lon`, while `EngineAdapterStageB` was already seeded with the trip's geodetic origin. The Euclidean distance between them inflated to thousands of meters. | Added `set_reference(lat, lon, alt)` to `LiveEvaluator`. `router.prepare_benchmark()` now calls `evaluator.set_reference(trip_lat, trip_lon, trip_alt)` immediately after seeding the engine, guaranteeing both share a common geodetic anchor. |
+| **Benchmark State Deload on Drawer Close** | `server/router.py`, `server/engine_adapter.py` | After closing the benchmark drawer, the app still showed green ticks (Gravity, Mount, Buffer, Alpha) because the engine retained `lock_saved_alignment=True` from the loaded benchmark trip. | `stop_benchmark()` now constructs a fresh `EngineAdapterStageB(lock_saved_alignment=False, saved_alignment=None)` and immediately broadcasts a reset HUD, forcing the Android app to clear all four warmup condition ticks. |
+| **Non-Blocking Warmup Gate** | `android/.../MainActivity.kt`, `server/engine_adapter.py` | The START button was hard-blocked on the 0/8 turn counter — requiring 8 witnessed turns before dead-reckoning could begin, preventing first-use in any unfamiliar area. | `is_ready` is now satisfied by `gravity_converged AND buffer_warm AND (mount_locked OR gravity_converged)`. The 8-turn accumulator refines mount calibration continuously post-start but no longer blocks initiation. |
+| **Benchmark Trip Slicing Timestamp Fix** | `server/replay.py`, `server/router.py` | `slice_scenario()` used `bo_start_ns - warmup_s` from raw trip timestamps without validating that the slice start was before the blackout origin, causing warmup data to partially overlap the blackout window. | Corrected to clamp `slice_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_s * 1e9))` with the actual trip bounds, ensuring a clean 30s warmup followed by a zero-overlap blackout window. |
+
+
