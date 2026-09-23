@@ -19,6 +19,9 @@ from sih.map.route_matcher import RouteMatcher
 from sih.data.geo import geodetic_to_enu
 from sih.core.contracts import VelocityEstimate, GNSSSample, FusedPosition
 from sih.engine.speed_observer import KinematicSpeedObserver
+# [ROUND1] feature-flagged hooks (all OFF by default -> r1 is None -> baseline path)
+from sih.round1.engine_hooks import Round1EngineHooks
+from sih.round1.history import build_pre_blackout_history
 
 
 class SteppableStepResult:
@@ -112,6 +115,8 @@ class SteppableDeadReckoningEngine:
         self.acq_h_diff_deg: Optional[float] = None
         self.entry_acq_info: str = "no entry segment"
         self.blackout_active: bool = False
+        # [ROUND1] None when every round-1 flag is OFF
+        self.r1: Optional[Round1EngineHooks] = Round1EngineHooks.create(domain)
 
     def init_from_gnss(self, warmup_gnss: GNSSSample) -> None:
         self.ekf_pure.init_from_gnss(warmup_gnss, self.ref_lat, self.ref_lon, self.ref_alt)
@@ -272,9 +277,22 @@ class SteppableDeadReckoningEngine:
             current_yaw_rate_rad_s=turn_rate_entry,
         )
 
+        # [ROUND1] entry-speed bookkeeping for T3/T5
+        if self.r1 is not None:
+            self.r1.on_blackout_start(self, recent_ai_speeds, t_entry_ns)
+
     def step(self, cal: Any, v_pred: float, t_curr: int) -> SteppableStepResult:
+        # [ROUND1] T4 gyro scale (returns cal unchanged when OFF)
+        if self.r1 is not None:
+            cal = self.r1.pre_step_cal(cal)
         v_ai_cal = float(v_pred) * self.speed_scale
+        # [ROUND1] T7 band factor + T5 speed mode
+        if self.r1 is not None:
+            v_ai_cal = self.r1.adjust_ai_speed(float(v_pred), v_ai_cal, t_curr)
         v_pure_fwd, is_stat_pure = self.speed_obs_pure.update(cal, v_ai_cal)
+        # [ROUND1] T3 sticky stop detector
+        if self.r1 is not None:
+            v_pure_fwd, is_stat_pure = self.r1.post_observer(self.speed_obs_pure, v_pure_fwd, is_stat_pure, cal, v_ai_cal, t_curr)
 
         # Apply Road Kinematics Governor ONLY to the map-matched stream
         v_map_fwd = v_pure_fwd
@@ -313,6 +331,10 @@ class SteppableDeadReckoningEngine:
         matched_pos = None
         if v_map_fwd > 1.0 and self.matcher is not None:
             matched_pos = self.matcher.match(fused_map, ekf=self.ekf_map, domain=self.domain, v_fwd=v_map_fwd)
+
+        # [ROUND1] T8 junction along-track anchoring (map stream only)
+        if self.r1 is not None:
+            self.r1.post_step(self, cal, v_map_fwd, t_curr)
 
         return SteppableStepResult(
             pure_pos=self.ekf_pure._p[:2].copy(),
@@ -473,6 +495,11 @@ class DeadReckoningEngine:
             enable_speed_scale=self.enable_speed_scale,
         )
         session.init_from_gnss(warmup_gnss)
+
+        # [ROUND1] causal pre-blackout history (t < bo_start) for T3/T4/T7 learners
+        if session.r1 is not None and session.r1.needs_history:
+            session.r1.set_history(build_pre_blackout_history(
+                trip, calib_samples, v_preds, bo_start_ns, session.r1.cfg.history_s))
 
         n_gnss = len(trip.gnss_samples)
         gnss_idx = 0
@@ -714,7 +741,7 @@ class DeadReckoningEngine:
         cross_track_series[-1] = final_ct_map
         time_rel_s = (map_ts_arr - bo_start_ns) * 1e-9
 
-        return {
+        result = {
             "t_start_s": (bo_start_ns - t0_ns) * 1e-9,
             "duration_s": duration_s,
             "dist_m": gt_dist,
@@ -767,6 +794,10 @@ class DeadReckoningEngine:
             "entry_h_diff_deg": acq_h_diff_deg,
             "entry_acq_info": entry_acq_info,
         }
+        # [ROUND1] diagnostics (keys only added when a round-1 flag is ON)
+        if session.r1 is not None:
+            result.update(session.r1.summary())
+        return result
 
 
 def run_dead_reckoning_scenario(

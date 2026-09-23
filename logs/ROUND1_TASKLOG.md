@@ -45,5 +45,35 @@ This log records every command and process executed during Round 1 tuning and ev
   - Median |AT|: 33.27 m, Median |CT|: 5.89 m
   - Per-seed medians: 12345: 13.25%, 45736: 12.29%, 75496: 12.24%, 314159: 12.69%, 541098: 14.32%, 987654: 14.38%
   - By domain: Arterial: 14.53%, Highway: 8.88%, Mixed: 10.83%, Urban: 15.26%
-- **Commit Hash**: Pending commit (`round1: pre_patch baseline results`).
+- **Commit Hash**: `1e18708`
+
+---
+
+### Step 3: Apply Marked Edits and Verify Parity
+- **Start Time**: 2026-09-23 19:53:11 +05:30
+- **End Time**: 2026-09-23 20:02:51 +05:30
+- **Commands**:
+  1. `python scripts/round1_apply_edits.py --check 2>&1 | Tee-Object -FilePath "logs\round1\step3_apply_edits_check.log"`
+     - Purpose: Dry run anchor verification for engine and Kotlin edits.
+     - Exit Code: 0
+     - Key Numbers: 11 anchors verified (8 engine, 3 Kotlin), all valid.
+  2. `python scripts/round1_apply_edits.py 2>&1 | Tee-Object -FilePath "logs\round1\step3_apply_edits.log"`
+     - Purpose: Apply marked Round 1 edits.
+     - Exit Code: 0
+     - Key Numbers: 8 edits written to `sih/engine/dead_reckoning_engine.py`, 3 edits to `MainActivity.kt`.
+  3. `python -m pytest tests -q --continue-on-collection-errors 2>&1 | Tee-Object -FilePath "logs\round1\step3_pytest_post_patch.log"`
+     - Purpose: Regression testing post-patch.
+     - Exit Code: 1
+     - Key Numbers: 115 passed (102 baseline + 13 new passes), 1 failed (baseline stale literal check), 1 skipped. No new failures.
+  4. `python scripts/round1_eval.py --tag parity --configs config/round1/baseline_off.json config/round1/diagnostics.json --assert-parity results/round1/pre_patch/baseline_off_scenarios.csv 2>&1 | Tee-Object -FilePath "logs\round1\step3_parity.log"`
+     - Purpose: Verify bit-exact parity against pre-patch baseline.
+     - Exit Code: 0
+     - Key Numbers: `PARITY PASS` (max_abs_diff_map_err_m = 5.68e-14, exactly 0 within float64 precision).
+- **Log Paths**:
+  - `logs/round1/step3_apply_edits_check.log`
+  - `logs/round1/step3_apply_edits.log`
+  - `logs/round1/step3_pytest_post_patch.log`
+  - `logs/round1/step3_parity.log`
+- **Commit Hash**: Pending commit (`round1: apply marked edits and pass parity`).
+
 
