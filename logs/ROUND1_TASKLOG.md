@@ -90,7 +90,37 @@ This log records every command and process executed during Round 1 tuning and ev
   - Worst 5 scenarios: #40 (101.0%), #9 (91.0%), #35 (47.6%), #38 (34.6%), #37 (32.7%).
   - Main causes: All top 5 driven by SPEED/SCALE error.
   - Double speed-scale check (T9): Median engine scale 1.201, median effective scale 1.201 (0.0% difference, does not differ by >2%).
-- **Commit Hash**: Pending commit (`round1: autopsy results`).
+- **Commit Hash**: `ec8b740`
+
+---
+
+### Step 5: Ablation (13 configs x 6 canonical seeds)
+- **Start Time**: 2026-09-23 20:05:44 +05:30
+- **End Time**: 2026-09-23 20:32:03 +05:30
+- **Command**: `python scripts/round1_eval.py --tag ablation --configs config/round1/baseline_off.json config/round1/t9_engine.json config/round1/t9_ekf.json config/round1/t3_stop.json config/round1/t4_gyro.json config/round1/t5_hold.json config/round1/t5_decay.json config/round1/t7_band.json config/round1/t8_junction.json config/round1/t9e_t3.json config/round1/t9e_t8.json config/round1/t9e_t3_t8.json config/round1/all_on.json 2>&1 | Tee-Object -FilePath "logs\round1\step5_ablation.log"`
+- **Purpose**: Paired ablation of each Round 1 flag (and key combos) vs baseline, all 6 canonical seeds.
+- **Exit Code**: 0
+- **Log Path**: `logs/round1/step5_ablation.log`
+- **Key Numbers (ablation table)**:
+
+| Config | Median | Mean +- Std | P90 | T1 | Worst | vs_first |
+|---|---|---|---|---|---|---|
+| baseline_off | 12.97% | 13.19 +- 0.88 | 40.8% | 0.42 | 172.8% | (baseline) |
+| t9_engine | 12.77% | 13.17 +- 1.05 | 40.8% | 0.42 | 172.8% | B7/W8 delta=+0.00pp |
+| t9_ekf | 13.63% | 13.76 +- 1.14 | 45.3% | 0.37 | 153.3% | B107/W113 delta=+0.01pp |
+| t3_stop | 12.97% | 13.19 +- 0.88 | 40.8% | 0.42 | 172.8% | B5/W5 delta=+0.00pp |
+| t4_gyro | 13.81% | 13.65 +- 0.76 | 40.8% | 0.40 | 172.8% | B13/W29 delta=+0.00pp |
+| t5_hold | 19.19% | 19.11 +- 4.99 | 57.9% | 0.34 | 127.2% | B91/W131 delta=+1.82pp |
+| t5_decay | 13.17% | 13.20 +- 3.17 | 44.4% | 0.42 | 186.6% | B103/W85 delta=-0.09pp |
+| t7_band | 12.80% | 12.62 +- 0.59 | 40.3% | 0.41 | 172.6% | B76/W57 delta=-0.03pp |
+| t8_junction | 12.78% | 12.82 +- 0.95 | 40.8% | 0.43 | 172.8% | B19/W8 delta=+0.00pp |
+| t9e_t3 | 12.77% | 13.17 +- 1.05 | 40.8% | 0.42 | 172.8% | B12/W13 delta=+0.00pp |
+| t9e_t8 | 12.77% | 12.80 +- 1.10 | 40.8% | 0.43 | 172.8% | B26/W15 delta=+0.00pp |
+| t9e_t3_t8 | 12.77% | 12.80 +- 1.10 | 40.8% | 0.43 | 172.8% | B31/W20 delta=+0.00pp |
+| all_on | 12.84% | 12.68 +- 0.74 | 40.3% | 0.41 | 172.6% | B76/W80 delta=+0.00pp |
+
+- **Commit Hash**: Pending commit (`round1: ablation results`).
+
 
 
 
