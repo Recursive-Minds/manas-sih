@@ -1,0 +1,1 @@
+{"name": "all_on", "scale_fix": {"source": "engine"}, "stop": {"enabled": true}, "gyro_scale": {"enabled": true}, "online_calib": {"enabled": true}, "junction": {"enabled": true}}

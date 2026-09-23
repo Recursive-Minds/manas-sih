@@ -1,0 +1,141 @@
+"""
+Applies the round-1 marked edits to existing files.
+
+- Idempotent: an edit whose NEW text is already present is skipped.
+- Safe: every OLD anchor must occur exactly once, otherwise NOTHING is written
+  and the script exits 1 (report to the user, do not hand-edit around it).
+- Preserves CRLF / LF line endings of each file.
+
+Usage (repo root):
+    python scripts/round1_apply_edits.py --check     # dry run
+    python scripts/round1_apply_edits.py             # apply
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+ENGINE = "sih/engine/dead_reckoning_engine.py"
+KOTLIN = "android/app/src/main/java/com/recursiveminds/idr/ui/MainActivity.kt"
+
+EDITS = [
+    # ---------------- engine -----------------------------------------------------------
+    (ENGINE, "E1 imports",
+     "from sih.engine.speed_observer import KinematicSpeedObserver\n",
+     "from sih.engine.speed_observer import KinematicSpeedObserver\n"
+     "# [ROUND1] feature-flagged hooks (all OFF by default -> r1 is None -> baseline path)\n"
+     "from sih.round1.engine_hooks import Round1EngineHooks\n"
+     "from sih.round1.history import build_pre_blackout_history\n"),
+    (ENGINE, "E2 hooks object",
+     "        self.blackout_active: bool = False\n\n    def init_from_gnss",
+     "        self.blackout_active: bool = False\n"
+     "        # [ROUND1] None when every round-1 flag is OFF\n"
+     "        self.r1: Optional[Round1EngineHooks] = Round1EngineHooks.create(domain)\n\n"
+     "    def init_from_gnss"),
+    (ENGINE, "E3 blackout start",
+     "            current_yaw_rate_rad_s=turn_rate_entry,\n        )\n\n    def step(",
+     "            current_yaw_rate_rad_s=turn_rate_entry,\n        )\n\n"
+     "        # [ROUND1] entry-speed bookkeeping for T3/T5\n"
+     "        if self.r1 is not None:\n"
+     "            self.r1.on_blackout_start(self, recent_ai_speeds, t_entry_ns)\n\n"
+     "    def step("),
+    (ENGINE, "E4 speed path",
+     "        v_ai_cal = float(v_pred) * self.speed_scale\n"
+     "        v_pure_fwd, is_stat_pure = self.speed_obs_pure.update(cal, v_ai_cal)\n",
+     "        # [ROUND1] T4 gyro scale (returns cal unchanged when OFF)\n"
+     "        if self.r1 is not None:\n"
+     "            cal = self.r1.pre_step_cal(cal)\n"
+     "        v_ai_cal = float(v_pred) * self.speed_scale\n"
+     "        # [ROUND1] T7 band factor + T5 speed mode\n"
+     "        if self.r1 is not None:\n"
+     "            v_ai_cal = self.r1.adjust_ai_speed(float(v_pred), v_ai_cal, t_curr)\n"
+     "        v_pure_fwd, is_stat_pure = self.speed_obs_pure.update(cal, v_ai_cal)\n"
+     "        # [ROUND1] T3 sticky stop detector\n"
+     "        if self.r1 is not None:\n"
+     "            v_pure_fwd, is_stat_pure = self.r1.post_observer(self.speed_obs_pure, v_pure_fwd, is_stat_pure, cal, v_ai_cal, t_curr)\n"),
+    (ENGINE, "E5 junction anchor",
+     "            matched_pos = self.matcher.match(fused_map, ekf=self.ekf_map, domain=self.domain, v_fwd=v_map_fwd)\n\n"
+     "        return SteppableStepResult(",
+     "            matched_pos = self.matcher.match(fused_map, ekf=self.ekf_map, domain=self.domain, v_fwd=v_map_fwd)\n\n"
+     "        # [ROUND1] T8 junction along-track anchoring (map stream only)\n"
+     "        if self.r1 is not None:\n"
+     "            self.r1.post_step(self, cal, v_map_fwd, t_curr)\n\n"
+     "        return SteppableStepResult("),
+    (ENGINE, "E6 history",
+     "        session.init_from_gnss(warmup_gnss)\n",
+     "        session.init_from_gnss(warmup_gnss)\n\n"
+     "        # [ROUND1] causal pre-blackout history (t < bo_start) for T3/T4/T7 learners\n"
+     "        if session.r1 is not None and session.r1.needs_history:\n"
+     "            session.r1.set_history(build_pre_blackout_history(\n"
+     "                trip, calib_samples, v_preds, bo_start_ns, session.r1.cfg.history_s))\n"),
+    (ENGINE, "E7 result var",
+     "        return {\n            \"t_start_s\": (bo_start_ns - t0_ns) * 1e-9,",
+     "        result = {\n            \"t_start_s\": (bo_start_ns - t0_ns) * 1e-9,"),
+    (ENGINE, "E8 result diagnostics",
+     "            \"entry_acq_info\": entry_acq_info,\n        }\n",
+     "            \"entry_acq_info\": entry_acq_info,\n        }\n"
+     "        # [ROUND1] diagnostics (keys only added when a round-1 flag is ON)\n"
+     "        if session.r1 is not None:\n"
+     "            result.update(session.r1.summary())\n"
+     "        return result\n"),
+    # ---------------- T1 pointer (Kotlin) ------------------------------------------------
+    (KOTLIN, "K1 live GNSS marker",
+     "                                vehicleMarker?.rotation = gnss.bearingDeg\n",
+     "                                vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(gnss.bearingDeg)  // [ROUND1] T1\n"),
+    (KOTLIN, "K2 replay GNSS marker",
+     "                        vehicleMarker?.rotation = g.bearingDeg?.toFloat() ?: 0f\n",
+     "                        vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(g.bearingDeg)  // [ROUND1] T1\n"),
+    (KOTLIN, "K3 replay DR marker",
+     "                    vehicleMarker?.rotation = d.headingDeg?.toFloat() ?: 0f\n",
+     "                    vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)  // [ROUND1] T1\n"),
+]
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--check", action="store_true", help="dry run")
+    ap.add_argument("--only", choices=["engine", "kotlin"], default=None)
+    args = ap.parse_args()
+
+    root = Path(".").resolve()
+    files = {}
+    errors = []
+    for path, name, old, new in EDITS:
+        if args.only == "engine" and path != ENGINE or args.only == "kotlin" and path != KOTLIN:
+            continue
+        if path not in files:
+            raw = (root / path).read_bytes().decode("utf-8")
+            files[path] = {"crlf": "\r\n" in raw, "text": raw.replace("\r\n", "\n"), "applied": []}
+        f = files[path]
+        if new in f["text"]:
+            print(f"[skip] {name}: already applied")
+            continue
+        n = f["text"].count(old)
+        if n != 1:
+            errors.append(f"{name}: anchor found {n} times in {path}")
+            continue
+        f["text"] = f["text"].replace(old, new)
+        f["applied"].append(name)
+        print(f"[ok]   {name}")
+
+    if errors:
+        print("\nABORTED - nothing written:")
+        for e in errors:
+            print("  -", e)
+        return 1
+    if args.check:
+        print("\n--check: all anchors valid, nothing written")
+        return 0
+    for path, f in files.items():
+        if not f["applied"]:
+            continue
+        out = f["text"].replace("\n", "\r\n") if f["crlf"] else f["text"]
+        (root / path).write_bytes(out.encode("utf-8"))
+        print(f"wrote {path} ({len(f['applied'])} edits, {'CRLF' if f['crlf'] else 'LF'})")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
