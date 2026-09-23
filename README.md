@@ -1200,57 +1200,14 @@ adb reverse tcp:8765 tcp:8765
 
 ### 19.6 Live Android App Screenshots
 
-The screenshots below show the production IDR app running on a real Android device. All UI elements are functional and correspond to the modes described in Section 19.5.
-
-#### Startup & Connection
+The screenshots below show the production IDR app running on a real Android device (Samsung Galaxy, Android 14) connected to the Python IDR server via USB ADB reverse tunnel.
 
 <p align="center">
-  <img src="artifacts/app_screen_initial.png" width="280" alt="App Initial Screen" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_connected.png" width="280" alt="App Connected to Server" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_live_ready.png" width="280" alt="App Warmup Ready" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_initial.png" width="340" alt="App Opening Screen — Connected to server, IIITA campus map with live GPS location, warmup calibrating" style="margin:8px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
+  <img src="artifacts/app_screen_replaying_15.png" width="340" alt="Benchmark Scenario #15 Urban mid-replay — REPLAYING #15 badge, BLACKOUT state, cyan DR track on map, Drift 16.99%" style="margin:8px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
 </p>
 
-*Left: Initial cold-start screen. Centre: Connected to IDR Python server via USB ADB tunnel. Right: All four warmup conditions satisfied — engine ready to start dead-reckoning.*
-
-#### Live Map & Location Tracking
-
-<p align="center">
-  <img src="artifacts/app_screen_live_fullmap.png" width="280" alt="Full Map View" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_live_location.png" width="280" alt="Live Location on Map" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_live_final.png" width="280" alt="Dead Reckoning Live" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-</p>
-
-*Real-time OSMDroid map with vehicle marker, GNSS track (green), and dead-reckoning track (blue/amber) overlaid.*
-
-#### Benchmark Suite Drawer
-
-<p align="center">
-  <img src="artifacts/app_screen_benchmark_drawer.png" width="280" alt="Benchmark Drawer Closed" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_benchmark_drawer_open.png" width="280" alt="Benchmark Drawer Open with Scenario 15" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_dropdown_list.png" width="280" alt="Scenario Dropdown List" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-</p>
-
-*Left: Benchmark badge in top bar. Centre: Scenario #15 Urban (S-S1, 45s, 399m) preloaded with all warmup ticks green and RUN BENCHMARK ready. Right: Full scenario dropdown showing all canonical scenarios with drift percentages.*
-
-#### Benchmark Replay & Results
-
-<p align="center">
-  <img src="artifacts/app_screen_replaying_15.png" width="280" alt="Scenario 15 Replaying" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_scenario15_done.png" width="280" alt="Scenario 15 Complete" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_scenario15_summary.png" width="280" alt="Scenario 15 Summary" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-</p>
-
-*Scenario #15 Urban (S-S1) replay — benchmark replaying mid-blackout (left), post-replay map with DR track (centre), and SESSION EVALUATION SUMMARY overlay showing Drift 18.74%, Final Error 74.9m, City 20-50 km/h classification (right).*
-
-#### CSV Recording Card
-
-<p align="center">
-  <img src="artifacts/app_screen_live_clean_reset.png" width="280" alt="Clean Reset State" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_dropdown_open.png" width="280" alt="Scenario Dropdown Open" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-  <img src="artifacts/app_screen_dropdown_list.png" width="280" alt="Scenario Dropdown List" style="margin:4px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.25);" />
-</p>
-
-*Clean post-reset live drive state (left), scenario spinner open (centre), and full scenario list showing all 25 canonical scenarios with drift percentages (right).*
+*Left: App connected to IDR server showing live GPS location on IIITA campus map with warmup calibration in progress (Gravity ✓, Buffer 6s ✓, mount calibrating). Right: Benchmark Scenario #15 Urban (S-S1, 45s, 399m) mid-replay — REPLAYING #15 badge, BLACKOUT state active, cyan dead-reckoning track diverging from ground-truth GNSS waypoints on the map, real-time drift 16.99% with along-track error -56.3m.*
 
 ---
 
