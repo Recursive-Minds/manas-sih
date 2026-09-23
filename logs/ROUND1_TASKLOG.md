@@ -119,7 +119,60 @@ This log records every command and process executed during Round 1 tuning and ev
 | t9e_t3_t8 | 12.77% | 12.80 +- 1.10 | 40.8% | 0.43 | 172.8% | B31/W20 delta=+0.00pp |
 | all_on | 12.84% | 12.68 +- 0.74 | 40.3% | 0.41 | 172.6% | B76/W80 delta=+0.00pp |
 
-- **Commit Hash**: Pending commit (`round1: ablation results`).
+- **Commit Hash**: `f0a8a25`
+
+---
+
+### Step 6: T6 Interval-Loss Velocity Fine-Tuning & Evaluation
+- **Start Time**: 2026-09-23 20:33:00 +05:30
+- **End Time**: 2026-09-23 20:55:00 +05:30
+- **Commands**:
+  1. `python sih/models/train_interval.py --smoke 2>&1 | Tee-Object -FilePath "logs\round1\step6_smoke.log"`
+     - Purpose: 2-epoch smoke test on interval-loss fine-tuning.
+     - Exit Code: 0
+     - Key Numbers: Best epoch 2, validation int_err_median 0.1022.
+  2. `python sih/models/train_interval.py --lam 0.5 2>&1 | Tee-Object -FilePath "logs\round1\step6_lam0.5.log"`
+     - Purpose: Train candidate lambda = 0.5.
+     - Exit Code: 0
+     - Key Numbers: Validation int_err_median: 0.1305 (base) -> 0.1214 (best epoch 4, RMSE 2.98, scale 1.098).
+  3. `python sih/models/train_interval.py --lam 1.0 2>&1 | Tee-Object -FilePath "logs\round1\step6_lam1.0.log"`
+     - Purpose: Train candidate lambda = 1.0.
+     - Exit Code: 0
+     - Key Numbers: Validation int_err_median: 0.1305 (base) -> 0.1218 (best epoch 5, RMSE 2.98, scale 1.084).
+  4. `python sih/models/train_interval.py --lam 2.0 2>&1 | Tee-Object -FilePath "logs\round1\step6_lam2.0.log"`
+     - Purpose: Train candidate lambda = 2.0.
+     - Exit Code: 0
+     - Key Numbers: Validation int_err_median: 0.1305 (base) -> 0.1192 (best epoch 5, RMSE 3.01, scale 1.087).
+  5. `python scripts/round1_eval.py --tag t6_lam0.5 --model-path models/checkpoints/round1_interval_lam0.5_s42.pt --configs config/round1/baseline_off.json config/round1/t9_engine.json 2>&1 | Tee-Object -FilePath "logs\round1\step6_eval_lam0.5.log"`
+     - Purpose: Benchmark evaluation for lambda = 0.5 across 6 canonical seeds.
+     - Exit Code: 0
+     - Key Numbers:
+       - `baseline_off`: median 11.05%, mean 11.31 +- 2.11%, p90 43.8%, T1 0.45, worst 177.7%
+       - `t9_engine`: median 11.60%, mean 11.52 +- 2.22%, p90 43.8%, T1 0.45, worst 177.7%
+  6. `python scripts/round1_eval.py --tag t6_lam1.0 --model-path models/checkpoints/round1_interval_lam1.0_s42.pt --configs config/round1/baseline_off.json config/round1/t9_engine.json 2>&1 | Tee-Object -FilePath "logs\round1\step6_eval_lam1.0.log"`
+     - Purpose: Benchmark evaluation for lambda = 1.0 across 6 canonical seeds.
+     - Exit Code: 0
+     - Key Numbers:
+       - `baseline_off`: median 12.23%, mean 11.51 +- 1.93%, p90 44.9%, T1 0.44, worst 175.1%
+       - `t9_engine`: median 12.23%, mean 11.51 +- 1.93%, p90 44.4%, T1 0.44, worst 175.1%
+  7. `python scripts/round1_eval.py --tag t6_lam2.0 --model-path models/checkpoints/round1_interval_lam2.0_s42.pt --configs config/round1/baseline_off.json config/round1/t9_engine.json 2>&1 | Tee-Object -FilePath "logs\round1\step6_eval_lam2.0.log"`
+     - Purpose: Benchmark evaluation for lambda = 2.0 across 6 canonical seeds.
+     - Exit Code: 0
+     - Key Numbers:
+       - `baseline_off`: median 11.58%, mean 11.47 +- 2.15%, p90 44.5%, T1 0.43, worst 175.4%
+       - `t9_engine`: median 11.58%, mean 11.47 +- 2.15%, p90 43.5%, T1 0.43, worst 175.4%
+- **Log Paths**:
+  - `logs/round1/step6_smoke.log`
+  - `logs/round1/step6_lam0.5.log`
+  - `logs/round1/step6_lam1.0.log`
+  - `logs/round1/step6_lam2.0.log`
+  - `logs/round1/step6_eval_lam0.5.log`
+  - `logs/round1/step6_eval_lam1.0.log`
+  - `logs/round1/step6_eval_lam2.0.log`
+  - `logs/round1/train_interval_lam0.5_s42.json`
+  - `logs/round1/train_interval_lam1.0_s42.json`
+  - `logs/round1/train_interval_lam2.0_s42.json`
+- **Commit Hash**: Pending commit (`round1: T6 training and evaluation results`).
 
 
 
