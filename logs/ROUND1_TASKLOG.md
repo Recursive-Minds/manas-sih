@@ -24,4 +24,26 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Exit Code**: 0
 - **Log Path**: `logs/round1/step1_unzip.log`
 - **Key Numbers**: 32 files extracted, 0 skipped (all 32 files were new).
-- **Commit Hash**: Pending commit (`round1: add inactive round1 files`).
+- **Commit Hash**: `10d5341`
+
+---
+
+### Step 2: Reference Baseline Run (pre_patch)
+- **Start Time**: 2026-09-23 19:48:33 +05:30
+- **End Time**: 2026-09-23 19:52:17 +05:30
+- **Command**: `python scripts/round1_eval.py --tag pre_patch --configs config/round1/baseline_off.json 2>&1 | Tee-Object -FilePath "logs\round1\step2_pre_patch.log"`
+- **Purpose**: Run reference baseline before any engine edits across 6 canonical seeds (236 scenarios).
+- **Exit Code**: 0
+- **Log Path**: `logs/round1/step2_pre_patch.log`
+- **Key Numbers**:
+  - Median of seed medians: 12.968%
+  - Mean +- std of seed medians: 13.194 +- 0.879%
+  - P90 drift: 40.823%
+  - T1 (<10%) share: 41.53%
+  - Beats pure share: 81.78%
+  - Worst drift: 172.789%
+  - Median |AT|: 33.27 m, Median |CT|: 5.89 m
+  - Per-seed medians: 12345: 13.25%, 45736: 12.29%, 75496: 12.24%, 314159: 12.69%, 541098: 14.32%, 987654: 14.38%
+  - By domain: Arterial: 14.53%, Highway: 8.88%, Mixed: 10.83%, Urban: 15.26%
+- **Commit Hash**: Pending commit (`round1: pre_patch baseline results`).
+
