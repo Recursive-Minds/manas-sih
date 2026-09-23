@@ -186,6 +186,43 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Key Numbers**: BUILD SUCCESSFUL in 8m 32s (38 actionable tasks: 5 executed, 33 up-to-date).
 - **Commit Hash**: `24da4de`
 
+---
+
+### Step 9: T6 Validation, Seed Robustness, Saturation & Flag Combination
+- **Start Time**: 2026-09-23 21:54:00 +05:30
+- **End Time**: 2026-09-23 22:16:00 +05:30
+- **Summary**:
+  1. Addon unpack: Extracted `config/round1/t7_t8.json` and `scripts/round1_compare.py`.
+  2. Baseline reconciliation: 11.13% +- 1.50% headline originates from 3 held-out seeds (120 scenarios) in `artifacts/heldout_seed_results.json`, while `pre_patch` baseline (12.97%) is across the 6 canonical dev seeds (236 scenarios).
+  3. Paired comparison of T6 base vs lam0.5/lam1.0/lam2.0: Confirmed consistent generalization on unseen trips (S-S3a / S-S4, n=117) with median deltas -0.63 pp, -0.24 pp, -0.16 pp.
+  4. Speed-scale saturation on base model: `r1_scale_engine` median 1.126, hitting 1.25 clip ceiling on 32.6% of scenarios.
+  5. Seed robustness of T6 (lam=0.5):
+     - Seed 42: benchmark median 11.05%, mean 11.31 +- 2.11%, unseen delta -0.63 pp (62 B / 42 W)
+     - Seed 7: benchmark median 10.51%, mean 11.26 +- 2.29%, unseen delta -0.42 pp (58 B / 42 W)
+     - Seed 123: benchmark median 11.33%, mean 12.12 +- 1.75%, unseen delta -0.25 pp (58 B / 44 W)
+  6. Combination with T7 (band) and T8 (junction) (`t6_lam0.5_combo`):
+     - `baseline_off`: median 11.05%, mean 11.31 +- 2.11%, T1 44.9%
+     - `t7_band`: median 10.07%, mean 10.66 +- 2.00%, T1 46.2%
+     - `t8_junction`: median 11.48%, mean 11.66 +- 1.93%, T1 44.1%
+     - `t7_t8`: median 11.31%, mean 10.83 +- 2.43%, T1 46.2%
+  7. Comparison of `t7_t8` vs `baseline_off`:
+     - ALL: better 89 vs worse 66 (sign-test p = 0.077)
+     - Unseen trips: median 9.92%, delta -0.21 pp (49 B vs 29 W, sign-test p = 0.031)
+     - Speed scale saturation: median 1.034, ceiling saturation dropped from 32.6% to 22.9%.
+- **Log Paths**:
+  - `logs/round1/step9_train_lam0.5_s7.log`
+  - `logs/round1/step9_train_lam0.5_s123.log`
+  - `logs/round1/step9_eval_lam0.5_s7.log`
+  - `logs/round1/step9_eval_lam0.5_s123.log`
+  - `logs/round1/step9_compare_lam0.5_s7.log`
+  - `logs/round1/step9_compare_lam0.5_s123.log`
+  - `logs/round1/step9_part5_saturation.log`
+  - `logs/round1/step9_eval_combo.log`
+  - `logs/round1/step9_compare_combo_t7_t8.log`
+  - `logs/round1/train_interval_lam0.5_s7.json`
+  - `logs/round1/train_interval_lam0.5_s123.json`
+- **Commit Hash**: Pending commit (`round1: step 9 verification and combination results`).
+
 
 
 
