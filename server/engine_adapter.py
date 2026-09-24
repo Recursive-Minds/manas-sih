@@ -695,7 +695,8 @@ class EngineAdapterStageB:
         pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(
             valid_hist_gnss, t_entry_ns, self.ref_lat, self.ref_lon
         )
-        if g_ref is not None and g_ref.bearing_deg is not None and pre_gnss_window:
+        from sih.round1.entry_bearing import live_override_enabled  # [ROUND1] R2
+        if g_ref is not None and g_ref.bearing_deg is not None and pre_gnss_window and live_override_enabled():
             # GNSSSample is a frozen dataclass: replace the last element with preserved Doppler bearing
             last_g = pre_gnss_window[-1]
             pre_gnss_window[-1] = GNSSSample(

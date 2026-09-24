@@ -106,6 +106,22 @@ EDITS = [
      "                self.recent_imu_calib, self.recent_ai_speeds, valid_hist_gnss,\n"
      "                self.ref_lat, self.ref_lon, t_entry_ns, self.session.r1.cfg.history_s))\n\n"
      "        self.session.start_blackout(\n            entry_pos_enu=entry_pos_enu,\n"),
+    # ---------------- R2: one entry-bearing rule for batch and live
+    (ENGINE, "E10 entry bearing (batch)",
+     "        pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(\n"
+     "            valid_hist_gnss, bo_start_ns, trip.reference_lat_deg, trip.reference_lon_deg\n"
+     "        )\n",
+     "        pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(\n"
+     "            valid_hist_gnss, bo_start_ns, trip.reference_lat_deg, trip.reference_lon_deg\n"
+     "        )\n"
+     "        # [ROUND1] R2: same entry-bearing rule as the live adapter (flag entry_doppler_bearing)\n"
+     "        if session.r1 is not None and session.r1.cfg.entry_doppler_bearing:\n"
+     "            from sih.round1.entry_bearing import apply_entry_doppler\n"
+     "            pre_gnss_window = apply_entry_doppler(pre_gnss_window, g_entry)\n"),
+    (ADAPTER, "A2 entry bearing (live)",
+     "        if g_ref is not None and g_ref.bearing_deg is not None and pre_gnss_window:\n",
+     "        from sih.round1.entry_bearing import live_override_enabled  # [ROUND1] R2\n"
+     "        if g_ref is not None and g_ref.bearing_deg is not None and pre_gnss_window and live_override_enabled():\n"),
     # ---------------- T1 pointer (Kotlin) ------------------------------------------------
     (KOTLIN, "K1 live GNSS marker",
      "                                vehicleMarker?.rotation = gnss.bearingDeg\n",
