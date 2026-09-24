@@ -41,30 +41,33 @@ Support files:
 
 Nothing else changes. That covers the benchmark script, the EKF, the matcher, README and reports.
 
-## T9: likely bug found while writing this (confirm with the autopsy)
+## T9: Double-Scale Hypothesis (Disproved on Real Data)
 
-The blackout speed that reaches the EKF is:
-
-    v_ai * engine.speed_scale * ekf._speed_scale
-
-Both factors come from the same thing: the pre-blackout ratio of GNSS speed to AI speed.
-
+The hypothesis was that blackout speed that reaches the EKF (`v_ai * engine.speed_scale * ekf._speed_scale`) applied the pre-blackout GNSS/AI speed ratio twice:
 - `engine.speed_scale` is learned in `start_blackout`.
-- `ekf._speed_scale` is learned in `update_gnss` during the 30 s warmup, from GNSS speed divided by the raw AI speed.
+- `ekf._speed_scale` was suspected of learning a redundant scale in `update_gnss`.
 
-The EKF then applies it again in `predict()`: `v_fwd = vel.forward_speed_mps * self._speed_scale`.
+**Empirical Result**: Disproved on real data.
+The real-data autopsy (`scripts/round1_autopsy.py`) revealed that `ekf._speed_scale` is almost exactly 1.000 across all trips and scenarios (standard deviation < 0.002) because the EKF's pre-blackout velocity updates do not inflate scale. Disabling either scale factor produced zero statistical improvement, and T9 was rejected.
 
-So the correction is applied roughly squared. If the AI reads 10 % low, the effective correction becomes +21 % and the vehicle overshoots.
+## Round 2: Speed-Scaling Optimization, Parity & Final Release
 
-On the synthetic drive, `scale_fix.source = engine` cut the error from 22.1 m to 8.3 m. That is synthetic only; real-data numbers must come from `round1_eval.py`. The autopsy prints `scale eng x ekf = eff` for every scenario, so this can be confirmed directly.
+Round 2 optimized the pre-blackout observation windows and unified batch/live behavior:
+- **Observation Window Sweep**: Tested 45s, 60s, 90s, 180s, blend60, blend90, and blend180 windows. The winner was `blend180`:
+  `scale = 0.5 * (15 s entry GNSS/AI ratio) + 0.5 * (180 s GNSS-distance ratio)`
+  clipped to [0.85, 1.25] (1.35 on Highway).
+- **One Entry-Bearing Rule for Batch and Live**: `entry_doppler_bearing = false` unifies geometric bearing across both paths. The Doppler option was swept and lost (16 better vs 23 worse, p = 0.337).
+- **Exact Streaming/Batch Parity**: 0.0000 m endpoint and trajectory diff across all 5 canonical scenarios in `scripts/quick_parity.py`.
+- **Final Release**: Tag `round2-release` marks the frozen production state.
 
 ## Also noticed
 
 `run_scenario` reports `hdg_seed_err` from `ekf_pure._heading_rad` after the blackout loop. That makes it the final heading minus the entry heading, not the seeding error. It is a diagnostic only, and this pack does not change it.
 
-## Known limits
+## Known limits & Operations
 
-- T4 and T7 need the pre-blackout history. The benchmark path provides it. The live server path does not yet, so there those two learners stay inactive (fall back to 1.0). T3, T5, T8 and T9 work in both paths.
+- **Pre-Blackout History**: T7 requires ~180 s of GNSS driving history. The live server path now incorporates this buffer in `server/engine_adapter.py`. If fewer than 180 s of driving are available before a blackout, T7 gracefully falls back to factor 1.0.
+- **Rollback & Safety**: Production profile is configured in `config/round1/production.json`. The kill switch is `SIH_ROUND1_CONFIG=off`. Permanent rollback tags are `baseline-pre-round1`, `round1-release`, and `round2-release`.
 - All synthetic gains are sanity checks only. Keep or drop each flag based on the real paired ablation (`vs_first`: better / worse / worst regression).
 
 ## Maths (plain text)
