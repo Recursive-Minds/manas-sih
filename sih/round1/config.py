@@ -91,6 +91,7 @@ class ScaleLevelParams:            # T10
     hi_highway: float = 1.35
     source: str = "entry"          # "entry" (baseline 15 s ratio) | "history" (180 s GNSS-distance ratio) | "blend"
     w_history: float = 0.5         # blend weight of the history ratio
+    window_s: float = 0.0          # R2: GNSS-distance ratio over only the last window_s seconds (0 = all history_s)
 
 
 @dataclass

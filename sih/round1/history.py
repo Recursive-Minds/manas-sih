@@ -106,3 +106,17 @@ def build_history_from_buffers(
     g_brg = np.array([np.nan if g.bearing_deg is None else g.bearing_deg for g in fixes], dtype=np.float64)
     return PreBlackoutHistory(imu_ts_ns=imu_ts, gyro_z=gyro_z, accel=accel, v_ai_raw=v_ai,
                               gnss_ts_ns=g_ts, gnss_en=g_en, gnss_speed=g_spd, gnss_bearing=g_brg)
+
+
+def slice_history_tail(hist: PreBlackoutHistory, window_s: float) -> PreBlackoutHistory:
+    """Keep only the last window_s seconds of a history (relative to its newest sample)."""
+    ends = [int(a[-1]) for a in (hist.imu_ts_ns, hist.gnss_ts_ns) if len(a)]
+    if window_s <= 0 or not ends:
+        return hist
+    t_lo = max(ends) - int(window_s * 1e9)
+    mi = hist.imu_ts_ns >= t_lo
+    mg = hist.gnss_ts_ns >= t_lo
+    return PreBlackoutHistory(
+        imu_ts_ns=hist.imu_ts_ns[mi], gyro_z=hist.gyro_z[mi], accel=hist.accel[mi], v_ai_raw=hist.v_ai_raw[mi],
+        gnss_ts_ns=hist.gnss_ts_ns[mg], gnss_en=hist.gnss_en[mg], gnss_speed=hist.gnss_speed[mg],
+        gnss_bearing=hist.gnss_bearing[mg])

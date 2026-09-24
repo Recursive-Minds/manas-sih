@@ -385,11 +385,23 @@ This log records every command and process executed during Round 1 tuning and ev
      - Documented known pre-existing issue in `README.md` Section 19.5 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 14.5: batch vs streaming differ by 7–29 m on S-S3a scenarios #22, #23, and #30 even with Round 1 off (`SIH_ROUND1_CONFIG=off`), caused by pre-existing differences in warm-up EKF initialization and initial map attachment history.
 - **Commit Hash**: `bb8887f`
 
-
-
-
-
-
+### Step 19: Round 2 Step 1 - Addon Install & Baseline Parity Verification
+- **Start Time**: 2026-09-24 17:35:00 +05:30
+- **End Time**: 2026-09-24 17:41:00 +05:30
+- **Summary**:
+  1. Addon unpack: Extracted `sih_round2_addon.zip` adding `scale_level.window_s` configuration and history evaluation:
+     - `sih/round1/config.py`
+     - `sih/round1/history.py`
+     - `sih/round1/engine_hooks.py`
+     - `tests/test_round1.py`
+     - 5 new configs: `r2_level45.json`, `r2_level60.json`, `r2_level90.json`, `r2_blend60.json`, `r2_blend180.json`
+  2. Verified git diff strictly limited to required files.
+  3. Pytest: 20 round-1 unit tests passed in 14.64s.
+  4. Parity check: `python scripts/round1_eval.py --tag parity_r2 --configs config/round1/baseline_off.json --assert-parity results/round1/pre_patch/baseline_off_scenarios.csv`
+     - Result: `PARITY PASS` (`max_abs_diff_map_err_m = 5.684e-14`).
+- **Log Paths**:
+  - `results/round1/parity_r2/summary.json`
+  - `results/round1/parity_r2/baseline_off_scenarios.csv`
 
 
 

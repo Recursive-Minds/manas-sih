@@ -88,6 +88,17 @@ class TestRound1Flags(unittest.TestCase):
         hist = run(d, {"scale_level": {"enabled": True, "lo": 0.6, "hi": 1.6, "source": "history"}})
         self.assertAlmostEqual(hist["r1_scale_history"], 1 / 1.35, delta=0.03)
 
+    def test_r2_level_window(self):
+        from sih.round1.history import slice_history_tail
+        d = make_drive(ai_gain=1.35)
+        h = build_pre_blackout_history(d.trip, d.calib, d.v_ai, d.trip.gnss_samples[185].timestamp_ns, 180.0)
+        t = slice_history_tail(h, 60.0)
+        self.assertLessEqual((t.imu_ts_ns[-1] - t.imu_ts_ns[0]) * 1e-9, 60.0 + 1e-6)
+        self.assertEqual(t.imu_ts_ns[-1], h.imu_ts_ns[-1])
+        r = run(d, {"scale_fix": {"source": "engine"},
+                    "scale_level": {"enabled": True, "source": "history", "window_s": 60.0, "lo": 0.6, "hi": 1.6}})
+        self.assertAlmostEqual(r["r1_scale_history"], 1 / 1.35, delta=0.04)
+
     def test_every_flag_runs(self):
         for cfg in ({"gyro_scale": {"enabled": True}}, {"online_calib": {"enabled": True}},
                     {"speed_mode": {"mode": "hold_entry"}}, {"speed_mode": {"mode": "entry_offset_decay"}},
