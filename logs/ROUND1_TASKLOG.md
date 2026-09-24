@@ -519,3 +519,28 @@ This log records every command and process executed during Round 1 tuning and ev
   - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1560.log`
   - `artifacts/heldout_seed_results.json`
   - `FINAL_NUMBERS_FOR_PPT.md`
+
+---
+
+### Step 25: Documentation Final Sync - Step 3: Master README.md & Verification Script
+- **Start Time**: 2026-09-25 00:05:00 +05:30
+- **End Time**: 2026-09-25 00:19:00 +05:30
+- **Branch**: `docs/final-sync`
+- **Summary**:
+  1. Created `scripts/check_doc_numbers.py` to rigorously verify headline numbers in documentation against underlying ground-truth source JSON/CSV files within 0.01 tolerance.
+  2. Updated `README.md`:
+     - Top badges updated to reflect 21 Round 1 / 123 Total passing tests, held-out benchmark 10.71% +- 1.17%, multi-seed matrix 10.86% +- 2.47%, and frozen Round 2 production release.
+     - Added Executive Headline Benchmark table comparing pre-round-1 baseline vs final production across 120 held-out scenarios side-by-side with explicit P90 definition note.
+     - Added Round 1 and Round 2 subsections to Section 2.3 with honest methodology (dev seeds for selection, single look on held-out seeds, paired sign-tests) and comprehensive tested-and-rejected table.
+     - Added Pivot 4 to Section 3 explaining speed underestimation resolution via interval distance loss (T6) and updated subsystem comparison matrix.
+     - Reconstructed Section 5 with full end-to-end 9-stage ASCII pipeline diagram incorporating T6, T7, T8, blended speed scale, and 180s pre-blackout history buffer.
+     - Added active production profile parameters (`config/round1/production.json`) to Section 17.
+     - Added all Round 1/2 modules, scripts, Kotlin file `MarkerHeading.kt`, and test suite to Section 18 Codebase Inventory.
+     - Updated Section 19 Quickstart with production execution, kill switch (`SIH_ROUND1_CONFIG=off`), rollback tags, reproduction commands, and T6 training.
+     - Documented exact 0.0000 m batch vs streaming parity, T1 map pointer rotation fix, and mobile export status (TorchScript s42, ONNX/TFLite mobile next phase) in Section 19.5.
+     - Documented real-world limitations (P90 32.91%, tail scenarios, 5 trips, S-S3a/S-S4 unseen generalization) in Section 20.
+  3. Verified all headline numbers pass with zero errors via `python scripts/check_doc_numbers.py`.
+- **Log Paths**:
+  - `scripts/check_doc_numbers.py`
+  - `README.md`
+
