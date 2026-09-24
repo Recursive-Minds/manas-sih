@@ -368,7 +368,7 @@ This log records every command and process executed during Round 1 tuning and ev
        - Scenario #26: Batch Err 46.02 m, Stage B Err 45.88 m, Endpoint Diff 0.1442 m, Max Traj Diff 1.7697 m
        - Scenario #30: Batch Err 14.00 m, Stage B Err 14.27 m, Endpoint Diff 7.4699 m, Max Traj Diff 23.1124 m
   5. Documentation: Updated `README.md` and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` to state "reduces the systemic speed underestimation on vehicle dynamics (median pre-blackout scale 1.13 -> 1.03)". Confirmed `EngineAdapterStageA` was unchanged.
-- **Commit Hash**: Pending commit
+- **Commit Hash**: `12ce403`
 
 
 
