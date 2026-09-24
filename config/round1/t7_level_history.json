@@ -1,0 +1,1 @@
+{"name": "t7_level_history", "online_calib": {"enabled": true}, "scale_level": {"enabled": true, "source": "history", "lo": 0.70, "hi": 1.50, "hi_highway": 1.60}}

@@ -1,0 +1,63 @@
+{
+  "args": {
+    "base": "models/checkpoints/best_moe_velocity_model.pt",
+    "lam": 1.0,
+    "epochs": 2,
+    "steps": 3,
+    "batch": 4,
+    "lr": 0.0002,
+    "seed": 42,
+    "cal_s": 20.0,
+    "horizons": [
+      30.0,
+      45.0,
+      60.0,
+      75.0
+    ],
+    "pointwise_stride": 5,
+    "max_rmse_increase": 0.1,
+    "out": null,
+    "overwrite": false,
+    "smoke": true
+  },
+  "out": "models/checkpoints/round1_interval_lam1.0_s42_smoke.pt",
+  "best": {
+    "score": 0.10220316052436829,
+    "epoch": 2
+  },
+  "history": [
+    {
+      "epoch": 0,
+      "int_err_median": 0.11027200147509575,
+      "int_err_p90": 0.3534169465303424,
+      "rmse": 2.348190644743077,
+      "scale_ratio": 1.046826877577047,
+      "n_seq": 48
+    },
+    {
+      "epoch": 1,
+      "train_pointwise": 5.661763747533162,
+      "train_interval": 0.1073313554128011,
+      "int_err_median": 0.1125619225203991,
+      "int_err_p90": 0.3358655393123629,
+      "rmse": 2.385671605312892,
+      "scale_ratio": 1.068799544488477,
+      "n_seq": 48,
+      "rmse_guard_ok": true,
+      "best": false
+    },
+    {
+      "epoch": 2,
+      "train_pointwise": 6.596059481302897,
+      "train_interval": 0.13405193636814752,
+      "int_err_median": 0.10220316052436829,
+      "int_err_p90": 0.3204547375440599,
+      "rmse": 2.3896595143478683,
+      "scale_ratio": 1.0835143557640998,
+      "n_seq": 48,
+      "rmse_guard_ok": true,
+      "best": true
+    }
+  ],
+  "elapsed_s": 1.7191197872161865
+}

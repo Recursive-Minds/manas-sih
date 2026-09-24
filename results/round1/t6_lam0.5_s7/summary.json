@@ -1,0 +1,111 @@
+{
+  "seeds": [
+    541098,
+    75496,
+    45736,
+    12345,
+    987654,
+    314159
+  ],
+  "model_path": "models/checkpoints/round1_interval_lam0.5_s7.pt",
+  "map_source": "osm",
+  "configs": {
+    "baseline_off": {
+      "name": "baseline_off",
+      "diagnostics": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": false,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": false,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    }
+  },
+  "summary": {
+    "baseline_off": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 10.514932532513967,
+      "mean_seed_median": 11.262029858806839,
+      "std_seed_median": 2.2911344799185165,
+      "per_seed_median": {
+        "12345": 14.813,
+        "45736": 9.303,
+        "75496": 8.811,
+        "314159": 11.607,
+        "541098": 13.615,
+        "987654": 9.423
+      },
+      "p90": 44.818873601410374,
+      "t1_lt10_share": 0.4703389830508475,
+      "beats_pure_share": 0.8220338983050848,
+      "worst": 176.58712432945185,
+      "median_abs_at_m": 30.61568560331386,
+      "median_abs_ct_m": 5.6694580537576265,
+      "by_domain": {
+        "Arterial": 13.49,
+        "Highway": 8.309,
+        "Mixed": 8.929,
+        "Urban": 14.685
+      }
+    }
+  },
+  "parity": null,
+  "elapsed_s": 199.74104356765747
+}

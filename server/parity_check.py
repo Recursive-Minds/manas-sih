@@ -30,7 +30,7 @@ from sih.map.network import load_trip_road_network
 from sih.engine.dead_reckoning_engine import run_dead_reckoning_scenario
 from sih.data.geo import geodetic_to_enu
 from sih.data.can_sync import load_synchronized_can_speed, is_can_supervised_allowed
-from sih.data.trip_partition import compute_trip_partition
+from sih.data.split import compute_trip_partition
 from server.engine_adapter import EngineAdapterStageB
 
 

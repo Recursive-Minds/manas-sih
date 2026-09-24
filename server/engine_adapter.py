@@ -718,6 +718,13 @@ class EngineAdapterStageB:
             is_calibrated=True,
         )
 
+        # [ROUND1] live pre-blackout history (same data the benchmark uses) for T7 / T10 learners
+        if self.session.r1 is not None and self.session.r1.needs_history:
+            from sih.round1.history import build_history_from_buffers
+            self.session.r1.set_history(build_history_from_buffers(
+                self.recent_imu_calib, self.recent_ai_speeds, valid_hist_gnss,
+                self.ref_lat, self.ref_lon, t_entry_ns, self.session.r1.cfg.history_s))
+
         self.session.start_blackout(
             entry_pos_enu=entry_pos_enu,
             pre_gnss_window=pre_gnss_window,

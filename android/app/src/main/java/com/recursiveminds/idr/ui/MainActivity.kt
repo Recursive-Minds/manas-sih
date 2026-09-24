@@ -634,7 +634,7 @@ class MainActivity : AppCompatActivity() {
                             )
                             vehicleMarker?.position = pt
                             if (gnss.bearingDeg != null) {
-                                vehicleMarker?.rotation = gnss.bearingDeg
+                                vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(gnss.bearingDeg)  // [ROUND1] T1
                             }
                             val lastPt = gnssPolyline.actualPoints.lastOrNull()
                             val distToLast = if (lastPt != null) pt.distanceToAsDouble(lastPt) else 1000.0
@@ -827,7 +827,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (hud.drPos == null) {
                         vehicleMarker?.position = pt
-                        vehicleMarker?.rotation = g.bearingDeg?.toFloat() ?: 0f
+                        vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(g.bearingDeg)  // [ROUND1] T1
                     }
                 }
             }
@@ -850,7 +850,7 @@ class MainActivity : AppCompatActivity() {
                         drPolyline.addPoint(pt)
                     }
                     vehicleMarker?.position = pt
-                    vehicleMarker?.rotation = d.headingDeg?.toFloat() ?: 0f
+                    vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)  // [ROUND1] T1
                 }
             }
         }
