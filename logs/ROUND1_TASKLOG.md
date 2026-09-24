@@ -383,7 +383,7 @@ This log records every command and process executed during Round 1 tuning and ev
   3. Documentation:
      - Added note in `README.md` Section 19.5 (Live Mode) that T7 online speed calibration requires ~3 min of GNSS driving before a blackout; with less history available, it automatically falls back to factor 1.0.
      - Documented known pre-existing issue in `README.md` Section 19.5 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 14.5: batch vs streaming differ by 7–29 m on S-S3a scenarios #22, #23, and #30 even with Round 1 off (`SIH_ROUND1_CONFIG=off`), caused by pre-existing differences in warm-up EKF initialization and initial map attachment history.
-- **Commit Hash**: Pending commit
+- **Commit Hash**: `bb8887f`
 
 
 
