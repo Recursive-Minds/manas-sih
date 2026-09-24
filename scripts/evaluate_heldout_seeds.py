@@ -50,10 +50,18 @@ def run_heldout_evaluation():
     beats_cnts = [m.get("beats_pure_count", 0) for m in results]
     beats_rates = [m.get("beats_pure_rate", 0.0) for m in results]
 
+    from sih.round1.model_select import resolve_velocity_checkpoint
+    resolved_ckpt = resolve_velocity_checkpoint(ROOT_DIR)
+    if resolved_ckpt:
+        ckpt_labels = [os.path.basename(p) for p in resolved_ckpt.split(",")]
+        model_arch = f"Mean MoE Ensemble ({', '.join(ckpt_labels)})" if len(ckpt_labels) > 1 else f"Single Dual-Expert MoE ({ckpt_labels[0]})"
+    else:
+        model_arch = "Single Dual-Expert MoE (best_moe_velocity_model.pt)"
+
     heldout_summary = {
         "evaluation_name": "Fresh Held-Out Seed Evaluation (Zero Tuning)",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "model_architecture": "Single Dual-Expert MoE (best_moe_velocity_model.pt)",
+        "model_architecture": model_arch,
         "seeds": HELDOUT_SEEDS,
         "seed_count": len(HELDOUT_SEEDS),
         "osm_median_drift_mean": round(float(np.mean(map_drifts)), 2),

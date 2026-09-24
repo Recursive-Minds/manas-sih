@@ -348,6 +348,28 @@ This log records every command and process executed during Round 1 tuning and ev
   3. Audited "Zero-Speed Stop Accuracy 99.8% precision / 99.5% recall": confirmed it was a chat summary conflation of two real OSM Route Coverage figures (99.8% and 99.5%) in `logs/round1/step14_final_benchmark.log`. Confirmed absent from all markdown documentation files.
 - **Commit Hash**: `a443cd4`
 
+---
+
+### Step 17: Round 1 Follow-ups & Edge Model Re-Export
+- **Start Time**: 2026-09-24 16:59:00 +05:30
+- **End Time**: 2026-09-24 17:07:00 +05:30
+- **Summary**:
+  1. `scripts/evaluate_heldout_seeds.py`: Updated `model_architecture` label to dynamically report the checkpoint actually loaded from the active profile (`round1_interval_lam0.5_s42.pt`), with fallback to `best_moe_velocity_model.pt` when `SIH_ROUND1_CONFIG=off`. Re-ran and verified `artifacts/heldout_seed_results.json`.
+  2. `scripts/train_can_moe.py`: Removed automatic overwrite of `models/checkpoints/best_moe_velocity_model.pt`, ensuring it remains the pre-round1 backup. Training saves strictly to `--checkpoint-path`.
+  3. `sih/models/export_onnx.py` & `scripts/export_onnx.py`: Updated default checkpoint to resolve from the production profile (`round1_interval_lam0.5_s42.pt`), maintaining `--checkpoint` CLI override.
+  4. Re-exported edge model:
+     - Backed up `models/exported/moe_velocity_model.torchscript_pre_round1.pt` and `models/exported/normalization_params_pre_round1.npz`.
+     - Re-exported `moe_velocity_model.torchscript.pt` (2.66 MB) and `normalization_params.npz` from `round1_interval_lam0.5_s42.pt`.
+     - Verified Eager vs TorchScript max absolute error: 0.000000e+00 m/s. Single-thread CPU latency: 1.74 ms / step (574 Hz).
+     - Executed `scripts/quick_parity.py` on S-S3a canonical scenarios:
+       - Scenario #22: Batch Err 9.61 m, Stage B Err 9.90 m, Endpoint Diff 2.0701 m, Max Traj Diff 11.8150 m
+       - Scenario #23: Batch Err 102.82 m, Stage B Err 99.59 m, Endpoint Diff 3.2576 m, Max Traj Diff 30.8523 m
+       - Scenario #25: Batch Err 77.26 m, Stage B Err 82.28 m, Endpoint Diff 5.0242 m, Max Traj Diff 12.6564 m
+       - Scenario #26: Batch Err 46.02 m, Stage B Err 45.88 m, Endpoint Diff 0.1442 m, Max Traj Diff 1.7697 m
+       - Scenario #30: Batch Err 14.00 m, Stage B Err 14.27 m, Endpoint Diff 7.4699 m, Max Traj Diff 23.1124 m
+  5. Documentation: Updated `README.md` and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` to state "reduces the systemic speed underestimation on vehicle dynamics (median pre-blackout scale 1.13 -> 1.03)". Confirmed `EngineAdapterStageA` was unchanged.
+- **Commit Hash**: Pending commit
+
 
 
 

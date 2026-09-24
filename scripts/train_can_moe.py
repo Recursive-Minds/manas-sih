@@ -250,9 +250,6 @@ def train_can_moe(
                 "long_len": 60,
             }
             torch.save(save_payload, checkpoint_path)
-            canonical_path = "models/checkpoints/best_moe_velocity_model.pt"
-            if os.path.abspath(checkpoint_path) != os.path.abspath(canonical_path):
-                torch.save(save_payload, canonical_path)
 
     elapsed = time.time() - start_time
     print("=" * 80)

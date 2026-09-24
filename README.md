@@ -1078,7 +1078,7 @@ Round 1 introduces a feature-flagged accuracy upgrade targeting speed-scale drif
 * **T6: Interval-Loss Velocity Fine-Tuning**:
   Augments sample-wise velocity training with an integrated distance loss over horizons of 30.0 to 75.0 seconds:
   `L = L_phase55 + lambda * L_int` (with lambda = 0.5).
-  This directly penalizes accumulated distance integration drift and resolves the systemic 17% speed underestimation on vehicle dynamics.
+  This directly penalizes accumulated distance integration drift and reduces the systemic speed underestimation on vehicle dynamics (median pre-blackout scale 1.13 -> 1.03).
 * **T7: Per-Speed-Band Speed Calibration**:
   Per-speed-band speed calibration: shape factor learned from GNSS distance vs AI distance over the last 180 s before the blackout, shrunk toward 1.0.
 * **T8: Topological Junction Snapping**:

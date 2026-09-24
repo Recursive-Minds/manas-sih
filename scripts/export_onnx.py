@@ -35,9 +35,14 @@ class MoEEdgeWrapper(torch.nn.Module):
 
 
 def export_edge_models(
-    checkpoint_path: str = "models/checkpoints/best_moe_velocity_model.pt",
+    checkpoint_path: Optional[str] = None,
     output_dir: str = "models/exported",
 ):
+    if checkpoint_path is None:
+        from sih.round1.model_select import resolve_velocity_checkpoint
+        resolved = resolve_velocity_checkpoint(ROOT_DIR)
+        checkpoint_path = resolved.split(",")[0] if resolved else os.path.join(ROOT_DIR, "models", "checkpoints", "best_moe_velocity_model.pt")
+
     print("=" * 75)
     print("SMARTPHONE INTELLIGENT DEAD RECKONING - MOBILE EDGE MODEL EXPORTER")
     print(f"Source Checkpoint : {checkpoint_path}")
@@ -165,4 +170,15 @@ def export_edge_models(
 
 
 if __name__ == "__main__":
-    export_edge_models()
+    import argparse
+    parser = argparse.ArgumentParser(description="Mobile Edge Model Exporter: ONNX & TorchScript")
+    parser.add_argument("--checkpoint", "-c", type=str, default=None, help="Path to model checkpoint (default: production model)")
+    parser.add_argument("--output-dir", "-o", type=str, default="models/exported", help="Path to output directory")
+    args, unknown = parser.parse_known_args()
+    ckpt = args.checkpoint
+    out_d = args.output_dir
+    if ckpt is None and unknown:
+        ckpt = unknown[0]
+        if len(unknown) > 1:
+            out_d = unknown[1]
+    export_edge_models(checkpoint_path=ckpt, output_dir=out_d)

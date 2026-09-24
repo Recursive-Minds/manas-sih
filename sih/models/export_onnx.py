@@ -23,13 +23,27 @@ class MoEONNXWrapper(nn.Module):
         return v_fused, var_fused
 
 
+from typing import Optional
+
+
+def resolve_default_checkpoint(root_dir: str = ".") -> str:
+    from sih.round1.model_select import resolve_velocity_checkpoint
+    resolved = resolve_velocity_checkpoint(os.path.abspath(root_dir))
+    if resolved:
+        return resolved.split(",")[0]
+    return os.path.join(root_dir, "models", "checkpoints", "best_moe_velocity_model.pt")
+
+
 def export_moe_to_onnx(
-    checkpoint_path: str = "models/checkpoints/best_moe_velocity_model.pt",
+    checkpoint_path: Optional[str] = None,
     output_onnx_path: str = "models/checkpoints/moe_fusion.onnx",
     short_len: int = 20,
     long_len: int = 60,
     channels: int = 12,
 ):
+    if checkpoint_path is None:
+        checkpoint_path = resolve_default_checkpoint()
+
     print("=" * 75)
     print("EXPORTING BAYESIAN MoE MODEL TO ONNX")
     print(f"Checkpoint: {checkpoint_path}")
@@ -87,10 +101,16 @@ def export_moe_to_onnx(
 
 
 if __name__ == "__main__":
-    ckpt = "models/checkpoints/best_moe_velocity_model.pt"
-    out = "models/checkpoints/moe_fusion.onnx"
-    if len(sys.argv) > 1:
-        ckpt = sys.argv[1]
-    if len(sys.argv) > 2:
-        out = sys.argv[2]
+    import argparse
+    parser = argparse.ArgumentParser(description="Export Bayesian MoE Fusion Model to ONNX")
+    parser.add_argument("--checkpoint", "-c", type=str, default=None, help="Path to model checkpoint")
+    parser.add_argument("--output", "-o", type=str, default="models/checkpoints/moe_fusion.onnx", help="Path to output ONNX file")
+    # Support positional args for backward compatibility if provided
+    args, unknown = parser.parse_known_args()
+    ckpt = args.checkpoint
+    out = args.output
+    if ckpt is None and unknown:
+        ckpt = unknown[0]
+        if len(unknown) > 1:
+            out = unknown[1]
     export_moe_to_onnx(checkpoint_path=ckpt, output_onnx_path=out)

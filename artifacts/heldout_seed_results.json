@@ -1,7 +1,7 @@
 {
   "evaluation_name": "Fresh Held-Out Seed Evaluation (Zero Tuning)",
-  "timestamp_utc": "2026-09-24T10:56:20.599298+00:00",
-  "model_architecture": "Single Dual-Expert MoE (best_moe_velocity_model.pt)",
+  "timestamp_utc": "2026-09-24T11:34:13.577804+00:00",
+  "model_architecture": "Single Dual-Expert MoE (round1_interval_lam0.5_s42.pt)",
   "seeds": [
     319976,
     480577,
