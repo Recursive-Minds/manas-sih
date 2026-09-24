@@ -301,7 +301,27 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Log Paths**:
   - `logs/round1/step13_ens_dev.log`
   - `logs/round1/step13_heldout_ens.log`
-- **Commit Hash**: `89d34d0`
+- **Commit Hash**: `a2cd99e`
+
+---
+
+### Step 14: Promotion of Winning Recipe (s42 + T7 + T8) to Production
+- **Start Time**: 2026-09-24 16:23:00 +05:30
+- **End Time**: 2026-09-24 16:39:00 +05:30
+- **Summary**:
+  1. Copied `config/round1/production_candidate_s42.json` to `config/round1/production.json`.
+  2. Verified git tracking of checkpoints: `best_moe_velocity_model.pt` is tracked, committed promoted checkpoint `models/checkpoints/round1_interval_lam0.5_s42.pt` (2.53 MB).
+  3. Confirmed default model loader `load_ai_model` uses `round1_interval_lam0.5_s42.pt`.
+  4. Backed up `artifacts/heldout_seed_results.json` as `artifacts/heldout_seed_results_pre_round1.json`.
+  5. Verified held-out evaluation via `evaluate_heldout_seeds.py`: 11.50% +- 1.70% (0.00 pp diff vs Part B).
+  6. Re-ran official master benchmark `benchmarks/run_final_benchmark.py --fixed`: canonical 6-seed median drift 11.31%, mean 10.83% +- 2.43%, sub-30% rate 85.0%. Regenerated reports and synchronized Section 16 of `README.md` and Section 9 of `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`.
+  7. Added Section 16.1 "Round 1 Improvements" to `README.md` detailing T6, T7, T8, honest held-out results, and kill switch `SIH_ROUND1_CONFIG=off`.
+  8. Ran `server/parity_check.py` and `test_app_*` unit tests: 13 passed in 35.32s.
+- **Log Paths**:
+  - `logs/round1/step14_evaluate_heldout_seeds.log`
+  - `logs/round1/step14_final_benchmark.log`
+- **Commit Hash**: Pending commit (`round1: promote winning recipe s42 to production`).
+
 
 
 
