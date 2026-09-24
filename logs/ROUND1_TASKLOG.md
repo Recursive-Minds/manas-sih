@@ -563,4 +563,36 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Log Paths**:
   - `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`
 
+---
+
+### Step 27: Documentation Final Sync - Comprehensive Cross-Doc Synchronization & Verification
+- **Start Time**: 2026-09-25 00:27:00 +05:30
+- **End Time**: 2026-09-25 00:33:00 +05:30
+- **Branch**: `docs/final-sync`
+- **Summary**:
+  1. Updated `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`: Added Round 1 and Round 2 evolutionary milestones, honest methodology (dev seeds for exploration, held-out seeds for single confirmation, paired sign-tests), 8-row Tested-and-Rejected table, and Pivot 4 (speed underestimation on smooth asphalt resolved via T6 interval distance loss, median scale 1.13 -> 1.03).
+  2. Updated `ROUND1_README.md`: Marked T9 double-scale hypothesis as disproved on real data (EKF scale ~1.000 std < 0.002); added Round 2 section (blended speed scale, unified entry bearing `entry_doppler_bearing = false`, exact 0.0000 m parity); updated 180s live history buffer requirement.
+  3. Updated `CLAUDE.md`: Updated Sections 7-9 with Round 1/2 additions (T6, T7, T8, blended scale, unified entry bearing, 180s buffer), held-out headline scorecards (10.71% +- 1.17% mean, 11.15% median, 86.67% beats pure DR rate), and Phase 7/8 status.
+  4. Updated status and secondary audit reports:
+     - `APP_STATUS_REPORT.md`: Updated active model checkpoint to `round1_interval_lam0.5_s42.pt` (with `best_moe_velocity_model.pt` as backup); updated benchmark output with final held-out scorecard; fixed link typo.
+     - `DEMO.md`: Updated model checkpoint reference to `round1_interval_lam0.5_s42.pt`.
+     - `FEATURE_PARITY.md`: Removed LaTeX syntax (`($D=0.50$)` -> `(discount D = 0.50)`); clarified baseline model scope.
+     - `AUDIT.md`: Clarified TorchScript export defaults to `round1_interval_lam0.5_s42.pt`.
+  5. Verified Step 6 criteria:
+     - Number check (`scripts/check_doc_numbers.py`): 100% PASS on all headline metrics against ground-truth source files within 0.01 tolerance.
+     - Link check: 213 relative links and image paths verified existing.
+     - LaTeX check: Zero LaTeX syntax across all edited markdown documents.
+     - Unit tests: 21/21 passed in `tests/test_round1.py`.
+     - Scope check: `git diff --stat main` shows exclusively documentation files + `scripts/check_doc_numbers.py`.
+- **Log Paths**:
+  - `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`
+  - `ROUND1_README.md`
+  - `CLAUDE.md`
+  - `APP_STATUS_REPORT.md`
+  - `DEMO.md`
+  - `FEATURE_PARITY.md`
+  - `AUDIT.md`
+  - `logs/ROUND1_TASKLOG.md`
+
+
 
