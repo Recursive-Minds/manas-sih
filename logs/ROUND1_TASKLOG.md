@@ -451,6 +451,71 @@ This log records every command and process executed during Round 1 tuning and ev
      - Scenario #30: Endpoint Diff 0.0000 m (Batch 14.00 m vs Stage B 14.00 m) - PASS
      - **All Scenarios Passed (<0.01m): True** (100% bit-identical parity achieved across all 5 canonical scenarios!).
 - **Log Paths**:
-  - `results/round1/parity_r2b/summary.json`
-  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1344.log`
-  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1369.log`
+- **Commit Hash**: `2bbdc93`
+
+### Step 22: Round 2 Step 3 - Speed-Scale Window & Doppler Bearing Sweep (Dev Seeds)
+- **Start Time**: 2026-09-24 18:04:00 +05:30
+- **End Time**: 2026-09-24 21:58:00 +05:30
+- **Summary**:
+  1. Evaluated 7 configurations across 6 dev seeds (236 scenarios) with `round1_interval_lam0.5_s42.pt`:
+     - `t7_t8`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46% (reference)
+     - `r2_doppler`: median 11.31%, mean 10.69 +- 2.58%, p90 41.0%, T1 47%
+     - `r2_level45`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_level60`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_level90`: median 10.87%, mean 11.34 +- 1.02%, p90 38.0%, T1 45%
+     - `r2_blend60`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_blend180`: median 11.76%, mean 10.86 +- 2.47%, p90 34.0%, T1 49%
+  2. Paired comparisons vs `t7_t8`:
+     - `r2_doppler`: better 16 vs worse 23 (better not > worse; p = 0.337) -> FAILED.
+     - `r2_level45`, `r2_level60`, `r2_blend60`: identical to `t7_t8` (0 better, 0 worse) -> FAILED.
+     - `r2_level90`: better 74 vs worse 75 (worse > better; p = 1.000) -> FAILED.
+     - `r2_blend180`:
+       - ALL: better 78 vs worse 53 (sign-test p = 0.036 < 0.10)
+       - Unseen: better 34 vs worse 26 (median 9.92% -> 7.21%, delta -1.01 pp)
+       - Mean delta: -1.48 pp < 0
+       - Domain breakdown: Arterial -0.87 pp, Highway -1.06 pp, Mixed -0.65 pp, Urban -4.96 pp (all negative, none > +1.0 pp)
+       - **Sole winner meeting all strict rules**: `r2_blend180`.
+- **Log Paths**:
+  - `results/round1/r2_sweep/summary.json`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1384.log`
+
+---
+
+### Step 23: Round 2 Step 4 - Single Pre-Declared Held-Out Evaluation & Promotion
+- **Start Time**: 2026-09-24 21:59:00 +05:30
+- **End Time**: 2026-09-24 22:03:00 +05:30
+- **Summary**:
+  1. Executed single pre-declared held-out evaluation for `r2_blend180` across 3 held-out seeds (120 scenarios):
+     - `median 11.15 | mean 10.71 +- 1.17 | p90 32.9 | T1 0.48 | worst 140.8`
+  2. Paired comparison against `heldout_s42/t7_t8`:
+     - ALL: better 39 vs worse 23 (sign-test p = 0.056)
+     - Mean delta: -1.18 pp (< 0 -> PASS)
+     - Tier 1 share: 48.33% (>= 48.3% -> PASS)
+     - P90 drift: 32.91% (<= 36.6% -> PASS)
+     - Unseen median: 11.06% -> 9.66% (-1.40 pp, 17 B vs 10 W)
+     - **Decision**: All 3 promotion criteria met; PROMOTED to production.
+- **Log Paths**:
+  - `results/round1/heldout_r2_blend180/summary.json`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1501.log`
+
+---
+
+### Step 24: Round 2 Step 5 - Production Freeze, Verification & Final Reporting
+- **Start Time**: 2026-09-24 22:04:00 +05:30
+- **End Time**: 2026-09-24 22:16:00 +05:30
+- **Summary**:
+  1. Updated `config/round1/production.json` with `"scale_level": {"enabled": true, "source": "blend"}` and `"entry_doppler_bearing": false`.
+  2. Executed `python scripts/quick_parity.py` on final production profile:
+     - All 5 canonical scenarios passed with bit-identical 0.0000 m endpoint and trajectory differences.
+  3. Executed `python scripts/evaluate_heldout_seeds.py` (mean median 10.71% +- 1.17%, P90 33.62%).
+  4. Executed `python benchmarks/run_final_benchmark.py --fixed`:
+     - Re-generated 40 scenario trajectory plots and master gallery.
+     - Re-generated `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html`.
+     - Synchronized `README.md` Section 16 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 9.
+  5. Created `FINAL_NUMBERS_FOR_PPT.md` documenting baseline vs final held-out scorecard with traceable data files.
+- **Log Paths**:
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1528.log`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1533.log`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1560.log`
+  - `artifacts/heldout_seed_results.json`
+  - `FINAL_NUMBERS_FOR_PPT.md`
