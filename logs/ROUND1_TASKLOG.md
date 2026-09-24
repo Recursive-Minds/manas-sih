@@ -346,7 +346,7 @@ This log records every command and process executed during Round 1 tuning and ev
      - T8: After a completed junction turn, snap the position ALONG the road to the matching road corner (along-track correction only).
      - Verified plain-text math throughout all documentation.
   3. Audited "Zero-Speed Stop Accuracy 99.8% precision / 99.5% recall": confirmed it was a chat summary conflation of two real OSM Route Coverage figures (99.8% and 99.5%) in `logs/round1/step14_final_benchmark.log`. Confirmed absent from all markdown documentation files.
-- **Commit Hash**: Pending commit
+- **Commit Hash**: `a443cd4`
 
 
 
