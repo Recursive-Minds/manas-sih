@@ -320,7 +320,7 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Log Paths**:
   - `logs/round1/step14_evaluate_heldout_seeds.log`
   - `logs/round1/step14_final_benchmark.log`
-- **Commit Hash**: Pending commit (`round1: promote winning recipe s42 to production`).
+- **Commit Hash**: `c25351e`
 
 
 
