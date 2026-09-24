@@ -401,8 +401,30 @@ This log records every command and process executed during Round 1 tuning and ev
      - Result: `PARITY PASS` (`max_abs_diff_map_err_m = 5.684e-14`).
 - **Log Paths**:
   - `results/round1/parity_r2/summary.json`
-  - `results/round1/parity_r2/baseline_off_scenarios.csv`
+- **Commit Hash**: `6b74417`
 
-
-
-
+### Step 20: Round 2 Step 2 - Parity Test Harness Harmonization & EKF State Diagnosis
+- **Start Time**: 2026-09-24 17:42:00 +05:30
+- **End Time**: 2026-09-24 17:48:00 +05:30
+- **Summary**:
+  1. `scripts/quick_parity.py`: Harmonized streaming warmup duration to strictly 30.0s before blackout (`bo_start - 30s`), exactly matching `DeadReckoningEngine.run_scenario`.
+  2. Prefilled adapter history buffers (`recent_imu_calib`, `recent_ai_speeds`, `recent_ai_ts`, `recent_gnss_window`) from `t_hist = bo_start - (history_s + 10s)` up to `warmup_start`, without running `on_imu`/`on_gnss`.
+  3. Re-ran `quick_parity.py` with `production.json`:
+     - Scenario #23: Endpoint Diff 0.0000 m (Batch 102.82 m vs Stage B 102.82 m) - PASS
+     - Scenario #25: Endpoint Diff 0.0004 m (Batch 77.26 m vs Stage B 77.26 m) - PASS (improved from 45 m mismatch!)
+     - Scenario #26: Endpoint Diff 0.0000 m (Batch 46.02 m vs Stage B 46.02 m) - PASS
+     - Scenario #30: Endpoint Diff 0.0000 m (Batch 14.00 m vs Stage B 14.00 m) - PASS (improved from 7.4 m mismatch!)
+     - Scenario #22: Endpoint Diff 0.6216 m (Batch 9.61 m vs Stage B 9.70 m)
+  4. Re-ran `quick_parity.py` with `SIH_ROUND1_CONFIG=off`:
+     - Scenarios #23, #25, #26, #30 all achieve bit-identical 0.0000 m endpoint difference.
+     - Scenario #22 differs by 8.8911 m (Batch 40.05 m vs Stage B 31.16 m).
+  5. EKF State Diagnosis at Blackout Start on Scenario #22 (`SIH_ROUND1_CONFIG=off`):
+     - `pos`: Batch `[2245.187, 158.411, 136.899]`, Stream `[2245.187, 158.411, 136.788]` (diff = 0.110 m)
+     - `v`: Batch `[11.137, -7.576, 0.000]`, Stream `[12.452, -7.549, 0.000]` (diff = 1.315 m/s)
+     - `heading`: Batch `124.2250 deg`, Stream `121.2250 deg` (diff = exactly 3.0000 deg)
+     - `_bg`: Batch `[0, 0, 3.357e-5] rad/s`, Stream `[0, 0, 3.357e-5] rad/s` (diff = 0.000e+00 rad/s)
+     - `speed_scale`: Batch `1.238672`, Stream `1.238672` (diff = 0.000000)
+     - Root cause: Doppler bearing injection in `EngineAdapterStageB.set_blackout` (`pre_gnss_window[-1].bearing_deg = g_ref.bearing_deg`) vs batch `synthesize_1hz_gnss_window` geometric bearing.
+- **Log Paths**:
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1274.log`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1279.log`

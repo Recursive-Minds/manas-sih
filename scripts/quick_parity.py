@@ -125,7 +125,9 @@ def run_quick_parity(raw_mode: bool = False):
         bo_start_ns = entry_g.timestamp_ns
         bo_end_ns = bo_start_ns + int(tgt["dur"] * 1e9)
         cfg = get_active_config()
-        warmup_dur_s = max(60.0, cfg.history_s + 10.0) if cfg.needs_history() else 60.0
+        history_s = cfg.history_s if hasattr(cfg, "history_s") else 180.0
+        t_hist_ns = bo_start_ns - int((history_s + 10.0) * 1e9)
+        warmup_dur_s = 30.0
         warmup_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_dur_s * 1e9))
 
         # 1. Warm-up MountCalibrator alignment up to bo_start_ns
@@ -159,6 +161,16 @@ def run_quick_parity(raw_mode: bool = False):
         valid_gnss = [g for g in trip.gnss_samples if g.is_valid and g.timestamp_ns <= bo_start_ns]
         warmup_gnss = min(valid_gnss, key=lambda g: abs(g.timestamp_ns - warmup_start_ns), default=valid_gnss[0])
         adapter.session.init_from_gnss(warmup_gnss)
+
+        # Prefill adapter's history buffers with pre-warmup data (without calling on_imu/on_gnss)
+        j_hist = next((i for i, im in enumerate(trip.imu_samples) if im.timestamp_ns >= t_hist_ns), 0)
+        j_warm = next((i for i, im in enumerate(trip.imu_samples) if im.timestamp_ns >= warmup_start_ns), 0)
+        j_hist = min(j_hist, j_warm)
+
+        adapter.recent_imu_calib = list(calibs[j_hist:j_warm])
+        adapter.recent_ai_speeds = list(v_preds[j_hist:j_warm])
+        adapter.recent_ai_ts = [imu.timestamp_ns for imu in trip.imu_samples[j_hist:j_warm]]
+        adapter.recent_gnss_window = [g for g in valid_gnss if t_hist_ns <= g.timestamp_ns < warmup_start_ns]
 
         # 3. Stream through warmup then blackout
         g_stream_idx = 0
