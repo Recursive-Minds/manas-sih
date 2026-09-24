@@ -544,3 +544,23 @@ This log records every command and process executed during Round 1 tuning and ev
   - `scripts/check_doc_numbers.py`
   - `README.md`
 
+---
+
+### Step 26: Documentation Final Sync - Architecture Doc Sync (`SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`)
+- **Start Time**: 2026-09-25 00:20:00 +05:30
+- **End Time**: 2026-09-25 00:26:00 +05:30
+- **Branch**: `docs/final-sync`
+- **Summary**:
+  1. Updated Section 1 with held-out headline metrics (10.71% +- 1.17% mean drift, 11.15% median drift, 32.91% P90, 48.33% Tier 1 share, 9.66% unseen trips median).
+  2. Updated Section 2 with 9-stage pipeline ASCII architecture diagram reflecting T6, T7, T8, blended speed scale, and 180s pre-blackout history buffer.
+  3. Added Section 6.4 documenting Distance Interval Loss Fine-Tuning (T6, `round1_interval_lam0.5_s42.pt`).
+  4. Added Section 8.5 documenting Post-Turn Junction Corner Snapping (T8, `junction_anchor.py`).
+  5. Updated Section 10 and Section 11.3 replacing stale 9.25% references with 10.86% +- 2.47% multi-seed grand median, 10.71% +- 1.17% held-out mean, and 11.85% canonical seed drift.
+  6. Updated Section 13 Codebase Inventory with all Round 1 and Round 2 modules, scripts, and tests.
+  7. Updated Section 14 Deliverables (21 Round 1 / 123 total unit tests) and Section 14.3 audit statistics.
+  8. Rewrote Section 14.5 parity row: documented resolution of streaming vs batch parity across all 5 canonical scenarios (0.0000 m exact).
+  9. Verified all checks pass cleanly via `python scripts/check_doc_numbers.py`.
+- **Log Paths**:
+  - `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`
+
+
