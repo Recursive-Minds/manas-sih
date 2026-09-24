@@ -290,6 +290,20 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/step12_parity3.log`
 - **Commit Hash**: `61d996e`
 
+---
+
+### Step 13: 3-Model Ensemble Evaluation (Canonical & Held-Out Seeds)
+- **Start Time**: 2026-09-24 16:12:00 +05:30
+- **End Time**: 2026-09-24 16:18:00 +05:30
+- **Summary**:
+  1. Canonical seeds (`ens_dev`): 3-model mean ensemble (s42, s7, s123) with `t7_t8`: median 11.55%, mean 11.36 +- 2.70%, P90 43.8%, T1 46.2%, unseen median 9.25% (vs pre_patch: 114 better / 93 worse; unseen: 67 better / 36 worse, p = 0.003).
+  2. Held-out seeds (`heldout_ens`): 3-model mean ensemble with `t7_t8`: median 10.37%, mean 11.08 +- 1.17%, P90 41.4%, T1 45.8%, unseen median 12.08% (vs heldout_base: 51 better / 51 worse).
+- **Log Paths**:
+  - `logs/round1/step13_ens_dev.log`
+  - `logs/round1/step13_heldout_ens.log`
+- **Commit Hash**: Pending commit (`round1: ensemble evaluation on canonical and held-out seeds`).
+
+
 
 
 
