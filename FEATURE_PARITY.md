@@ -2,7 +2,7 @@
 
 **Author**: Senior Embedded Systems & Sensor Fusion Engineer  
 **Scope**: SIH Problem Statement 26168 (Smartphone Intelligent Dead Reckoning during GNSS Outages)  
-**Target Checkpoint**: `models/checkpoints/best_moe_velocity_model.pt`  
+**Target Checkpoint**: `models/checkpoints/best_moe_velocity_model.pt` (pre-round-1 baseline model; production model is `round1_interval_lam0.5_s42.pt`)  
 **Evaluation Mode**: Read-Only Audit with Empirical Verification (Strictly No Hyperparameter Tuning)
 
 ---
@@ -160,7 +160,7 @@ Inspection of `data/cache/v_preds_all_trips.npz` (committed in `d193767` during 
   * `S-S2`: **RMSE = 2.869 m/s**, Scale = 1.015
   * Training trips mean: (2.935 + 2.169 + 2.869) / 3 = **2.658 m/s** (or combined RMSE = **2.77 m/s**).
 
-**Conclusion**: The documented claims in earlier README drafts ("2.49 m/s on held-out S-S3a, 2.77 m/s on training trips") were produced by the 5-fold LOTO ensemble with trip-id conditioning ($D=0.50$), **not** by the single deployable model. The single model achieves **3.91 m/s** RMSE on S-S3a.
+**Conclusion**: The documented claims in earlier README drafts ("2.49 m/s on held-out S-S3a, 2.77 m/s on training trips") were produced by the 5-fold LOTO ensemble with trip-id conditioning (discount D = 0.50), **not** by the single deployable model. The single model achieves **3.91 m/s** RMSE on S-S3a.
 
 ---
 

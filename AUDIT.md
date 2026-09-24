@@ -113,7 +113,7 @@
 
 ## 5. TorchScript Export Audit
 
-- **Script**: `scripts/export_onnx.py` exports `models/exported/moe_velocity_model.torchscript.pt` from `models/checkpoints/best_moe_velocity_model.pt`.
+- **Script**: `scripts/export_onnx.py` exports `models/exported/moe_velocity_model.torchscript.pt` (defaults to production checkpoint `models/checkpoints/round1_interval_lam0.5_s42.pt`, with pre-round-1 checkpoint `best_moe_velocity_model.pt` selectable via `--checkpoint`).
 - **Numerical Parity**: Verified via independent scratch script (`scratch/test_torchscript_parity.py`) in fresh Python process:
   - Input: random tensor `(1, 12, 20)` and `(1, 12, 60)`.
   - Eager output: `v = 12.397964 m/s, var = 0.496575`.

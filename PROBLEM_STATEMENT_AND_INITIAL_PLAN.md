@@ -108,6 +108,40 @@ The project was originally structured into five sequential development phases:
   - Exported PyTorch Mobile TorchScript model (`moe_velocity_model.torchscript.pt`, **2.66 MB**, **1.84 ms on laptop CPU; not measured on phone** / 544 Hz throughput).
   - Fully streaming causal pipeline with zero lookahead.
 
+### Round 1: Accuracy & Reliability Package
+* **Goal**: Eliminate systemic along-track and turn-exit errors through targeted physical hardenings.
+* **Outcome**:
+  - **T6 (Interval Distance Loss)**: Fine-tuned the Bayesian MoE with symmetric distance interval loss (`L = L_phase55 + lambda * L_int`, `lambda = 0.5`, horizons 30-75s) with pre-blackout scale `alpha` emulated during training (`round1_interval_lam0.5_s42.pt`). Reduces median speed underestimation from 1.13 down to 1.03.
+  - **T7 (Online Per-Speed-Band Calibration)**: Learned speed shape factors from 180s trailing GNSS distance vs AI distance before the blackout, shrunk toward 1.0.
+  - **T8 (Post-Turn Junction Snapping)**: Snapped position along the outgoing road centerline to the matching road corner upon detecting completed turns (|delta_theta| >= 25 deg).
+
+### Round 2: Speed-Scaling Optimization, Parity & Final Freeze
+* **Goal**: Optimize observation windows, achieve bit-identical streaming parity, and freeze the production release.
+* **Outcome**:
+  - **Blended Speed Scale**: Combined 15s entry GNSS/AI ratio (0.5 weight) with 180s GNSS-distance ratio (0.5 weight), clipped to [0.85, 1.25] (1.35 Highway).
+  - **Unified Geometric Entry Bearing**: Enforced `entry_doppler_bearing = false` across both batch and streaming paths (Doppler bearing lost the sweep, 16 better vs 23 worse, p = 0.337).
+  - **Live Pre-Blackout History Buffer**: Implemented 180s sliding history buffer in live server adapter (`server/engine_adapter.py`).
+  - **Bit-Identical Streaming Parity**: Achieved exact 0.0000 m endpoint and trajectory parity across all 5 canonical scenarios in `scripts/quick_parity.py`.
+  - **Final Production Frozen System (Tag `round2-release`)**: Evaluated on 120 held-out scenarios across 3 random seeds without hyperparameter tuning: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share, **9.66%** unseen trips median, and **86.67%** beats pure DR rate.
+
+### Tested and Rejected Hypotheses
+Every candidate technique was evaluated honestly against paired real-data baselines:
+
+| Candidate Technique | Evaluation Result | Evidence & Empirical Reason for Rejection |
+| :--- | :--- | :--- |
+| **T3 Sticky Stop Detector** | Rejected | Never fired (0 activations across all scenarios; ZUPT variance detector already handles physical stops). |
+| **T4 Pre-Blackout Gyro Scale** | Rejected | Hurt performance (worsened cross-track error due to pre-blackout turn noise). |
+| **T5 Hold / Decay Speed Mode** | Rejected | Hurt performance (caused premature deceleration and along-track lag). |
+| **T9 Double-Scale Bug Fix** | Rejected | The suspected double-scale bug does not occur on real data; EKF pre-blackout scale is ~1.000 (std < 0.002). |
+| **T10 Wider Speed Clip Bounds** | Rejected | Hurt performance (P90 tail blew out by +2.0 to +4.1 percentage points). |
+| **3-Model Checkpoint Ensemble** | Rejected | Worse tail on held-out seeds (P90 35.3% vs 32.9% single model s42). |
+| **Doppler Entry Bearing** | Rejected | Lost empirical sweep against geometric bearing (16 better vs 23 worse, p = 0.337). |
+| **45s / 60s Scale Windows** | Rejected | Fell back to baseline due to insufficient historical fix counts, effectively untested. |
+
+### Evaluation Methodology (Stated Honestly)
+- **Dev Seeds vs Held-Out Seeds**: 6 fixed development seeds (`[541098, 75496, 45736, 12345, 987654, 314159]`) were used strictly for feature exploration and selection. Fresh held-out seeds (`[319976, 480577, 473995]`, drawn via `os.urandom`) were used strictly once per round for a single pre-declared winning candidate (2 looks in total).
+- **Paired Comparisons**: All candidate comparisons are paired per scenario and evaluated via two-tailed sign tests.
+
 ---
 
 ## 4. Key Scientific Discoveries & Architectural Pivots
@@ -128,6 +162,9 @@ Initial Assumption                        Real-Data Finding                     
 
 4. OpenStreetMap polylines as exact      OSM waypoints contain artificial angle         Repaired Road Network Governor filtering
    kinematic curvature boundaries         kinks that produce 6.2 m/s^2 lateral spikes.   curvature against real gyro yaw rate & IRC:73.
+
+5. MSE loss sufficient for speed         Vibration decoupling on smooth asphalt         Symmetric Distance Interval Loss (T6)
+   estimation across all speeds           causes ~17% speed underestimation.             reducing scale deficit from 1.13 to 1.03.
 ```
 
 ### Pivot 1: Abandoning End-to-End Neural Heading in Favor of Physics Fusion
@@ -142,6 +179,13 @@ Initial Assumption                        Real-Data Finding                     
 ### Pivot 3: Inventing the Kinematic Delta-v Speed Observer
 * **Why it mattered**: Pure neural speed estimation relies on a rolling window buffer (2.0s to 6.0s). While this accurately predicts steady-state cruising speed, it suffers from a 1.3-second causal phase lag during sudden braking or full-throttle acceleration.
 * **The Solution**: The Kinematic Delta-v Speed Observer (`sih/engine/speed_observer.py`). Instantaneous velocity is integrated forward at 10 Hz directly from longitudinal IMU acceleration (`v_k = v_{k-1} + a_long * dt`), while the neural model provides continuous drift-free upper and lower bounding envelopes, and Physical Rest ZUPT clamps stop speed to 0.00 km/h.
+
+### Pivot 4: Overcoming Smooth Asphalt Speed Underestimation via Distance Interval Loss
+* **Why it mattered**: On ultra-smooth asphalt at high cruising speeds (>50 km/h), vehicle chassis vibrations decouple from vehicle forward velocity. Classical MSE loss caused the neural model to read speed ~17% low (median pre-blackout scale factor 1.13), accumulating along-track position shortfalls.
+* **The Solution**: Fine-tuning the Bayesian MoE with symmetric distance interval loss (T6, `sih/models/interval_loss.py`):
+  `L = L_phase55 + 0.5 * L_int`
+  `L_int = mean_h |sum(alpha * v_hat * dt) - sum(v_GT * dt)| / max(sum(v_GT * dt), 20.0m)`
+  spanning multi-scale horizons (30s to 75s) with pre-blackout scale `alpha` emulated during training. Promoted checkpoint `models/checkpoints/round1_interval_lam0.5_s42.pt` reduced median speed underestimation from 1.13 down to 1.03.
 
 ---
 
@@ -176,21 +220,21 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 
 | Architectural Subsystem | Initial Planned Concept (Phase 1 Proposals) | Delivered Production Reality | Empirical Benefit |
 | :--- | :--- | :--- | :--- |
-| **Speed Estimation** | Single 1D-CNN regressing forward speed from 20-sample accelerometer windows. | **Dual-Brain Bayesian Mixture-of-Experts (MoE)**: ResNet-1D micro-expert (2.0s) + Dilated TCN-Attention macro-expert (6.0s) + Kinematic Delta-v Observer. | Speed RMSE reduced to 1.46 m/s; 1.3s lag eliminated; scale ratio = 1.00. |
-| **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. | Completely immune to vehicle magnetic distortion (+76°); initial heading error cut to 0.14° average (0.0002° median). |
+| **Speed Estimation** | Single 1D-CNN regressing forward speed from 20-sample accelerometer windows. | **Dual-Brain Bayesian Mixture-of-Experts (MoE) with T6 Distance Interval Loss & T7 Online Calibration**: ResNet-1D micro-expert (2.0s) + Dilated TCN-Attention macro-expert (6.0s) + Kinematic Delta-v Observer. Checkpoint `round1_interval_lam0.5_s42.pt`. | Speed RMSE reduced to 1.46 m/s; 1.3s lag eliminated; scale ratio = 1.00; median speed underestimation reduced from 1.13 to 1.03. |
+| **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. Unified geometric entry bearing across batch and streaming. | Completely immune to vehicle magnetic distortion (+76°); initial heading error cut to 0.14° average (0.0002° median). |
 | **Mount Calibration** | Manual user calibration or static orientation assumption. | **Dynamic Autonomous SO(3) Leveling**: Rodrigues rotation from gravity + continuous least-squares centripetal acceleration turn correlation. | Zero user calibration required; adapts to arbitrary portrait/landscape/tilted phone orientations. |
-| **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor**: Turn-inflated likelihood, branch multi-hypothesis gating, and IRC:73 lateral comfort limits. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
-| **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation**. | Portal multipath parameter protection; sub-millimeter geometric C^2 continuity on real sequences. |
-| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 1.84 ms on laptop CPU; not measured on phone). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
+| **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor & T8 Junction Corner Snapping**: Turn-inflated likelihood, branch multi-hypothesis gating, IRC:73 lateral comfort limits, and along-track junction corner snapping. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
+| **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation & 180s History Buffer**. | Portal multipath parameter protection; sub-millimeter geometric C^2 continuity on real sequences; exact 0.0000 m batch vs live parity. |
+| **Runtime Target** | Python desktop prototype. | **Standalone Embedded C++ Engine & PyTorch Mobile TorchScript Graph** (2.66 MB, 1.84 ms on laptop CPU; not measured on phone; exported from s42). | Sub-millisecond execution; deployable on budget Android smartphones without cloud dependency. |
 
 ---
 
 ## 7. Production Readiness & Delivery Status
 
 * [x] **Core IMU Pipeline**: Fully modular, contract-driven (`sih/core/`).
-* [x] **Neural Velocity Model**: Trained, calibrated, and exported to TorchScript (`models/exported/`).
+* [x] **Neural Velocity Model**: Trained, calibrated with distance interval loss (T6), and exported to TorchScript (`models/exported/`).
 * [x] **15-State Error-State EKF**: SO(3) quaternion manifold with closed-loop NHC (`sih/fusion/es_ekf.py`).
 * [x] **Road Network & Governor**: Spatial polyline index, curvature governor, Overpass API client (`sih/map/`).
 * [x] **GNSS-INS Handoff**: 6-state FSM with C^2 Hermite smoothstep reconciliation (`sih/handoff/`).
-* [x] **Edge Streaming Pipeline**: Causal real-time stream for mobile (`sih/mobile/causal_stream.py`).
-* [x] **Empirical Benchmark Verification**: 6-seed 240-scenario evaluation with 9.53% grand median drift, beating the SIH < 10% target ([FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md)).
+* [x] **Edge Streaming Pipeline**: Causal real-time stream for mobile with 180s history buffer and exact 0.0000 m batch parity (`server/engine_adapter.py`, `scripts/quick_parity.py`).
+* [x] **Empirical Benchmark Verification**: Held-out 120-scenario evaluation across 3 seeds: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share, **9.66%** unseen trips median, and **86.67%** beats pure DR rate. Multi-seed 240-scenario evaluation: **10.86% ± 2.47%** grand median drift ([FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe/SIH/FINAL_NUMBERS_FOR_PPT.md), [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md)).

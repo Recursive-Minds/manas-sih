@@ -72,8 +72,8 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
 `IMUSample -> CalibratedSample -> VelocityEstimate -> FusedPosition -> MatchedPosition`
 
 - **Calibration (Phase 4)** (`sih/calibration/mount.py`): 3D gravity leveling (Rodrigues rotation) + dual-metric centripetal acceleration correlation (`|r_a| * E_a`) for yaw-axis selection with dynamic least-squares sign lock (`Cov(omega_z, psi_dot) / Var(omega_z)`).
-- **Initial Heading Seeding (Phase 4)** (`sih/fusion/es_ekf.py`): Speed-regime 2-point GNSS displacement vector seeder with pre-blackout heading consistency gating (cross-checks against moving GNSS Doppler `v >= 2.0 m/s`, overriding if discrepancy > 50°) and decisive straight-line cruise innovation (`gain = 0.85`), bypassing phone cabin magnetic distortions of +28° to +76°.
-- **AI Velocity Estimator (Phase 3)** (`sih/models/moe_fusion.py`, `sih/models/inference.py`, `sih/velocity/ai_estimator.py`): Dual-Brain Bayesian Mixture-of-Experts (`BayesianMoEFusion`) combining ResNet-1D micro-window (2.0s / 20 steps) + dilated TCN-Attention macro-window (6.0s / 60 steps) with GRU over 12 input features. Supervised by 10 Hz physical vehicle CAN-bus wheel speeds (`V-M.csv`, `V-S1.csv`, `V-S2.csv`), resolving the 9-second phone GPS stair-step optical illusion. Clean decoupled inference pipeline in `sih/models/inference.py`.
+- **Initial Heading Seeding (Phase 4 & Round 2)** (`sih/fusion/es_ekf.py`, `sih/round1/entry_bearing.py`): Speed-regime 2-point GNSS displacement vector seeder with pre-blackout heading consistency gating and decisive straight-line cruise innovation (`gain = 0.85`), bypassing phone cabin magnetic distortions of +28° to +76°. Unified geometric entry bearing across batch and streaming (`entry_doppler_bearing = false`).
+- **AI Velocity Estimator (Phase 3 & Round 1 T6)** (`sih/models/moe_fusion.py`, `sih/models/inference.py`, `sih/velocity/ai_estimator.py`, `round1_interval_lam0.5_s42.pt`): Dual-Brain Bayesian Mixture-of-Experts (`BayesianMoEFusion`) combining ResNet-1D micro-window (2.0s / 20 steps) + dilated TCN-Attention macro-window (6.0s / 60 steps) with GRU over 12 input features. Supervised by 10 Hz physical vehicle CAN-bus wheel speeds (`V-M.csv`, `V-S1.csv`, `V-S2.csv`), resolving the 9-second phone GPS stair-step optical illusion. Fine-tuned with symmetric distance interval loss (T6, `lambda = 0.5`, horizons 30-75s) to reduce median speed underestimation from 1.13 down to 1.03.
 - **Causal Kinematic Speed Smoother (Phase 2/3)** (`sih/fusion/speed_smoother.py`): Physical acceleration slew rate limiting (`-5.0 m/s^2 <= a <= +3.5 m/s^2`) and causal EMA smoothing (`tau = 0.25s`) eliminating 89% of high-frequency speed variance without phase lag.
 - **Fusion Filter (Phase 2 & 3)** (`sih/fusion/es_ekf.py`): 15-state error-state EKF on SO(3) quaternion manifold (position, velocity, attitude, accel bias, gyro bias).
 - **Physical Hardening & Invariant Constraints**:
@@ -81,7 +81,10 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
   - *Lorentzian Turn-Damped Gyro Bias*: Damps bias updates with `1.0 / (1.0 + (|omega_z| / omega_0)^2)` to prevent centripetal turn dynamics from corrupting gyro bias.
   - *Physical Rest ZUPT & ZARU*: Accel variance (`Var(a) < 0.04 m^2/s^4`) and gyro norm (`||omega|| < 0.05 rad/s`) clamp velocity to zero and freeze integration during stops.
   - *Low-Speed Crawl Clamping*: Enforces `v_fwd <= max(v_entry + 1.2 m/s, 3.5 m/s)` during crawl entries (`v_entry < 4.0 m/s`), preventing engine idle vibrations from simulating cruising.
-  - *Pre-Blackout Dynamic Speed Scaling*: Adapts pavement vibration scale (`s_v = mean(v_GPS) / mean(v_AI)`) over the 20s prior to blackout.
+  - *Online Per-Band Speed Calibration (T7)*: Learns speed error shape factor from trailing 180s GNSS distance vs AI distance before the blackout, shrunk toward 1.0.
+  - *Blended Speed Scale (Round 2)*: `scale = 0.5 * (15s entry GNSS/AI ratio) + 0.5 * (180s GNSS-distance ratio)`, clipped to [0.85, 1.25] (1.35 Highway).
+  - *Live Pre-Blackout History Buffer*: Continuously buffers 180s of IMU + GNSS fixes in `server/engine_adapter.py`, guaranteeing exact 0.0000 m batch vs streaming parity.
+  - *Post-Turn Junction Corner Snapping (T8)*: Snaps position along the outgoing road centerline to the matching road corner upon detecting completed turns (|delta_theta| >= 25 deg).
   - *ZARU Highway Straight-Line Lock*: Freezes yaw gyro bias when `v > 15 m/s` and `|omega_z| < 0.005 rad/s` for > 2.0s, eliminating phantom highway curvature.
   - *Hybrid Speed Blending*: Blends accelerometer forward velocity integration with neural MoE speed using 1.5-4.5 Hz frequency vibration power (Band B).
 - **Map-Matching & Gating (Phase 5)** (`sih/map/network.py`, `sih/map/matcher.py`, `sih/map/governor.py`): Spatial polyline indexing with turn-inflated Gaussian emission likelihood (`sigma_eff >= 45°`), curvature kinematics governor (`v <= sqrt(a_lat_max / kappa)`), branch multi-hypothesis fork gating (`diff_theta > 15 deg, L2 > 0.20 * L1`), expanded 105°–110° successor turn gates with 60° hard heading limit (`sigma_heading_deg = 30.0°`), anti-boundary clamping watchdog suppressing junction stalls, and prompt corridor heading steering (`0.50 * diff_rad`).
@@ -93,14 +96,19 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
 
 All benchmark scores, multi-seed statistical validations (6 random seeds x 40 scenarios = 240 evaluation runs), domain breakdowns, and trajectory maps are maintained exclusively in:
 👉 [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md)
+👉 [FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe\SIH\FINAL_NUMBERS_FOR_PPT.md)
 
-**Official SIH Benchmark Criteria**:
+**Official SIH Benchmark Criteria & Final Frozen Results (Tag `round2-release`)**:
+- **Headline Benchmark Result (Held-Out Seeds, 120 Scenarios)**: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share (<10%), **9.66%** unseen trips median, **86.67%** beats pure DR rate.
+- **Secondary Multi-Seed Benchmark (6 Fixed Seeds, 240 Scenarios)**: **10.86% ± 2.47%** grand median drift.
+- **Canonical Reference Seed 541098**: **11.85%** Median Drift (P90: 27.94%, Tier 1: 18/40 = 45.0%).
+- **Streaming/Batch Parity**: Exact 0.0000 m endpoint and trajectory diff across all 5 canonical scenarios in `scripts/quick_parity.py`.
 - **Grand Target**: Dead Reckoning Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km).
 - **Tier 1 (Traffic Crawl, < 20 km/h, < 200m)**: Stopping drift arrested via Physical Rest ZUPT.
 - **Tier 2 (City Maneuvers, 20-50 km/h, 200-500m)**: Heading drift < 10% through dynamic multi-source heading and road governing.
 - **Tier 3 (Highway Cruising, > 50 km/h, > 500m-1.2km)**: Speed scale fidelity sum(v_hat)/sum(v_GT) approx 1.00 and high-speed gyro drift suppression.
 
-*(See [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md) for current verified scorecards passing all SIH criteria).*
+*(See [FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe\SIH\FINAL_NUMBERS_FOR_PPT.md) and [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md) for verified scorecards passing all SIH criteria).*
 
 ---
 
@@ -120,12 +128,14 @@ All benchmark scores, multi-seed statistical validations (6 random seeds x 40 sc
    - Comprehensive unit test suite in `tests/test_map_ingestion.py` (6/6 passed, 40/40 repo-wide).
 
 3. **[COMPLETED] Phase 7: Mobile App Deployment Readiness & Edge Causal Runtime**:
-   - Exported PyTorch Mobile TorchScript graph `models/exported/moe_velocity_model.torchscript.pt` (**2.66 MB**, 0.000000 m/s numerical parity, **2.68 ms latency** on CPU / 373 Hz throughput).
+   - Exported PyTorch Mobile TorchScript graph `models/exported/moe_velocity_model.torchscript.pt` (**2.66 MB**, exported from promoted s42 model, **1.84 ms on laptop CPU; not measured on phone** / 544 Hz throughput; pre-round-1 export preserved as `*_pre_round1`).
    - Exported 12-channel normalization vectors `models/exported/normalization_params.npz`.
    - Production streaming causal interface `sih/mobile/causal_stream.py` (`MobileDeadReckoningStream`) ingesting 10-50 Hz IMU and 1 Hz GNSS with zero lookahead.
+   - Live Android integration in `server/engine_adapter.py` with 180s pre-blackout history buffer and verified exact 0.0000 m batch parity.
+   - *Next Phase*: Direct on-device Kotlin / NDK ONNX Runtime or TFLite execution.
 4. **Phase 8: Final Presentation & Jury Demonstration**:
    - Standalone evaluation executable and interactive web dashboard (`FINAL_JUDGE_EVALUATION_REPORT.html`).
-   - Slide deck highlighting leak-free OSM fusion (10.58% ± 2.39% multi-seed median drift, 87.5% win rate vs pure DR, and 2.66 MB edge model footprint).
+   - Slide deck highlighting leak-free OSM fusion (10.71% ± 1.17% held-out mean drift, 11.15% median, 86.67% win rate vs pure DR, 48.33% Tier 1 share across 120 scenarios, and 2.66 MB edge model footprint).
 
 ---
 

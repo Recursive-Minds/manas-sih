@@ -29,7 +29,7 @@ The system supports three distinct operational demonstration modes:
    pip install -r requirements.txt
    ```
 2. **PyTorch MoE Checkpoint**: Verify the velocity model exists at:
-   [models/checkpoints/best_moe_velocity_model.pt](file:///c:/Users/carpe/SIH/models/checkpoints/best_moe_velocity_model.pt)
+   [models/checkpoints/round1_interval_lam0.5_s42.pt](file:///c:/Users/carpe/SIH/models/checkpoints/round1_interval_lam0.5_s42.pt) (production model, with `best_moe_velocity_model.pt` retained as pre-round-1 backup).
 3. **Android Platform Tools (ADB)**:
    Ensure ADB is accessible. Default path on Windows:
    `C:\Users\<username>\AppData\Local\Android\Sdk\platform-tools\adb.exe`

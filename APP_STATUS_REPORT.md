@@ -141,12 +141,12 @@ All algorithmic computation is imported directly from `sih/` modules. No core fu
 | **Mount Calibration** | `sih.calibration.mount.MountCalibrator` ([mount.py:65](file:///c:/Users/carpe/SIH/sih/calibration/mount.py#L65)) | [engine_adapter.py:454](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L454), [engine_adapter.py:644](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L644), [engine_adapter.py:780](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L780) | Imported directly. Observes GNSS velocity vectors and IMU accelerometer samples to compute SO(3) roll/pitch leveling and yaw alignment. |
 | **Anti-Alias & Decimation** | SciPy Butterworth 2nd-order SOS filter | [engine_adapter.py:49](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L49), [engine_adapter.py:763](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L763) | Implemented in `CausalAntiAliasFilter` (cutoff 4.0 Hz, 50 Hz to 10 Hz decimation). Maintains persistent filter state across streaming batches. |
 | **StreamingFeatureExtractor** | `sih.features.streaming.StreamingFeatureExtractor` ([streaming.py:34](file:///c:/Users/carpe/SIH/sih/features/streaming.py#L34)) | [engine_adapter.py:449](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L449), [engine_adapter.py:711](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L711) | Imported directly. Causal sliding window (60 frames @ 10 Hz) computing 10-channel kinematic and spectral features. |
-| **Model Inference** | `sih.models.inference.load_ai_model` ([inference.py:28](file:///c:/Users/carpe/SIH/sih/models/inference.py#L28)) | [engine_adapter.py:420](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L420), [engine_adapter.py:738](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L738) | Imported directly. Loads Unified MoE Checkpoint: `models/checkpoints/best_moe_velocity_model.pt` in eager PyTorch mode. |
+| **Model Inference** | `sih.models.inference.load_ai_model` ([inference.py:28](file:///c:/Users/carpe/SIH/sih/models/inference.py#L28)) | [engine_adapter.py:420](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L420), [engine_adapter.py:738](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L738) | Imported directly. Loads production MoE Checkpoint: `models/checkpoints/round1_interval_lam0.5_s42.pt` (with `best_moe_velocity_model.pt` as backup when `SIH_ROUND1_CONFIG=off`) in eager PyTorch mode. |
 | **Speed Smoother** | `sih.fusion.speed_smoother.CausalSpeedSmoother` ([speed_smoother.py:12](file:///c:/Users/carpe/SIH/sih/fusion/speed_smoother.py#L12)) | [engine_adapter.py:451](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L451), [engine_adapter.py:740](file:///c:/Users/carpe/SIH/server/engine_adapter.py#L740) | Imported directly. Limits acceleration between -5.0 and +3.5 m/s^2 with tau = 0.25s exponential smoothing. |
 | **Kinematic Speed Observer** | `sih.engine.speed_observer.KinematicSpeedObserver` ([speed_observer.py:18](file:///c:/Users/carpe/SIH/sih/engine/speed_observer.py#L18)) | Wrapped in `SteppableDeadReckoningEngine` ([dead_reckoning_engine.py:105](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L105)) | Imported directly. Zero-speed detection and longitudinal acceleration integration during low-speed crawling. |
 | **Alpha Scaling** | `sih.engine.dead_reckoning_engine.SteppableDeadReckoningEngine.estimate_speed_scale` | [dead_reckoning_engine.py:230](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L230) | Imported directly. Computes ratio sum(v_GNSS) / sum(v_AI) over the 20s pre-blackout window, bounded to [0.75, 1.25]. |
 | **Heading Seeding** | `sih.fusion.es_ekf.ErrorStateEKF.seed_pre_blackout_heading` ([es_ekf.py:420](file:///c:/Users/carpe/SIH/sih/fusion/es_ekf.py#L420)) | Wrapped in `SteppableDeadReckoningEngine.start_blackout` ([dead_reckoning_engine.py:270](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L270)) | Imported directly. Multi-regime vector seeding combining Doppler bearing, gyro dead-reckoning delta, and road bearing. |
-| **Error-State EKF (15-State)** | `sih.fusion.es_ekf.ErrorStateEKF` ([es_ekf.py:48](file:///c:/Users/carpe/SIH/sih/fusion/es_ekf.py#L48)) | Wrapped in `SteppableDeadReckoningEngine` ([dead_reckoning_engine.py:82](file:///c:/Users/carpe/SIH/sih/sih/engine/dead_reckoning_engine.py#L82)) | Imported directly. 15-state ES-EKF with velocity pseudo-measurement updates and dynamic process noise inflation. |
+| **Error-State EKF (15-State)** | `sih.fusion.es_ekf.ErrorStateEKF` ([es_ekf.py:48](file:///c:/Users/carpe/SIH/sih/fusion/es_ekf.py#L48)) | Wrapped in `SteppableDeadReckoningEngine` ([dead_reckoning_engine.py:82](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L82)) | Imported directly. 15-state ES-EKF with velocity pseudo-measurement updates and dynamic process noise inflation. |
 | **Road Governor** | `sih.map.governor.RoadKinematicsGovernor` ([governor.py:15](file:///c:/Users/carpe/SIH/sih/map/governor.py#L15)) | Wrapped in `SteppableDeadReckoningEngine` ([dead_reckoning_engine.py:94](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L94)) | Imported directly. Enforces lateral acceleration limit: v <= sqrt(a_lat_max / kappa). |
 | **Topological Map Matcher** | `sih.map.matcher.HMMMapMatcher` ([matcher.py:42](file:///c:/Users/carpe/SIH/sih/map/matcher.py#L42)) | Wrapped in `SteppableDeadReckoningEngine` ([dead_reckoning_engine.py:98](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L98)) | Imported directly. Multi-hypothesis HMM map matching with heading emission weighting and road branch evaluation. |
 | **Live Evaluator** | `server.evaluator.LiveEvaluator` ([evaluator.py:35](file:///c:/Users/carpe/SIH/server/evaluator.py#L35)) | [router.py:126](file:///c:/Users/carpe/SIH/server/router.py#L126), [router.py:280](file:///c:/Users/carpe/SIH/server/router.py#L280) | Uses `geodetic_to_enu` from `sih.data.geo`. Calculates along-track and cross-track error projections against ground truth. |
@@ -439,17 +439,18 @@ All Scenarios Passed (<15m): True
 
 ---
 
-### 4. Canonical Benchmark Output (Seed 541098)
-Extracted from `FINAL_JUDGE_EVALUATION_REPORT.md`:
-- **Headline Benchmark Result (Held-Out Seeds):** **11.13% ± 1.50%** median drift across 3 held-out seeds (`319976`, `480577`, `473995`) (120 scenarios, zero tuning)
-- **Secondary Multi-Seed Benchmark (6 Fixed Seeds, 240 Scenarios):** **13.20% ± 0.88%**
-- **Canonical Reference Seed 541098:** **14.32%** Median Drift (P90: 32.87%, Tier 1 Pass Rate: 17/40 = 42.5%, High Reliability <= 30%: 35/40 = 87.5%)
-- **Multi-Trip Domain Breakdown (Seed 541098):**
-  - Highway Cruising (`S-M.csv`): **14.94%** (8 scenarios)
-  - Arterial Corridors (`S-S2.csv`): **16.09%** (6 scenarios)
-  - Urban Grid & Crawl (`S-S1.csv`): **14.55%** (6 scenarios)
-  - Mixed Arterial / Grid (`S-S3a.csv`): **6.00%** (10 scenarios) — **PASSED**
-  - Arterial Corridors (`S-S4.csv`): **19.33%** (10 scenarios)
+### 4. Canonical Benchmark Output
+Extracted from `FINAL_NUMBERS_FOR_PPT.md` and `FINAL_JUDGE_EVALUATION_REPORT.md`:
+- **Headline Benchmark Result (Held-Out Seeds, Final Production):** **10.71% ± 1.17%** mean drift, **11.15%** median drift across 3 held-out seeds (`319976`, `480577`, `473995`) (120 scenarios, zero tuning; P90: 32.91%, Tier 1 Pass Rate: 58/120 = 48.33%, Beats Pure DR: 104/120 = 86.67%, Unseen Trips Median: 9.66%)
+- **Pre-Round-1 Baseline (Held-Out Seeds):** **11.13% ± 1.50%** mean drift, **11.48%** median drift (P90: 37.25%, Tier 1: 51/120 = 42.50%)
+- **Secondary Multi-Seed Benchmark (6 Fixed Seeds, 240 Scenarios):** **10.86% ± 2.47%** grand median drift
+- **Canonical Reference Seed 541098:** **11.85%** Median Drift (P90: 27.94%, Tier 1 Pass Rate: 18/40 = 45.0%)
+- **Multi-Trip Domain Breakdown (Held-Out Seeds):**
+  - Highway Cruising (`S-M.csv`): **10.87%**
+  - Arterial Corridors (`S-S2.csv`): **12.41%**
+  - Urban Grid & Crawl (`S-S1.csv`): **14.56%**
+  - Mixed Arterial / Grid (`S-S3a.csv`, Unseen Test Drive): **4.30%** — **PASSED**
+  - Arterial Corridors (`S-S4.csv`, Unseen Test Drive): **25.56%**
 
 ---
 
@@ -622,7 +623,7 @@ python scripts/quick_parity.py --raw
 | :---: | :--- | :--- | :---: |
 | **1** | **Live In-Vehicle Driving Test on Indian Roads**<br>Mount Samsung phone in a real car, record a 15-minute mixed drive (arterial + flyover + underpass), export CSV via `SHARE CSV`, and evaluate drift against GPS baseline. | Empirical proof in chaotic real-world traffic dynamics. | 1.0 - 2.0 Days |
 | **2** | **Offline MBTiles Vector Tile Pack Integration**<br>Bundle local `.mbtiles` package directly into Android app assets / storage for target cities, eliminating all external raster tile HTTP calls. | 100% offline map rendering with zero network dependency. | 0.5 Day |
-| **3** | **On-Device TFLite / ONNX Runtime Inference in Kotlin (Tier 2)**<br>Convert `best_moe_velocity_model.pt` to ONNX/TFLite and execute causal feature extraction directly on Android CPU via NDK/Kotlin, enabling Tier 2 (Solo Phone without Laptop). | Eliminates laptop requirement for live dead-reckoning. | 2.0 - 3.0 Days |
+| **3** | **On-Device TFLite / ONNX Runtime Inference in Kotlin (Tier 2)**<br>Convert production model `round1_interval_lam0.5_s42.pt` (and pre-round-1 backup `best_moe_velocity_model.pt`) to ONNX/TFLite and execute causal feature extraction directly on Android CPU via NDK/Kotlin, enabling Tier 2 (Solo Phone without Laptop). | Eliminates laptop requirement for live dead-reckoning. | 2.0 - 3.0 Days |
 | **4** | **Automatic Blackout Detection from Tunnel Light / BLE**<br>Use phone ambient light sensor or loss of NMEA satellite SNR to trigger blackout transitions automatically without pressing `START`. | Completely autonomous GNSS outage response. | 0.5 Day |
 | **5** | **Magnetometer Declination Fusion for Still-Stand Orientation**<br>Fuse magnetic compass azimuth with World Magnetic Model (WMM) declination correction during initial zero-speed standstill before vehicle motion begins. | Reduces initial heading acquisition error from still-stand. | 1.0 Day |
 
