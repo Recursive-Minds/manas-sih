@@ -274,7 +274,7 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/heldout_s42.log`
   - `logs/round1/heldout_s7.log`
   - `logs/round1/heldout_s123.log`
-- **Commit Hash**: Pending commit (`round1: held-out seed evaluation results`).
+- **Commit Hash**: `8481f08`
 
 
 
