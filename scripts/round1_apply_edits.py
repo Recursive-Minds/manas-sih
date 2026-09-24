@@ -19,6 +19,8 @@ from pathlib import Path
 
 ENGINE = "sih/engine/dead_reckoning_engine.py"
 KOTLIN = "android/app/src/main/java/com/recursiveminds/idr/ui/MainActivity.kt"
+INFERENCE = "sih/models/inference.py"
+ADAPTER = "server/engine_adapter.py"
 
 EDITS = [
     # ---------------- engine -----------------------------------------------------------
@@ -84,6 +86,26 @@ EDITS = [
      "                self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == \"Highway\" else 1.25))\n",
      "                self.speed_scale_raw = float(scale)  # [ROUND1] T10: unclipped ratio, read by hooks only\n"
      "                self.speed_scale = float(np.clip(scale, 0.85, 1.35 if self.domain == \"Highway\" else 1.25))\n"),
+    # ---------------- promotion support (behaviour-neutral until config/round1/production.json exists)
+    (INFERENCE, "M1 model selection",
+     "    default_tcn_path = os.path.join(root_dir, \"models\", \"checkpoints\", \"best_velocity_model.pt\")\n",
+     "    default_tcn_path = os.path.join(root_dir, \"models\", \"checkpoints\", \"best_velocity_model.pt\")\n\n"
+     "    # [ROUND1] production profile may choose the speed checkpoint; \"a.pt,b.pt\" = mean ensemble\n"
+     "    if model_path is None:\n"
+     "        from sih.round1.model_select import resolve_velocity_checkpoint\n"
+     "        model_path = resolve_velocity_checkpoint(root_dir)\n"
+     "    if model_path and \",\" in model_path:\n"
+     "        from sih.round1.model_select import load_mean_ensemble\n"
+     "        return load_mean_ensemble(model_path, device, root_dir)\n"),
+    (ADAPTER, "A1 live pre-blackout history",
+     "        self.session.start_blackout(\n            entry_pos_enu=entry_pos_enu,\n",
+     "        # [ROUND1] live pre-blackout history (same data the benchmark uses) for T7 / T10 learners\n"
+     "        if self.session.r1 is not None and self.session.r1.needs_history:\n"
+     "            from sih.round1.history import build_history_from_buffers\n"
+     "            self.session.r1.set_history(build_history_from_buffers(\n"
+     "                self.recent_imu_calib, self.recent_ai_speeds, valid_hist_gnss,\n"
+     "                self.ref_lat, self.ref_lon, t_entry_ns, self.session.r1.cfg.history_s))\n\n"
+     "        self.session.start_blackout(\n            entry_pos_enu=entry_pos_enu,\n"),
     # ---------------- T1 pointer (Kotlin) ------------------------------------------------
     (KOTLIN, "K1 live GNSS marker",
      "                                vehicleMarker?.rotation = gnss.bearingDeg\n",
@@ -100,7 +122,7 @@ EDITS = [
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="dry run")
-    ap.add_argument("--only", choices=["engine", "kotlin"], default=None)
+    ap.add_argument("--only", choices=["engine", "kotlin"], default=None)  # kept for compatibility
     args = ap.parse_args()
 
     root = Path(".").resolve()

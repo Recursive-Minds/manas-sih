@@ -66,6 +66,7 @@ def main() -> int:
     os.makedirs(out, exist_ok=True)
     bm = load_benchmark_module()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    set_active_config(Round1Config(name="precompute"))
     pre = bm.load_precomputed_benchmark_data(device, model_path=args.model_path)
     set_active_config(Round1Config(name="diagnostics", diagnostics=True))
     _, detailed, metrics = bm.evaluate_seed_scenarios(args.seed, pre)

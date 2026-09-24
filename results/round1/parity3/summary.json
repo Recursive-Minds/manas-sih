@@ -1,0 +1,125 @@
+{
+  "seeds": [
+    541098,
+    75496,
+    45736,
+    12345,
+    987654,
+    314159
+  ],
+  "model_path": null,
+  "map_source": "osm",
+  "configs": {
+    "baseline_off": {
+      "name": "baseline_off",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": false,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "entry",
+        "w_history": 0.5
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": false,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": false,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    }
+  },
+  "summary": {
+    "baseline_off": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 12.968180869876182,
+      "mean_seed_median": 13.19447698968088,
+      "std_seed_median": 0.8792922843806015,
+      "per_seed_median": {
+        "12345": 13.246,
+        "45736": 12.294,
+        "75496": 12.241,
+        "314159": 12.691,
+        "541098": 14.317,
+        "987654": 14.378
+      },
+      "p90": 40.82276503154584,
+      "t1_lt10_share": 0.4152542372881356,
+      "beats_pure_share": 0.8177966101694916,
+      "worst": 172.78918758296206,
+      "median_abs_at_m": 33.269603443234246,
+      "median_abs_ct_m": 5.885665303844705,
+      "by_domain": {
+        "Arterial": 14.526,
+        "Highway": 8.876,
+        "Mixed": 10.83,
+        "Urban": 15.255
+      }
+    }
+  },
+  "parity": {
+    "reference": "results/round1/pre_patch/baseline_off_scenarios.csv",
+    "same_scenarios": true,
+    "max_abs_diff_map_err_m": 5.684341886080802e-14,
+    "pass": true
+  },
+  "elapsed_s": 163.63236474990845
+}

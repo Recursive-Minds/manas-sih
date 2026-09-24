@@ -76,3 +76,33 @@ def integrate_between(ts_ns: np.ndarray, values: np.ndarray, t0_ns: int, t1_ns: 
     dt[0] = 0.1
     dt = np.clip(dt, 0.0, 1.0)
     return float(np.sum(values[m] * dt[m]))
+
+
+def build_history_from_buffers(
+    recent_imu_calib: List[Any],
+    recent_ai_speeds: List[float],
+    valid_gnss: List[Any],
+    ref_lat: float,
+    ref_lon: float,
+    bo_start_ns: int,
+    history_s: float,
+) -> PreBlackoutHistory:
+    """Live-path twin of build_pre_blackout_history (server/engine_adapter.py buffers).
+    recent_imu_calib[i] and recent_ai_speeds[i] belong to the same IMU sample."""
+    t_lo = bo_start_ns - int(history_s * 1e9)
+    n = min(len(recent_imu_calib), len(recent_ai_speeds))
+    idx = [i for i in range(n) if t_lo <= recent_imu_calib[i].timestamp_ns < bo_start_ns]
+    imu_ts = np.array([recent_imu_calib[i].timestamp_ns for i in idx], dtype=np.int64)
+    gyro_z = np.array([recent_imu_calib[i].gyro_vehicle[2] for i in idx], dtype=np.float64)
+    accel = (np.array([recent_imu_calib[i].accel_vehicle for i in idx], dtype=np.float64)
+             if idx else np.zeros((0, 3)))
+    v_ai = np.array([recent_ai_speeds[i] for i in idx], dtype=np.float64)
+
+    fixes = [g for g in valid_gnss if g.is_valid and t_lo <= g.timestamp_ns < bo_start_ns]
+    g_ts = np.array([g.timestamp_ns for g in fixes], dtype=np.int64)
+    g_en = np.array([geodetic_to_enu(g.latitude_deg, g.longitude_deg, 0.0, ref_lat, ref_lon, 0.0)[:2]
+                     for g in fixes], dtype=np.float64).reshape(-1, 2)
+    g_spd = np.array([np.nan if g.speed_mps is None else g.speed_mps for g in fixes], dtype=np.float64)
+    g_brg = np.array([np.nan if g.bearing_deg is None else g.bearing_deg for g in fixes], dtype=np.float64)
+    return PreBlackoutHistory(imu_ts_ns=imu_ts, gyro_z=gyro_z, accel=accel, v_ai_raw=v_ai,
+                              gnss_ts_ns=g_ts, gnss_en=g_en, gnss_speed=g_spd, gnss_bearing=g_brg)

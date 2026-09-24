@@ -276,6 +276,21 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/heldout_s123.log`
 - **Commit Hash**: `8481f08`
 
+---
+
+### Step 12: Addon D Installation, Edits M1/A1 & Parity3 Check
+- **Start Time**: 2026-09-24 16:01:00 +05:30
+- **End Time**: 2026-09-24 16:10:00 +05:30
+- **Summary**:
+  1. Addon D installed (`sih_round1d_addon.zip`): verified exact files via `git diff --stat`.
+  2. Applied edits with `scripts/round1_apply_edits.py`: applied M1 (model selection in `sih/models/inference.py`) and A1 (pre-blackout history in `server/engine_adapter.py`).
+  3. Pytest suite: 19 round-1 tests passed in 9.63s; full test suite 121 passed (0 new regressions).
+  4. Parity check (`parity3`): verified bit-exact zero regression against pre-patch baseline (`max diff = 5.68e-14`, `PARITY PASS`).
+- **Log Paths**:
+  - `logs/round1/step12_parity3.log`
+- **Commit Hash**: Pending commit (`round1: addon D installed, tests pass, parity3 pass`).
+
+
 
 
 

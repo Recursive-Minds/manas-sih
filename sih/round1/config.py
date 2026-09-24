@@ -6,8 +6,9 @@ to the pre-round-1 baseline (checked by scripts/round1_eval.py --assert-parity).
 
 Activation order of precedence:
   1. set_active_config(cfg) called by an orchestration script (round1_eval.py)
-  2. environment variable SIH_ROUND1_CONFIG=<path to json>
-  3. defaults (all OFF)
+  2. environment variable SIH_ROUND1_CONFIG=<path to json> ("off" forces the old behaviour)
+  3. config/round1/production.json, if present (the promoted production profile)
+  4. defaults (all OFF)
 """
 
 from __future__ import annotations
@@ -105,6 +106,7 @@ class SpeedScaleFixParams:         # T9
 @dataclass
 class Round1Config:
     name: str = "baseline_off"
+    velocity_checkpoint: str = ""  # "" = canonical model; "a.pt" or "a.pt,b.pt,c.pt" (mean ensemble)
     diagnostics: bool = False      # hooks active but behaviour unchanged (extra result keys only)
     history_s: float = 180.0       # pre-blackout history used by T3/T4/T7 learners
     scale_fix: SpeedScaleFixParams = field(default_factory=SpeedScaleFixParams)
@@ -177,10 +179,24 @@ def set_active_config(cfg: Optional[Round1Config]) -> None:
     _ACTIVE = cfg
 
 
+PRODUCTION_PROFILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "round1", "production.json")
+
+
 def get_active_config() -> Round1Config:
+    """
+    1. set_active_config(cfg)                       (orchestration scripts, tests)
+    2. env SIH_ROUND1_CONFIG=<json path> | "off"    (manual override; "off" = old behaviour)
+    3. config/round1/production.json if it exists   (the promoted production profile)
+    4. all OFF
+    """
     if _ACTIVE is not None:
         return _ACTIVE
-    path = os.environ.get("SIH_ROUND1_CONFIG", "").strip()
-    if path:
-        return Round1Config.from_json(path)
+    env = os.environ.get("SIH_ROUND1_CONFIG", "").strip()
+    if env.lower() == "off":
+        return Round1Config()
+    if env:
+        return Round1Config.from_json(env)
+    if os.path.exists(PRODUCTION_PROFILE):
+        return Round1Config.from_json(PRODUCTION_PROFILE)
     return Round1Config()

@@ -28,6 +28,14 @@ def load_ai_model(
     default_moe_path = os.path.join(root_dir, "models", "checkpoints", "best_moe_velocity_model.pt")
     default_tcn_path = os.path.join(root_dir, "models", "checkpoints", "best_velocity_model.pt")
 
+    # [ROUND1] production profile may choose the speed checkpoint; "a.pt,b.pt" = mean ensemble
+    if model_path is None:
+        from sih.round1.model_select import resolve_velocity_checkpoint
+        model_path = resolve_velocity_checkpoint(root_dir)
+    if model_path and "," in model_path:
+        from sih.round1.model_select import load_mean_ensemble
+        return load_mean_ensemble(model_path, device, root_dir)
+
     # Explicit research override for LOTO ensemble
     if model_path == "loto_ensemble":
         from sih.models.ensemble_gating import LOTOEnsembleVelocityEstimator

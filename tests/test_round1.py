@@ -40,8 +40,11 @@ class TestRound1Flags(unittest.TestCase):
     def test_all_off_means_no_hooks(self):
         self.assertTrue(Round1Config().is_all_off())
         self.assertIsNone(Round1EngineHooks.create("Urban", Round1Config()))
-        set_active_config(None)
-        eng = SteppableDeadReckoningEngine(12.97, 77.59, road_network=None, domain="Urban")
+        set_active_config(Round1Config())
+        try:
+            eng = SteppableDeadReckoningEngine(12.97, 77.59, road_network=None, domain="Urban")
+        finally:
+            set_active_config(None)
         self.assertIsNone(eng.r1)
         self.assertFalse(any(k.startswith("r1_") for k in self.base))
 
@@ -149,6 +152,70 @@ class TestLearners(unittest.TestCase):
         segs += [S((40, -100), (40, 0)), S((40, 0), (140, 0.5))]      # a second, parallel junction 40 m away
         c2 = find_corners(segs, 0.0, 90.0, np.array([20.0, -5.0]), 60.0, 25.0)
         self.assertEqual(len(c2), 2)
+
+
+class TestPromotionSupport(unittest.TestCase):
+    def test_profile_precedence(self):
+        import json
+        import tempfile
+        import sih.round1.config as C
+        old_prof, old_env = C.PRODUCTION_PROFILE, os.environ.pop("SIH_ROUND1_CONFIG", None)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                prof = os.path.join(d, "production.json")
+                C.PRODUCTION_PROFILE = prof
+                set_active_config(None)
+                self.assertTrue(C.get_active_config().is_all_off())            # no profile -> old behaviour
+                json.dump({"name": "production", "junction": {"enabled": True}}, open(prof, "w"))
+                self.assertEqual(C.get_active_config().name, "production")    # profile picked up
+                os.environ["SIH_ROUND1_CONFIG"] = "off"
+                self.assertTrue(C.get_active_config().is_all_off())            # env kill-switch wins
+                set_active_config(Round1Config(name="explicit"))
+                self.assertEqual(C.get_active_config().name, "explicit")      # explicit wins over all
+        finally:
+            set_active_config(None)
+            C.PRODUCTION_PROFILE = old_prof
+            os.environ.pop("SIH_ROUND1_CONFIG", None)
+            if old_env is not None:
+                os.environ["SIH_ROUND1_CONFIG"] = old_env
+
+    def test_missing_configured_checkpoint_raises(self):
+        from sih.round1.model_select import resolve_velocity_checkpoint
+        set_active_config(Round1Config(velocity_checkpoint="models/checkpoints/does_not_exist.pt"))
+        try:
+            with self.assertRaises(FileNotFoundError):
+                resolve_velocity_checkpoint(os.getcwd())
+        finally:
+            set_active_config(None)
+
+    def test_live_history_matches_benchmark_history(self):
+        from sih.round1.history import build_history_from_buffers
+        d = make_drive()
+        t_bo = d.trip.gnss_samples[185].timestamp_ns
+        a = build_pre_blackout_history(d.trip, d.calib, d.v_ai, t_bo, 180.0)
+        b = build_history_from_buffers(list(d.calib), list(d.v_ai), [g for g in d.trip.gnss_samples if g.is_valid],
+                                       d.trip.reference_lat_deg, d.trip.reference_lon_deg, t_bo, 180.0)
+        for f in ("imu_ts_ns", "gyro_z", "v_ai_raw", "gnss_ts_ns", "gnss_en", "gnss_speed"):
+            np.testing.assert_allclose(getattr(a, f), getattr(b, f), err_msg=f)
+
+    def test_mean_ensemble(self):
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("torch not installed")
+        from sih.models.resnet1d import ResNet1DSpeedEstimator
+        from sih.models.tcn_attention import TCNAttentionVelocityModel
+        from sih.models.moe_fusion import BayesianMoEFusion
+        from sih.round1.model_select import MeanMoEEnsemble
+        torch.manual_seed(0)
+        ms = [BayesianMoEFusion(ResNet1DSpeedEstimator(12, 64), TCNAttentionVelocityModel(12, 32, 4)).eval() for _ in range(2)]
+        ens = MeanMoEEnsemble(ms).eval()
+        xs, xl = torch.randn(3, 12, 20), torch.randn(3, 12, 60)
+        with torch.no_grad():
+            v, var, diag = ens(xs, xl)
+            v0, v1 = ms[0](xs, xl)[0], ms[1](xs, xl)[0]
+        self.assertTrue(torch.allclose(v, (v0 + v1) / 2, atol=1e-6))
+        self.assertEqual(tuple(diag["v_members"].shape[:1]), (2,))
 
 
 class TestIntervalLoss(unittest.TestCase):

@@ -89,7 +89,7 @@ def main() -> int:
     ap.add_argument("--tag", required=True)
     ap.add_argument("--seeds", default="canonical", help="canonical | heldout | comma list")
     ap.add_argument("--i-have-user-approval", action="store_true", help="required for held-out seeds")
-    ap.add_argument("--model-path", default=None)
+    ap.add_argument("--model-path", default=None, help="checkpoint, or comma-separated list = mean ensemble")
     ap.add_argument("--map-source", default="osm", choices=["osm", "masked", "trip"])
     ap.add_argument("--assert-parity", default=None, help="reference *_scenarios.csv; first config must match exactly")
     args = ap.parse_args()
@@ -115,6 +115,8 @@ def main() -> int:
     bm = load_benchmark_module()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     t0 = time.time()
+    # the production profile (if promoted) must not silently change the "base" model here
+    set_active_config(Round1Config(name="precompute"))
     pre = bm.load_precomputed_benchmark_data(device, model_path=args.model_path, map_source=args.map_source)
     print(f"[round1_eval] precompute {time.time() - t0:.0f}s")
 
