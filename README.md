@@ -1077,14 +1077,12 @@ Round 1 introduces a feature-flagged accuracy upgrade targeting speed-scale drif
 
 * **T6: Interval-Loss Velocity Fine-Tuning**:
   Augments sample-wise velocity training with an integrated distance loss over horizons of 30.0 to 75.0 seconds:
-  `L = L_phase55 + lambda * L_int` (with `lambda = 0.5`).
+  `L = L_phase55 + lambda * L_int` (with lambda = 0.5).
   This directly penalizes accumulated distance integration drift and resolves the systemic 17% speed underestimation on vehicle dynamics.
-* **T7: Online Speed-Band Calibration**:
-  Learns speed-dependent scale factors across 5 velocity bins from the pre-blackout GNSS history with Bayesian shrinkage toward prior unity:
-  `f_band = (T_band * (r_band / r_all) + T0) / (T_band + T0)`, applied as `v = v_ai * speed_scale * f(v)` within safety clip bounds `[0.85, 1.25]`.
+* **T7: Per-Speed-Band Speed Calibration**:
+  Per-speed-band speed calibration: shape factor learned from GNSS distance vs AI distance over the last 180 s before the blackout, shrunk toward 1.0.
 * **T8: Topological Junction Snapping**:
-  Detects qualifying sharp turns (50 to 140 degrees) at road intersections and snaps the along-track position to the road geometry apex:
-  `p <- p + gain * ((C + d_since_apex * u_out - p) . u_out) * u_out`.
+  After a completed junction turn, snap the position ALONG the road to the matching road corner (along-track correction only).
 
 ### Honest Held-Out Seed Evaluation (Seeds 319976, 480577, 473995)
 
@@ -1099,7 +1097,7 @@ Strict single-pass evaluation across 120 blackout scenarios without hyperparamet
 | **Highway Drift (S-M)** | 9.98% | **9.36%** | -0.62 pp | Improved |
 | **Mixed Corridor Drift (S-S3a)** | 12.88% | **10.04%** | -2.84 pp | Improved |
 | **Arterial Corridor Drift (S-S2, S-S4)** | 13.79% | 13.76% | -0.03 pp | Consistent |
-| **Mean Drift ± Std** | **11.13% ± 1.50%** | 11.50% ± 1.70% | +0.37 pp | *Outlier sensitive (did not improve)* |
+| **Mean Drift +- Std** | **11.13% +- 1.50%** | 11.50% +- 1.70% | +0.37 pp | *Outlier sensitive (did not improve)* |
 | **Urban Grid Drift (S-S1)** | **9.43%** | 9.74% | +0.31 pp | *Slight noise variance (did not improve)* |
 
 ### Production Configuration & Kill Switch

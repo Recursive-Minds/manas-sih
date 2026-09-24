@@ -332,6 +332,21 @@ This log records every command and process executed during Round 1 tuning and ev
   2. Pushed `main` to `origin/main`.
   3. Created release tag `round1-release` on `main` and pushed to `origin/round1-release`.
   4. Verified branch `improve/round1` and original baseline tag `baseline-pre-round1` are preserved intact.
+- **Commit Hash**: `b7c266b` (Merge commit)
+
+---
+
+### Step 16: Round 1 Cleanup and Documentation Alignment
+- **Start Time**: 2026-09-24 16:51:00 +05:30
+- **End Time**: 2026-09-24 16:55:00 +05:30
+- **Summary**:
+  1. Audited git diff between `baseline-pre-round1` and `server/parity_check.py`: verified single import correction (`from sih.data.trip_partition import compute_trip_partition` -> `from sih.data.split import compute_trip_partition`) fixing `ModuleNotFoundError`.
+  2. Standardized T7 and T8 descriptions in `README.md` (Section 16.1) and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` (Section 9.1):
+     - T7: Per-speed-band speed calibration: shape factor learned from GNSS distance vs AI distance over the last 180 s before the blackout, shrunk toward 1.0.
+     - T8: After a completed junction turn, snap the position ALONG the road to the matching road corner (along-track correction only).
+     - Verified plain-text math throughout all documentation.
+  3. Audited "Zero-Speed Stop Accuracy 99.8% precision / 99.5% recall": confirmed it was a chat summary conflation of two real OSM Route Coverage figures (99.8% and 99.5%) in `logs/round1/step14_final_benchmark.log`. Confirmed absent from all markdown documentation files.
+- **Commit Hash**: Pending commit
 
 
 
