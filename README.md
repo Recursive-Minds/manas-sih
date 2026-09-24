@@ -1216,6 +1216,7 @@ adb reverse tcp:8765 tcp:8765
   - **Non-Blocking Warmup**: Initial 3D SO(3) leveling completes in 3 seconds (30 accelerometer samples), and the AI feature buffer warms up in 6 seconds. Once warm, dead-reckoning blackout can be triggered immediately via the **START** button.
   - **Dynamic Turn Refinement**: Turn events (0/8) continuously refine the horizontal forward axis during driving without hard-blocking dead-reckoning initiation.
   - **Direct CSV Logging Card**: Tap **START REC** to log raw high-frequency IMU and GNSS directly to smartphone storage. Tap **STOP** to close the file, and **SHARE** to transmit the CSV via Android share intent (USB, Google Drive, WhatsApp) for offline analysis on your laptop.
+  - **Pre-Blackout Speed Calibration (T7)**: T7 online speed calibration requires approximately 3 minutes (180 s) of GNSS driving before a blackout; with less history available, it automatically falls back to factor 1.0.
 * **Benchmark Evaluation Drawer**:
   - Tap **BENCHMARK SUITE** in the top bar to open the drawer.
   - Select any canonical held-out scenario (e.g. Scenario #30, #22, #26) and choose replay speed (1.0x, 2.0x, 5.0x).
@@ -1230,6 +1231,7 @@ adb reverse tcp:8765 tcp:8765
 | **Benchmark Deload on Drawer Close** | `stop_benchmark()` in `server/router.py` now creates a fresh `EngineAdapterStageB` instance (`lock_saved_alignment=False`, `saved_alignment=None`) and broadcasts a reset HUD, so all four Android app warmup ticks correctly clear to ✗ when the drawer is closed. |
 | **Non-Blocking Warmup Gate** | The START button no longer hard-blocks on the 0/8 turn counter — gravity + 6s buffer is sufficient to begin dead-reckoning, with mount refinement happening continuously during live driving. |
 | **Benchmark Trip Slicing Fix** | Scenario trip slicing (`slice_scenario`) was corrected to use the exact blackout start timestamp, preventing warmup data from leaking into the blackout window. |
+| **Known Pre-Existing Issue (Batch vs Streaming on S-S3a)** | Batch vs streaming differ by 7–29 m on S-S3a scenarios #22, #23, #30 even with Round 1 off (`SIH_ROUND1_CONFIG=off`), caused by pre-existing differences in warm-up EKF initialization and initial map attachment history. Preserved as a known baseline limitation (not introduced by Round 1). |
 
 ---
 

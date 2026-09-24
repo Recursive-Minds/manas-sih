@@ -370,6 +370,21 @@ This log records every command and process executed during Round 1 tuning and ev
   5. Documentation: Updated `README.md` and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` to state "reduces the systemic speed underestimation on vehicle dynamics (median pre-blackout scale 1.13 -> 1.03)". Confirmed `EngineAdapterStageA` was unchanged.
 - **Commit Hash**: `12ce403`
 
+---
+
+### Step 18: Parity Follow-up & Known Issues Documentation
+- **Start Time**: 2026-09-24 17:22:00 +05:30
+- **End Time**: 2026-09-24 17:28:00 +05:30
+- **Summary**:
+  1. `scripts/quick_parity.py`: Updated streaming warmup window calculation to `warmup_dur_s = max(60.0, cfg.history_s + 10.0) if cfg.needs_history() else 60.0`, ensuring the streaming adapter buffers the full 180 s history needed by T7 online speed calibration. Changed test harness only.
+  2. Executed `quick_parity.py` with `production.json` and `SIH_ROUND1_CONFIG=off`:
+     - Isolated root cause of #26 delta to T7 window truncation (60 s vs 180 s lookback). With warmup expanded to 190 s, both batch and streaming fit identical 9 comparison windows (`r_all = 1.2549`, identical speed factors).
+     - Recorded baseline run numbers with `SIH_ROUND1_CONFIG=off`: Scenario #25 endpoint diff 0.0000 m, Scenario #26 endpoint diff 0.0076 m.
+  3. Documentation:
+     - Added note in `README.md` Section 19.5 (Live Mode) that T7 online speed calibration requires ~3 min of GNSS driving before a blackout; with less history available, it automatically falls back to factor 1.0.
+     - Documented known pre-existing issue in `README.md` Section 19.5 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 14.5: batch vs streaming differ by 7–29 m on S-S3a scenarios #22, #23, and #30 even with Round 1 off (`SIH_ROUND1_CONFIG=off`), caused by pre-existing differences in warm-up EKF initialization and initial map attachment history.
+- **Commit Hash**: Pending commit
+
 
 
 

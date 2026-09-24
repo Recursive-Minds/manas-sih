@@ -27,6 +27,7 @@ from sih.map.network import load_trip_road_network
 from sih.engine.dead_reckoning_engine import run_dead_reckoning_scenario
 from sih.data.geo import geodetic_to_enu
 from server.engine_adapter import EngineAdapterStageB
+from sih.round1.config import get_active_config
 
 
 def run_quick_parity(raw_mode: bool = False):
@@ -123,7 +124,9 @@ def run_quick_parity(raw_mode: bool = False):
 
         bo_start_ns = entry_g.timestamp_ns
         bo_end_ns = bo_start_ns + int(tgt["dur"] * 1e9)
-        warmup_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(60.0 * 1e9))
+        cfg = get_active_config()
+        warmup_dur_s = max(60.0, cfg.history_s + 10.0) if cfg.needs_history() else 60.0
+        warmup_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_dur_s * 1e9))
 
         # 1. Warm-up MountCalibrator alignment up to bo_start_ns
         calib_mount = MountCalibrator(min_samples=30)
