@@ -288,7 +288,7 @@ This log records every command and process executed during Round 1 tuning and ev
   4. Parity check (`parity3`): verified bit-exact zero regression against pre-patch baseline (`max diff = 5.68e-14`, `PARITY PASS`).
 - **Log Paths**:
   - `logs/round1/step12_parity3.log`
-- **Commit Hash**: Pending commit (`round1: addon D installed, tests pass, parity3 pass`).
+- **Commit Hash**: `61d996e`
 
 
 
