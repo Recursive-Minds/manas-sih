@@ -248,7 +248,34 @@ This log records every command and process executed during Round 1 tuning and ev
   - `logs/round1/step10_final_s42.log`
   - `logs/round1/step10_final_s7.log`
   - `logs/round1/step10_final_s123.log`
-- **Commit Hash**: `96c075c`
+- **Commit Hash**: `120b9f3`
+
+---
+
+### Step 11: Held-Out Seed Evaluation (319976, 480577, 473995)
+- **Start Time**: 2026-09-24 15:39:00 +05:30
+- **End Time**: 2026-09-24 15:51:00 +05:30
+- **Commands**:
+  1. `python scripts/round1_eval.py --tag heldout_base --seeds heldout --i-have-user-approval --configs config/round1/baseline_off.json 2>&1 | Tee-Object -FilePath "logs\round1\heldout_base.log"`
+  2. `python scripts/round1_eval.py --tag heldout_s42 --seeds heldout --i-have-user-approval --model-path models/checkpoints/round1_interval_lam0.5_s42.pt --configs config/round1/t7_t8.json 2>&1 | Tee-Object -FilePath "logs\round1\heldout_s42.log"`
+  3. `python scripts/round1_eval.py --tag heldout_s7 --seeds heldout --i-have-user-approval --model-path models/checkpoints/round1_interval_lam0.5_s7.pt --configs config/round1/t7_t8.json 2>&1 | Tee-Object -FilePath "logs\round1\heldout_s7.log"`
+  4. `python scripts/round1_eval.py --tag heldout_s123 --seeds heldout --i-have-user-approval --model-path models/checkpoints/round1_interval_lam0.5_s123.pt --configs config/round1/t7_t8.json 2>&1 | Tee-Object -FilePath "logs\round1\heldout_s123.log"`
+  5. `python scripts/round1_compare.py results/round1/heldout_base/baseline_off_scenarios.csv results/round1/heldout_s42/t7_t8_scenarios.csv --name-a heldout_base --name-b heldout_s42`
+  6. `python scripts/round1_compare.py results/round1/heldout_base/baseline_off_scenarios.csv results/round1/heldout_s7/t7_t8_scenarios.csv --name-a heldout_base --name-b heldout_s7`
+  7. `python scripts/round1_compare.py results/round1/heldout_base/baseline_off_scenarios.csv results/round1/heldout_s123/t7_t8_scenarios.csv --name-a heldout_base --name-b heldout_s123`
+- **Summary**:
+  - `heldout_base`: Median 11.48%, Mean 11.13 +- 1.50%, P90 37.3%, T1 42.5%, Unseen Median 11.89%
+  - `heldout_s42`: Median 11.36%, Mean 11.50 +- 1.70%, P90 36.6%, T1 48.3%, Unseen Median 11.06%
+  - `heldout_s7`: Median 9.96%, Mean 10.95 +- 1.44%, P90 33.8%, T1 48.3%, Unseen Median 11.91%
+  - `heldout_s123`: Median 10.41%, Mean 10.91 +- 1.48%, P90 35.4%, T1 47.5%, Unseen Median 11.41%
+  - **3-Model Average**: Median 10.58%, Mean 11.12 +- 1.54%, P90 35.3%, T1 48.1%, Unseen Median 11.46%
+- **Log Paths**:
+  - `logs/round1/heldout_base.log`
+  - `logs/round1/heldout_s42.log`
+  - `logs/round1/heldout_s7.log`
+  - `logs/round1/heldout_s123.log`
+- **Commit Hash**: Pending commit (`round1: held-out seed evaluation results`).
+
 
 
 
