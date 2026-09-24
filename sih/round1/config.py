@@ -91,6 +91,7 @@ class ScaleLevelParams:            # T10
     hi_highway: float = 1.35
     source: str = "entry"          # "entry" (baseline 15 s ratio) | "history" (180 s GNSS-distance ratio) | "blend"
     w_history: float = 0.5         # blend weight of the history ratio
+    window_s: float = 0.0          # R2: GNSS-distance ratio over only the last window_s seconds (0 = all history_s)
 
 
 @dataclass
@@ -108,6 +109,7 @@ class Round1Config:
     name: str = "baseline_off"
     velocity_checkpoint: str = ""  # "" = canonical model; "a.pt" or "a.pt,b.pt,c.pt" (mean ensemble)
     diagnostics: bool = False      # hooks active but behaviour unchanged (extra result keys only)
+    entry_doppler_bearing: bool = False  # R2: use the entry fix's Doppler bearing in BOTH batch and live (see entry_bearing.py)
     history_s: float = 180.0       # pre-blackout history used by T3/T4/T7 learners
     scale_fix: SpeedScaleFixParams = field(default_factory=SpeedScaleFixParams)
     scale_level: ScaleLevelParams = field(default_factory=ScaleLevelParams)
@@ -120,6 +122,7 @@ class Round1Config:
     def is_all_off(self) -> bool:
         return not (
             self.diagnostics
+            or self.entry_doppler_bearing
             or self.scale_fix.source != "both"
             or self.scale_level.enabled
             or self.stop.enabled

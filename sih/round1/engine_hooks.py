@@ -24,7 +24,7 @@ import numpy as np
 
 from sih.round1.config import Round1Config, get_active_config
 from sih.round1.gyro_scale import estimate_gyro_scale
-from sih.round1.history import PreBlackoutHistory
+from sih.round1.history import PreBlackoutHistory, slice_history_tail
 from sih.round1.junction_anchor import TurnJunctionAnchor
 from sih.round1.online_speed_calib import BandSpeedCalibrator
 from sih.round1.stop_detector import StopDetector
@@ -66,9 +66,10 @@ class Round1EngineHooks:
         if self.band is not None:
             self.band.fit(hist)
         if self.cfg.scale_level.enabled and self.cfg.scale_level.source != "entry":
-            lvl = self.band if self.band is not None else BandSpeedCalibrator(self.cfg.online_calib)
+            win = self.cfg.scale_level.window_s
+            lvl = self.band if (self.band is not None and win <= 0) else BandSpeedCalibrator(self.cfg.online_calib)
             if lvl is not self.band:
-                lvl.fit(hist)
+                lvl.fit(slice_history_tail(hist, win))
             r = lvl.info.get("r_all") if lvl.fitted else None
             self.history_ratio = float(r) if r is not None else None
         if self.stop is not None:

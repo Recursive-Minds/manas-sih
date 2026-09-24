@@ -385,12 +385,137 @@ This log records every command and process executed during Round 1 tuning and ev
      - Documented known pre-existing issue in `README.md` Section 19.5 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 14.5: batch vs streaming differ by 7–29 m on S-S3a scenarios #22, #23, and #30 even with Round 1 off (`SIH_ROUND1_CONFIG=off`), caused by pre-existing differences in warm-up EKF initialization and initial map attachment history.
 - **Commit Hash**: `bb8887f`
 
+### Step 19: Round 2 Step 1 - Addon Install & Baseline Parity Verification
+- **Start Time**: 2026-09-24 17:35:00 +05:30
+- **End Time**: 2026-09-24 17:41:00 +05:30
+- **Summary**:
+  1. Addon unpack: Extracted `sih_round2_addon.zip` adding `scale_level.window_s` configuration and history evaluation:
+     - `sih/round1/config.py`
+     - `sih/round1/history.py`
+     - `sih/round1/engine_hooks.py`
+     - `tests/test_round1.py`
+     - 5 new configs: `r2_level45.json`, `r2_level60.json`, `r2_level90.json`, `r2_blend60.json`, `r2_blend180.json`
+  2. Verified git diff strictly limited to required files.
+  3. Pytest: 20 round-1 unit tests passed in 14.64s.
+  4. Parity check: `python scripts/round1_eval.py --tag parity_r2 --configs config/round1/baseline_off.json --assert-parity results/round1/pre_patch/baseline_off_scenarios.csv`
+     - Result: `PARITY PASS` (`max_abs_diff_map_err_m = 5.684e-14`).
+- **Log Paths**:
+  - `results/round1/parity_r2/summary.json`
+- **Commit Hash**: `6b74417`
 
+### Step 20: Round 2 Step 2 - Parity Test Harness Harmonization & EKF State Diagnosis
+- **Start Time**: 2026-09-24 17:42:00 +05:30
+- **End Time**: 2026-09-24 17:48:00 +05:30
+- **Summary**:
+  1. `scripts/quick_parity.py`: Harmonized streaming warmup duration to strictly 30.0s before blackout (`bo_start - 30s`), exactly matching `DeadReckoningEngine.run_scenario`.
+  2. Prefilled adapter history buffers (`recent_imu_calib`, `recent_ai_speeds`, `recent_ai_ts`, `recent_gnss_window`) from `t_hist = bo_start - (history_s + 10s)` up to `warmup_start`, without running `on_imu`/`on_gnss`.
+  3. Re-ran `quick_parity.py` with `production.json`:
+     - Scenario #23: Endpoint Diff 0.0000 m (Batch 102.82 m vs Stage B 102.82 m) - PASS
+     - Scenario #25: Endpoint Diff 0.0004 m (Batch 77.26 m vs Stage B 77.26 m) - PASS (improved from 45 m mismatch!)
+     - Scenario #26: Endpoint Diff 0.0000 m (Batch 46.02 m vs Stage B 46.02 m) - PASS
+     - Scenario #30: Endpoint Diff 0.0000 m (Batch 14.00 m vs Stage B 14.00 m) - PASS (improved from 7.4 m mismatch!)
+     - Scenario #22: Endpoint Diff 0.6216 m (Batch 9.61 m vs Stage B 9.70 m)
+  4. Re-ran `quick_parity.py` with `SIH_ROUND1_CONFIG=off`:
+     - Scenarios #23, #25, #26, #30 all achieve bit-identical 0.0000 m endpoint difference.
+     - Scenario #22 differs by 8.8911 m (Batch 40.05 m vs Stage B 31.16 m).
+  5. EKF State Diagnosis at Blackout Start on Scenario #22 (`SIH_ROUND1_CONFIG=off`):
+     - `pos`: Batch `[2245.187, 158.411, 136.899]`, Stream `[2245.187, 158.411, 136.788]` (diff = 0.110 m)
+     - `v`: Batch `[11.137, -7.576, 0.000]`, Stream `[12.452, -7.549, 0.000]` (diff = 1.315 m/s)
+     - `heading`: Batch `124.2250 deg`, Stream `121.2250 deg` (diff = exactly 3.0000 deg)
+     - `_bg`: Batch `[0, 0, 3.357e-5] rad/s`, Stream `[0, 0, 3.357e-5] rad/s` (diff = 0.000e+00 rad/s)
+     - `speed_scale`: Batch `1.238672`, Stream `1.238672` (diff = 0.000000)
+- **Commit Hash**: `60bb690`
 
+### Step 21: Round 2 Step 2b - Addon 2b Installation & Parity Resolution on All Scenarios
+- **Start Time**: 2026-09-24 17:58:00 +05:30
+- **End Time**: 2026-09-24 18:04:00 +05:30
+- **Summary**:
+  1. Addon 2b unpack: Extracted `sih_round2b_addon.zip` adding `entry_doppler_bearing` flag control:
+     - `sih/round1/config.py`
+     - `sih/round1/entry_bearing.py`
+     - `scripts/round1_apply_edits.py`
+     - `tests/test_round1.py`
+     - `config/round1/r2_doppler.json`
+  2. Applied edits via `python scripts/round1_apply_edits.py`:
+     - `E10 entry bearing (batch)` in `dead_reckoning_engine.py`
+     - `A2 entry bearing (live)` in `engine_adapter.py`
+     - All other edits skipped.
+  3. Pytest: 21 round-1 unit tests passed in 10.68s.
+  4. Parity check: `python scripts/round1_eval.py --tag parity_r2b --configs config/round1/baseline_off.json --assert-parity results/round1/pre_patch/baseline_off_scenarios.csv`
+     - Result: `PARITY PASS` (`max_abs_diff_map_err_m = 5.684e-14`).
+  5. Executed `python scripts/quick_parity.py` with `production.json`:
+     - Scenario #22: Endpoint Diff 0.0000 m (Batch 9.61 m vs Stage B 9.61 m) - PASS
+     - Scenario #23: Endpoint Diff 0.0000 m (Batch 102.82 m vs Stage B 102.82 m) - PASS
+     - Scenario #25: Endpoint Diff 0.0000 m (Batch 77.26 m vs Stage B 77.26 m) - PASS
+     - Scenario #26: Endpoint Diff 0.0000 m (Batch 46.02 m vs Stage B 46.02 m) - PASS
+     - Scenario #30: Endpoint Diff 0.0000 m (Batch 14.00 m vs Stage B 14.00 m) - PASS
+     - **All Scenarios Passed (<0.01m): True** (100% bit-identical parity achieved across all 5 canonical scenarios!).
+- **Log Paths**:
+- **Commit Hash**: `2bbdc93`
 
+### Step 22: Round 2 Step 3 - Speed-Scale Window & Doppler Bearing Sweep (Dev Seeds)
+- **Start Time**: 2026-09-24 18:04:00 +05:30
+- **End Time**: 2026-09-24 21:58:00 +05:30
+- **Summary**:
+  1. Evaluated 7 configurations across 6 dev seeds (236 scenarios) with `round1_interval_lam0.5_s42.pt`:
+     - `t7_t8`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46% (reference)
+     - `r2_doppler`: median 11.31%, mean 10.69 +- 2.58%, p90 41.0%, T1 47%
+     - `r2_level45`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_level60`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_level90`: median 10.87%, mean 11.34 +- 1.02%, p90 38.0%, T1 45%
+     - `r2_blend60`: median 11.31%, mean 10.83 +- 2.43%, p90 43.1%, T1 46%
+     - `r2_blend180`: median 11.76%, mean 10.86 +- 2.47%, p90 34.0%, T1 49%
+  2. Paired comparisons vs `t7_t8`:
+     - `r2_doppler`: better 16 vs worse 23 (better not > worse; p = 0.337) -> FAILED.
+     - `r2_level45`, `r2_level60`, `r2_blend60`: identical to `t7_t8` (0 better, 0 worse) -> FAILED.
+     - `r2_level90`: better 74 vs worse 75 (worse > better; p = 1.000) -> FAILED.
+     - `r2_blend180`:
+       - ALL: better 78 vs worse 53 (sign-test p = 0.036 < 0.10)
+       - Unseen: better 34 vs worse 26 (median 9.92% -> 7.21%, delta -1.01 pp)
+       - Mean delta: -1.48 pp < 0
+       - Domain breakdown: Arterial -0.87 pp, Highway -1.06 pp, Mixed -0.65 pp, Urban -4.96 pp (all negative, none > +1.0 pp)
+       - **Sole winner meeting all strict rules**: `r2_blend180`.
+- **Log Paths**:
+  - `results/round1/r2_sweep/summary.json`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1384.log`
 
+---
 
+### Step 23: Round 2 Step 4 - Single Pre-Declared Held-Out Evaluation & Promotion
+- **Start Time**: 2026-09-24 21:59:00 +05:30
+- **End Time**: 2026-09-24 22:03:00 +05:30
+- **Summary**:
+  1. Executed single pre-declared held-out evaluation for `r2_blend180` across 3 held-out seeds (120 scenarios):
+     - `median 11.15 | mean 10.71 +- 1.17 | p90 32.9 | T1 0.48 | worst 140.8`
+  2. Paired comparison against `heldout_s42/t7_t8`:
+     - ALL: better 39 vs worse 23 (sign-test p = 0.056)
+     - Mean delta: -1.18 pp (< 0 -> PASS)
+     - Tier 1 share: 48.33% (>= 48.3% -> PASS)
+     - P90 drift: 32.91% (<= 36.6% -> PASS)
+     - Unseen median: 11.06% -> 9.66% (-1.40 pp, 17 B vs 10 W)
+     - **Decision**: All 3 promotion criteria met; PROMOTED to production.
+- **Log Paths**:
+  - `results/round1/heldout_r2_blend180/summary.json`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1501.log`
 
+---
 
-
-
+### Step 24: Round 2 Step 5 - Production Freeze, Verification & Final Reporting
+- **Start Time**: 2026-09-24 22:04:00 +05:30
+- **End Time**: 2026-09-24 22:16:00 +05:30
+- **Summary**:
+  1. Updated `config/round1/production.json` with `"scale_level": {"enabled": true, "source": "blend"}` and `"entry_doppler_bearing": false`.
+  2. Executed `python scripts/quick_parity.py` on final production profile:
+     - All 5 canonical scenarios passed with bit-identical 0.0000 m endpoint and trajectory differences.
+  3. Executed `python scripts/evaluate_heldout_seeds.py` (mean median 10.71% +- 1.17%, P90 33.62%).
+  4. Executed `python benchmarks/run_final_benchmark.py --fixed`:
+     - Re-generated 40 scenario trajectory plots and master gallery.
+     - Re-generated `FINAL_JUDGE_EVALUATION_REPORT.md` and `.html`.
+     - Synchronized `README.md` Section 16 and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` Section 9.
+  5. Created `FINAL_NUMBERS_FOR_PPT.md` documenting baseline vs final held-out scorecard with traceable data files.
+- **Log Paths**:
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1528.log`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1533.log`
+  - `C:\Users\carpe\.gemini\antigravity-ide\brain\02103a46-f055-474b-8239-195136e42ee2\.system_generated\tasks\task-1560.log`
+  - `artifacts/heldout_seed_results.json`
+  - `FINAL_NUMBERS_FOR_PPT.md`

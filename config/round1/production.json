@@ -1,1 +1,1 @@
-{"name": "production", "velocity_checkpoint": "models/checkpoints/round1_interval_lam0.5_s42.pt", "online_calib": {"enabled": true}, "junction": {"enabled": true}}
+{"name": "production", "velocity_checkpoint": "models/checkpoints/round1_interval_lam0.5_s42.pt", "online_calib": {"enabled": true}, "junction": {"enabled": true}, "scale_level": {"enabled": true, "source": "blend"}, "entry_doppler_bearing": false}

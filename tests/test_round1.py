@@ -88,6 +88,40 @@ class TestRound1Flags(unittest.TestCase):
         hist = run(d, {"scale_level": {"enabled": True, "lo": 0.6, "hi": 1.6, "source": "history"}})
         self.assertAlmostEqual(hist["r1_scale_history"], 1 / 1.35, delta=0.03)
 
+    def test_r2_level_window(self):
+        from sih.round1.history import slice_history_tail
+        d = make_drive(ai_gain=1.35)
+        h = build_pre_blackout_history(d.trip, d.calib, d.v_ai, d.trip.gnss_samples[185].timestamp_ns, 180.0)
+        t = slice_history_tail(h, 60.0)
+        self.assertLessEqual((t.imu_ts_ns[-1] - t.imu_ts_ns[0]) * 1e-9, 60.0 + 1e-6)
+        self.assertEqual(t.imu_ts_ns[-1], h.imu_ts_ns[-1])
+        r = run(d, {"scale_fix": {"source": "engine"},
+                    "scale_level": {"enabled": True, "source": "history", "window_s": 60.0, "lo": 0.6, "hi": 1.6}})
+        self.assertAlmostEqual(r["r1_scale_history"], 1 / 1.35, delta=0.04)
+
+    def test_r2_entry_bearing_rule(self):
+        from sih.round1.entry_bearing import apply_entry_doppler, live_override_enabled
+        d = make_drive()
+        g = gnss_at(d, 185.0)
+        win = [x for x in d.trip.gnss_samples if x.timestamp_ns <= g.timestamp_ns][-5:]
+        g2 = type(g)(timestamp_ns=g.timestamp_ns, latitude_deg=g.latitude_deg, longitude_deg=g.longitude_deg,
+                     altitude_m=0.0, speed_mps=9.0, bearing_deg=123.0, accuracy_h_m=3.0, is_valid=True)
+        out = apply_entry_doppler(win, g2)
+        self.assertEqual(out[-1].bearing_deg, 123.0)
+        self.assertEqual(out[:-1], win[:-1])
+        set_active_config(Round1Config())
+        self.assertTrue(live_override_enabled())                      # round 1 off -> legacy live
+        set_active_config(Round1Config(online_calib=Round1Config().online_calib))
+        cfg = Round1Config.from_dict({"junction": {"enabled": True}})
+        set_active_config(cfg)
+        self.assertFalse(live_override_enabled())                     # round 1 on, flag off -> geometric
+        set_active_config(Round1Config.from_dict({"junction": {"enabled": True}, "entry_doppler_bearing": True}))
+        self.assertTrue(live_override_enabled())
+        set_active_config(None)
+        a = run(d, {"junction": {"enabled": True}})
+        b = run(d, {"junction": {"enabled": True}, "entry_doppler_bearing": True})
+        self.assertTrue(np.isfinite(a["map_err_m"]) and np.isfinite(b["map_err_m"]))
+
     def test_every_flag_runs(self):
         for cfg in ({"gyro_scale": {"enabled": True}}, {"online_calib": {"enabled": True}},
                     {"speed_mode": {"mode": "hold_entry"}}, {"speed_mode": {"mode": "entry_offset_decay"}},

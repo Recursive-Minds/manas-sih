@@ -522,6 +522,10 @@ class DeadReckoningEngine:
         pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(
             valid_hist_gnss, bo_start_ns, trip.reference_lat_deg, trip.reference_lon_deg
         )
+        # [ROUND1] R2: same entry-bearing rule as the live adapter (flag entry_doppler_bearing)
+        if session.r1 is not None and session.r1.cfg.entry_doppler_bearing:
+            from sih.round1.entry_bearing import apply_entry_doppler
+            pre_gnss_window = apply_entry_doppler(pre_gnss_window, g_entry)
 
         for j, imu in enumerate(trip.imu_samples):
             t_curr = imu.timestamp_ns
