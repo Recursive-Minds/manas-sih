@@ -301,7 +301,7 @@ This log records every command and process executed during Round 1 tuning and ev
 - **Log Paths**:
   - `logs/round1/step13_ens_dev.log`
   - `logs/round1/step13_heldout_ens.log`
-- **Commit Hash**: Pending commit (`round1: ensemble evaluation on canonical and held-out seeds`).
+- **Commit Hash**: `89d34d0`
 
 
 
