@@ -687,5 +687,56 @@ This log records every command and process executed during Round 1 tuning and ev
   - `scripts/check_latex.py`
   - `logs/ROUND1_TASKLOG.md`
 
+---
+
+### Step 31: Documentation Accuracy & Sourcing Fix Pass (Branch docs/accuracy-fix)
+- **Start Time**: 2026-09-25 22:40:00 +05:30
+- **End Time**: 2026-09-25 23:05:00 +05:30
+- **Branch**: `docs/accuracy-fix`
+- **Summary**:
+  1. Measured real initial heading seeding error across all 236 dev scenarios (6 dev seeds: [541098, 75496, 45736, 12345, 987654, 314159]) using `python scripts/round1_eval.py --tag hdg_seed --configs config/round1/production.json`:
+     - Evaluated diagnostic output path: `results/round1/hdg_seed/production_scenarios.csv`
+     - Overall Mean: 18.18°
+     - Overall Median: 7.05°
+     - Canonical Dev Seed 541098: 17.15° mean / 8.30° median (40 scenarios)
+     - Status dynamically computed: < 20.0° -> PASSED
+     - Replaced all stale 17.15° / 8.30° unqualified claims in README.md (lines 197, 304, 375, 562, 1202) and generator template with 18.18° mean / 7.05° median over all dev scenarios.
+  2. Untangled P90 labels and sourcing:
+     - Headline Multi-Seed P90: 32.91% across 3 held-out seeds (120 scenarios, `artifacts/heldout_seed_results.json` / `results/round1/heldout_r2_blend180/summary.json`), status computed: Sub-35% -> PASSED.
+     - Canonical Dev Seed 541098 P90: 27.94% (40 scenarios, `artifacts/phase4_unseen_sm_benchmark_results.csv` / `benchmark_results.json`).
+     - Historical 6-Dev-Seed Mean P90: 36.60% ± 7.42% (236 scenarios, `benchmark_results.json` under `canonical_6_seed_fixed_evaluation.osm_p90_drift_mean`).
+     - Every P90 in executive summary and tables explicitly names its seed set and source file; status is strictly computed from headline held-out P90 (32.91% <= 35.0% -> PASSED).
+  3. Sourced and corrected per-trip values and leaked-network claim:
+     - S-S4: 25.56% sourced from `artifacts/phase4_unseen_sm_benchmark_results.csv` (rows 31-40, Seed 541098); in final held-out production (`results/round1/heldout_r2_blend180/r2_blend180_scenarios.csv`, 30 scenarios), S-S4 median is 10.46%.
+     - S-M: 11.85% identified as overall seed median in `benchmark_results.json` mistakenly labeled as highway; S-M highway median is 10.87% on Seed 541098 and 9.47% on held-out seeds; removed 11.85% from per-trip claims.
+     - S-S2: 6.64% untraced to any final production run (S-S2 is 12.41% on Seed 541098 and 19.25% on held-out seeds); removed 6.64%.
+     - S-S3a: 12.38% untraced to final production run (S-S3a is 4.30% on Seed 541098 and 9.47% on held-out seeds); removed 12.38%.
+     - S-S1: 13.79% identified as intermediate ablation Urban median; in final held-out production, S-S1 median is 8.09% (14.56% on Seed 541098); removed 13.79%.
+     - 9.87% leaked-network: Replaced untraced 9.87% with the verified historical trip-derived road network median from `benchmark_results.json` (`map_source_comparison.summary_matrix.trip_leaked_gt.median_drift_pct` = 7.18%).
+     - Updated cross-domain generalization statement in template (line 1374) to quote exact verified files and numbers.
+  4. Fixed E24 properly:
+     - Deleted the sentence with stale literals `(11.59% median, 35.80% P90, 17 passes < 10%, pure DR 26.31%)` from `benchmarks/run_final_benchmark.py` (line 1114).
+     - Extended `tests/test_report_integrity.py::test_benchmark_script_has_no_stale_literals` with strict regex patterns banning 11.59, 35.80, 26.31 near "P90", "median", or "pure", and banning "17 passes < 10%".
+     - Removed "median" near 11.59 in route matching rationale string (line 2009).
+  5. Refined E20 wording:
+     - Updated low-speed regime position error dynamics to: `ZUPT (both paths); causal speed smoothing (live path only)` in `benchmarks/run_final_benchmark.py` (line 1103), `README.md` (lines 374, 882), and `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` (line 490).
+  6. Verified:
+     - Exact parity check passed (`round1_eval.py --assert-parity`, max_abs_diff_map_err_m = 5.68e-14 m, PARITY PASS).
+     - `scripts/check_doc_numbers.py`: 100% PASS on all headline metrics.
+     - `scripts/check_links.py`: 100% PASS on all 237 links and in-page anchors.
+     - `scripts/check_latex.py`: 100% PASS (Zero LaTeX syntax across all docs).
+     - `pytest`: 124 passed, 1 skipped, 0 failed.
+- **Log Paths**:
+  - `results/round1/hdg_seed/production_scenarios.csv`
+  - `results/round1/parity_check/summary.json`
+  - `README.md`
+  - `benchmarks/run_final_benchmark.py`
+  - `scripts/render_reports_from_results.py`
+  - `tests/test_report_integrity.py`
+  - `FINAL_JUDGE_EVALUATION_REPORT.md`
+  - `FINAL_JUDGE_EVALUATION_REPORT.html`
+  - `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`
+
+
 
 

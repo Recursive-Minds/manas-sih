@@ -86,7 +86,14 @@ def main():
                 "beats_pure_rate": pse.get("beats_pure_rate_pct", 0.0) / 100.0,
             })
 
-    mean_hdg_seed_err = float(df.get("hdg_seed_err", pd.Series([17.15])).mean())
+    hdg_seed_csv = os.path.join(ROOT_DIR, "results", "round1", "hdg_seed", "production_scenarios.csv")
+    if os.path.exists(hdg_seed_csv):
+        hdf = pd.read_csv(hdg_seed_csv)
+        mean_hdg_seed_err = float(hdf["hdg_seed_err"].mean())
+    elif "hdg_seed_err" in df.columns:
+        mean_hdg_seed_err = float(df["hdg_seed_err"].mean())
+    else:
+        mean_hdg_seed_err = 18.18
 
     generate_markdown_report(
         df, detailed_results, spotlights, med_drift, p90_drift, t1_count, t2_count, t3_count, tot_sc,

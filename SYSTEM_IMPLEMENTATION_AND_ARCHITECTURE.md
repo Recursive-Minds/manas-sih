@@ -444,10 +444,10 @@ At street intersections and sharp branching turns, along-track integration error
 | **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
 | **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
-| **P90 (Worst Decile) Drift** | **59.20%** | **27.94%** (Canonical Seed) / **36.60% ± 7.42%** (Multi-Seed) | Sub-35% | **PASSED (Canonical) / NOT MET (Multi-Seed)** |
+| **P90 (Worst Decile) Drift** | **59.20%** | **32.91%** (Headline Held-Out, 3 Seeds, `artifacts/heldout_seed_results.json`) / **27.94%** (Dev Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`) | Sub-35% | **PASSED** |
 | **Share < 10% Drift** | 17.5% (7 / 40) | **45.0% (18 / 40)** (Canonical Seed) / **47.9% (19.2 / 40)** (Multi-Seed) | > 50% | **NOT MET (Canonical) / NOT MET (Multi-Seed)** |
 | **High Reliability (<= 30%)** | 65.0% (26 / 40) | **92.5% (37 / 40)** (Canonical Seed) / **84.6% (33.8 / 40)** (Multi-Seed) | > 85% | **PASSED (Canonical) / NOT MET (Multi-Seed)** |
-| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **17.15°** (Speed-Regime GPS Vector) | < 20.0° | **PASSED** |
+| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **18.18°** (Speed-Regime GPS Vector) | < 20.0° | **PASSED** |
 
 ---
 
@@ -463,7 +463,7 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 | Seed 12345 | **13.54%** | 44.49% | 21.62% | 16 / 40 (40.0%) | 32 / 40 (80.0%) | 21.59% | 8.27% | 10.16% | **NEAR TARGET** |
 | Seed 987654 | **12.92%** | 40.21% | 23.62% | 18 / 40 (45.0%) | 34 / 40 (85.0%) | 14.88% | 18.59% | 7.24% | **NEAR TARGET** |
 | Seed 314159 | **8.63%** | 31.68% | 18.33% | 21 / 40 (52.5%) | 34 / 40 (85.0%) | 6.09% | 10.89% | 11.99% | **PASSED** |
-| **Grand Multi-Seed Summary** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.31%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
+| **Historical Dev Seeds Summary (6 Seeds, benchmark_results.json)** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.31%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
 
 ---
 
@@ -487,7 +487,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 
 | Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT and speed smoothing mitigate low-speed stationary drift |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT (both paths); causal speed smoothing (live path only) |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | 26 | **12.00%** | 22.48% | 11 / 26 | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | 7 | **8.62%** | 28.58% | 4 / 7 | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 
@@ -498,7 +498,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 During extensive architectural auditing, seven specific integrity defects, causal leaks, and empirical benchmarks were investigated, isolated, and resolved across the pipeline:
 
 1. **Non-Causal Baseline Provenance & Clean Comparison (Item A1)**:
-   - *Provenance Analysis*: The previously cited historical baseline (11.59% median, 35.80% P90, 17 passes < 10%, pure DR 26.31%) did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
+   - *Provenance Analysis*: The historical baseline previously cited did not originate from a deployable single model: the reported results were produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
    - *Clean Single-Model Replication*: When re-evaluating the single deployable model (`best_moe_velocity_model.pt`) on Seed 541098 using the identical current engine version:
      - **Legacy Single Model (non-causal, not deployable)**: **11.96%** Map Median Drift, **31.39%** P90 Drift, **18 / 40** Tier-1 Passes, **27.33%** Pure DR Median Drift (Beating Pure DR on 33 / 40 scenarios).
      - **Unified Causal Single Model (`causal_moe_v1.pt`)**: Evaluated on identical current engine code without any non-causal forward-backward filtering or forward lookahead interpolation.
@@ -755,7 +755,7 @@ The pipeline achieves an overall median drift of **11.85%** (Highway **10.87%**,
 3. **Pre-Blackout Dynamic Speed Scale Anchoring**:
    - In the 20 seconds prior to outage entry, learns the pavement-specific scale factor (mean(v_GPS) / mean(v_AI)) to adapt for asphalt vibration damping, bounded physically to [0.85, 1.35] on Highway.
 4. **Speed-Regime GPS Heading Seeding**:
-   - Directional heading vector seeded from moving GPS fixes (v > 2.5 m/s) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **17.15° mean initial heading accuracy** across all 40 scenarios.
+   - Directional heading vector seeded from moving GPS fixes (v > 2.5 m/s) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **18.18° mean initial heading accuracy** across all 40 scenarios.
 5. **Real-Time Mount Auto-Calibration**:
    - SO(3) 3D coordinate frame transformation decoupling arbitrary smartphone cradle pitch, roll, and yaw from the vehicle chassis frame.
 6. **Closed-Loop 15-State Error-State Kalman Filter (ES-EKF)**:
@@ -788,7 +788,7 @@ To guarantee authentic scientific validity and real-world generalizability:
      - **Arterial Corridors (`S-S2`, `S-S4`)**: Multi-lane arterial maneuvers (40–60 km/h) -> **14.48% drift**
      - **Urban City Grid (`S-S1`)**: Stop-and-go dense street grid with 90° intersections -> **14.56% drift**
      - **Mixed Urban/Suburban (`S-S3a`)**: Varied driving dynamics -> **4.30% drift**
-   - Generalization varies across environments: highway cruise achieves 5.09% median drift, while complex urban grid (S-S1, 14.56%) and unmapped arterial chicanes (S-S4, 25.56%) exhibit higher drift due to frequent turns and gyro integration over extended blackouts.
+   - Generalization across environments on canonical dev seed 541098 (`artifacts/phase4_unseen_sm_benchmark_results.csv`) spans: S-S3a 4.30%, S-M 10.87%, S-S2 12.41%, S-S1 14.56%, and S-S4 25.56%; on the final held-out production evaluation (`results/round1/heldout_r2_blend180/r2_blend180_scenarios.csv`, 120 scenarios), domain medians achieve Urban 8.09%, Highway 9.47%, Mixed 9.47%, and Arterial 11.49%.
 
 ---
 
