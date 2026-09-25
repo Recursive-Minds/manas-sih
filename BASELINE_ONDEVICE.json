@@ -1,0 +1,154 @@
+{
+  "timestamp": "2026-09-26T01:08:00+05:30",
+  "branch": "phone/s0-baseline",
+  "base_tag": "docs-verified",
+  "commit": "1076f8e",
+  "pytest": {
+    "passed": 127,
+    "skipped": 1,
+    "failed": 0,
+    "total": 128,
+    "duration_s": 466.59
+  },
+  "quick_parity_normal": {
+    "all_passed": true,
+    "threshold_m": 0.01,
+    "scenarios": [
+      {
+        "id": 22,
+        "duration_s": 45.0,
+        "target_dist_m": 475.2,
+        "batch_err_m": 16.25,
+        "stage_b_err_m": 16.25,
+        "endpoint_diff_m": 0.0000,
+        "max_traj_diff_m": 0.0000,
+        "status": "PASS"
+      },
+      {
+        "id": 23,
+        "duration_s": 75.0,
+        "target_dist_m": 1128.4,
+        "batch_err_m": 67.77,
+        "stage_b_err_m": 67.77,
+        "endpoint_diff_m": 0.0000,
+        "max_traj_diff_m": 0.0000,
+        "status": "PASS"
+      },
+      {
+        "id": 25,
+        "duration_s": 45.0,
+        "target_dist_m": 614.3,
+        "batch_err_m": 77.30,
+        "stage_b_err_m": 77.30,
+        "endpoint_diff_m": 0.0000,
+        "max_traj_diff_m": 0.0000,
+        "status": "PASS"
+      },
+      {
+        "id": 26,
+        "duration_s": 75.0,
+        "target_dist_m": 892.8,
+        "batch_err_m": 122.77,
+        "stage_b_err_m": 122.77,
+        "endpoint_diff_m": 0.0000,
+        "max_traj_diff_m": 0.0000,
+        "status": "PASS"
+      },
+      {
+        "id": 30,
+        "duration_s": 60.0,
+        "target_dist_m": 244.2,
+        "batch_err_m": 7.04,
+        "stage_b_err_m": 7.04,
+        "endpoint_diff_m": 0.0000,
+        "max_traj_diff_m": 0.0000,
+        "status": "PASS"
+      }
+    ]
+  },
+  "quick_parity_raw": {
+    "all_passed": false,
+    "threshold_m": 5.0,
+    "scenarios": [
+      {
+        "id": 22,
+        "duration_s": 45.0,
+        "target_dist_m": 475.2,
+        "batch_err_m": 16.25,
+        "stage_b_err_m": 12.87,
+        "endpoint_diff_m": 4.4905,
+        "max_traj_diff_m": 11.7961,
+        "status": "PASS"
+      },
+      {
+        "id": 23,
+        "duration_s": 75.0,
+        "target_dist_m": 1128.4,
+        "batch_err_m": 67.77,
+        "stage_b_err_m": 1.60,
+        "endpoint_diff_m": 69.2377,
+        "max_traj_diff_m": 73.1573,
+        "status": "FAIL"
+      },
+      {
+        "id": 25,
+        "duration_s": 45.0,
+        "target_dist_m": 614.3,
+        "batch_err_m": 77.30,
+        "stage_b_err_m": 44.58,
+        "endpoint_diff_m": 33.6536,
+        "max_traj_diff_m": 35.6139,
+        "status": "FAIL"
+      },
+      {
+        "id": 26,
+        "duration_s": 75.0,
+        "target_dist_m": 892.8,
+        "batch_err_m": 122.77,
+        "stage_b_err_m": 130.47,
+        "endpoint_diff_m": 7.7096,
+        "max_traj_diff_m": 8.0849,
+        "status": "FAIL"
+      },
+      {
+        "id": 30,
+        "duration_s": 60.0,
+        "target_dist_m": 244.2,
+        "batch_err_m": 7.04,
+        "stage_b_err_m": 14.82,
+        "endpoint_diff_m": 11.3600,
+        "max_traj_diff_m": 22.5850,
+        "status": "FAIL"
+      }
+    ]
+  },
+  "latency_engine_adapter_stage_b": {
+    "steps_measured": 1000,
+    "cpu": {
+      "mean_latency_ms": 5.059,
+      "p50_latency_ms": 4.922,
+      "p90_latency_ms": 6.302,
+      "p99_latency_ms": 8.060,
+      "max_latency_ms": 8.940,
+      "breakdown_mean_ms": {
+        "features": 0.318,
+        "moe_model": 3.368,
+        "speed_smoother": 0.0412,
+        "core_stepping": 1.293
+      }
+    },
+    "cuda": {
+      "mean_latency_ms": 9.773,
+      "p50_latency_ms": 9.233,
+      "p90_latency_ms": 13.719,
+      "p99_latency_ms": 17.918,
+      "max_latency_ms": 23.377,
+      "breakdown_mean_ms": {
+        "features": 0.291,
+        "moe_model": 8.127,
+        "speed_smoother": 0.0501,
+        "core_stepping": 1.268
+      }
+    }
+  }
+}
