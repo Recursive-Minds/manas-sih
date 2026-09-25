@@ -380,6 +380,7 @@ class EngineAdapterStageB:
         gnss_decimate_interval_s: float = 9.0,
         decimate_gnss: Optional[bool] = None,
         lock_saved_alignment: bool = False,
+        use_speed_smoother: bool = True,
     ) -> None:
         if decimate_gnss is not None:
             decimate_gnss_for_seeding = decimate_gnss
@@ -451,7 +452,8 @@ class EngineAdapterStageB:
         # Feature extraction & speed smoothing
         self.feature_extractor = StreamingFeatureExtractor(sampling_rate=10.0, window_len=60, spectral_stride=5)
         self.feature_buf: List[np.ndarray] = []
-        self.speed_smoother = CausalSpeedSmoother(a_max_mps2=3.5, a_min_mps2=-5.0, tau_s=0.25)
+        self.use_speed_smoother = use_speed_smoother
+        self.speed_smoother = CausalSpeedSmoother(a_max_mps2=3.5, a_min_mps2=-5.0, tau_s=0.25) if use_speed_smoother else None
 
         # Mount calibration
         self.calibrator = MountCalibrator(min_samples=30)
@@ -769,7 +771,9 @@ class EngineAdapterStageB:
         with torch.no_grad():
             vf, _, _ = self.model(ts_s, ts_l)
         v_raw = float(vf.item())
-        return self.speed_smoother.update(v_raw, dt_s=0.1)
+        if self.use_speed_smoother and self.speed_smoother is not None:
+            return self.speed_smoother.update(v_raw, dt_s=0.1)
+        return v_raw
 
     def on_imu(
         self,

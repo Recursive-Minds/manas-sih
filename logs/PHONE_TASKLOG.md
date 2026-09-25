@@ -41,3 +41,25 @@ This log records every command and process executed during the On-Device Phone P
   - `logs/phone/step0_quick_parity_normal.log`
   - `logs/phone/step0_quick_parity_raw.log`
   - `logs/phone/step0_stage_b_latency.log`
+
+---
+
+### Step 0b: Raw-Mode Gap Isolation and Causality Audit
+- **Timestamp**: 2026-09-26 01:25:00 +05:30
+- **Branch**: `phone/s0-baseline`
+- **Commands Executed**:
+  1. Added `use_speed_smoother: bool = True` constructor flag to `EngineAdapterStageB` in `server/engine_adapter.py`.
+  2. Added `--no-smoother` flag and speed diff reporting to `scripts/quick_parity.py`.
+  3. `python scripts/quick_parity.py --raw --no-smoother 2>&1 | Tee-Object -FilePath "logs\phone\step0b_raw_no_smoother.log"`:
+     - Exit Code: 1
+     - Log Path: `logs/phone/step0b_raw_no_smoother.log`
+     - Result: Speed diffs during blackout are 0.012 to 0.016 m/s (> 1e-4); endpoint diffs are 0.69m to 29.12m (> 0.01m).
+  4. `python scripts/quick_parity.py`:
+     - Exit Code: 0
+     - Result: 5/5 scenarios exact 0.0000 m parity (<0.01m).
+  5. `python -m pytest tests/test_no_future_leak.py tests/test_causal_streaming.py tests/test_app_no_leak.py tests/test_round1.py -q`:
+     - Exit Code: 0
+     - Result: 30 passed in 350.49s.
+  6. Causality audit: Verified batch `predict_velocities` causality (2nd-order Butterworth via `sosfilt` with carried state in `sih/features/streaming.py:65, 103-104`, trailing causal windows in `sih/models/inference.py:151-158`, NO `filtfilt`, NO centred windows).
+  7. Root cause of raw divergence isolated: Identified feature buffer empty state and spectral window warm-up transient at `sih/features/streaming.py:124-126`, leading to speed distortion at `warmup_start_ns` (5.91 m/s diff on step 0) which biases the learned pre-blackout scale factor in `dead_reckoning_engine.py:228`.
+- **Decision**: Option 3.b.
