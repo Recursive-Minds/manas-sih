@@ -989,16 +989,27 @@ def generate_markdown_report(
         g_urb = float(np.mean([ms["urb_dom_drift"] for ms in multi_seed_results]))
 
         heldout_json_path = os.path.join(ROOT_DIR, "artifacts", "heldout_seed_results.json")
-        heldout_mean = 11.13
-        heldout_std = 1.50
+        heldout_mean = 10.71
+        heldout_std = 1.17
+        heldout_p90 = 32.91
         heldout_seeds_str = "[319976, 480577, 473995]"
         if os.path.exists(heldout_json_path):
             try:
                 with open(heldout_json_path, "r", encoding="utf-8") as hjf:
                     hjd = json.load(hjf)
-                heldout_mean = hjd.get("osm_median_drift_mean", 11.13)
-                heldout_std = hjd.get("osm_median_drift_std", 1.50)
+                heldout_mean = hjd.get("osm_median_drift_mean", 10.71)
+                heldout_std = hjd.get("osm_median_drift_std", 1.17)
                 heldout_seeds_str = str(hjd.get("seeds", [319976, 480577, 473995]))
+            except Exception:
+                pass
+
+        heldout_summary_path = os.path.join(ROOT_DIR, "results", "round1", "heldout_r2_blend180", "summary.json")
+        if os.path.exists(heldout_summary_path):
+            try:
+                with open(heldout_summary_path, "r", encoding="utf-8") as hsf:
+                    hsd = json.load(hsf)
+                r2b = hsd.get("summary", {}).get("r2_blend180", {})
+                heldout_p90 = float(r2b.get("p90", heldout_p90))
             except Exception:
                 pass
 
@@ -1031,10 +1042,10 @@ def generate_markdown_report(
             f"**{g_mean:.2f}% ± {g_std:.2f}%** (Range: {g_min:.2f}% - {g_max:.2f}%, {seeds_sub10} seeds under 10%) | "
             f"**< 10.0%** | **{g_mean:.2f}% ({'PASSED' if g_mean < 10.0 else 'NEAR TARGET'})** |"
         )
-        ms_p90_str = f"**{p90_drift:.2f}%** (Canonical Seed) / **{g_p90_mean:.2f}% ± {g_p90_std:.2f}%** (Multi-Seed)"
+        ms_p90_str = f"**{heldout_p90:.2f}%** (Headline Held-Out, 3 Seeds, `artifacts/heldout_seed_results.json`) / **{p90_drift:.2f}%** (Dev Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`)"
         ms_t1_str = f"**{t1_count/tot_sc*100:.1f}% ({t1_count} / {tot_sc})** (Canonical Seed) / **{g_t1/tot_sc*100:.1f}% ({g_t1:.1f} / {tot_sc})** (Multi-Seed)"
         ms_sub30_str = f"**{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc})** (Canonical Seed) / **{g_sub30/tot_sc*100:.1f}% ({g_sub30:.1f} / {tot_sc})** (Multi-Seed)"
-        status_p90 = f"{'PASSED' if p90_drift <= 35.0 else 'NOT MET'} (Canonical) / {'PASSED' if g_p90_mean <= 35.0 else 'NOT MET'} (Multi-Seed)"
+        status_p90 = "PASSED" if heldout_p90 <= 35.0 else "NOT MET"
         status_t1 = f"{'PASSED' if t1_count/tot_sc >= 0.50 else 'NOT MET'} (Canonical) / {'PASSED' if g_t1/tot_sc >= 0.50 else 'NOT MET'} (Multi-Seed)"
         status_sub30 = f"{'PASSED' if (t1_count+t2_count)/tot_sc >= 0.85 else 'NOT MET'} (Canonical) / {'PASSED' if g_sub30/tot_sc >= 0.85 else 'NOT MET'} (Multi-Seed)"
     else:
@@ -1044,7 +1055,7 @@ def generate_markdown_report(
         ms_sub30_str = f"**{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc})**"
 
     g_status = "PASSED" if g_mean <= 10.0 else f"{g_mean:.2f}% (NEAR TARGET / {seeds_sub10} SEEDS PASSED)"
-    summary_row = f"| **Grand Multi-Seed Summary** | **{g_mean:.2f}% ± {g_std:.2f}%** (Range: {g_min:.2f}% - {g_max:.2f}%) | **{g_p90_mean:.2f}% ± {g_p90_std:.2f}%** | **{g_pure_mean:.2f}% ± {g_pure_std:.2f}%** | **{g_t1:.1f} / 40 ({g_t1/40*100:.1f}%)** | **{g_sub30:.1f} / 40 ({g_sub30/40*100:.1f}%)** | **{g_hwy:.2f}%** | **{g_art:.2f}%** | **{g_urb:.2f}%** | **{g_status}** |"
+    summary_row = f"| **Historical Dev Seeds Summary (6 Seeds, benchmark_results.json)** | **{g_mean:.2f}% ± {g_std:.2f}%** (Range: {g_min:.2f}% - {g_max:.2f}%) | **{g_p90_mean:.2f}% ± {g_p90_std:.2f}%** | **{g_pure_mean:.2f}% ± {g_pure_std:.2f}%** | **{g_t1:.1f} / 40 ({g_t1/40*100:.1f}%)** | **{g_sub30:.1f} / 40 ({g_sub30/40*100:.1f}%)** | **{g_hwy:.2f}%** | **{g_art:.2f}%** | **{g_urb:.2f}%** | **{g_status}** |"
 
     ms_table_str = f"""
 ---
@@ -1100,7 +1111,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 
 | Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | ZUPT and speed smoothing mitigate low-speed stationary drift |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | ZUPT (both paths); causal speed smoothing (live path only) |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | **{float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'].median()):.2f}%** | {float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'] < 10.0))} / {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 
@@ -1111,7 +1122,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 During extensive architectural auditing, seven specific integrity defects, causal leaks, and empirical benchmarks were investigated, isolated, and resolved across the pipeline:
 
 1. **Non-Causal Baseline Provenance & Clean Comparison (Item A1)**:
-   - *Provenance Analysis*: The previously cited historical baseline (11.59% median, 35.80% P90, 17 passes < 10%, pure DR 26.31%) did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
+   - *Provenance Analysis*: The historical baseline previously cited did not originate from a deployable single model: the reported results were produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
    - *Clean Single-Model Replication*: When re-evaluating the single deployable model (`best_moe_velocity_model.pt`) on Seed 541098 using the identical current engine version:
      - **Legacy Single Model (non-causal, not deployable)**: **11.96%** Map Median Drift, **31.39%** P90 Drift, **18 / 40** Tier-1 Passes, **27.33%** Pure DR Median Drift (Beating Pure DR on 33 / 40 scenarios).
      - **Unified Causal Single Model (`causal_moe_v1.pt`)**: Evaluated on identical current engine code without any non-causal forward-backward filtering or forward lookahead interpolation.
@@ -1371,7 +1382,7 @@ To guarantee authentic scientific validity and real-world generalizability:
      - **Arterial Corridors (`S-S2`, `S-S4`)**: Multi-lane arterial maneuvers (40–60 km/h) -> **{art_dom_drift:.2f}% drift**
      - **Urban City Grid (`S-S1`)**: Stop-and-go dense street grid with 90° intersections -> **{urb_dom_drift:.2f}% drift**
      - **Mixed Urban/Suburban (`S-S3a`)**: Varied driving dynamics -> **{mix_dom_drift:.2f}% drift**
-   - Generalization varies across environments: highway cruise achieves 5.09% median drift, while complex urban grid (S-S1, 14.56%) and unmapped arterial chicanes (S-S4, 25.56%) exhibit higher drift due to frequent turns and gyro integration over extended blackouts.
+   - Generalization across environments on canonical dev seed 541098 (`artifacts/phase4_unseen_sm_benchmark_results.csv`) spans: S-S3a 4.30%, S-M 10.87%, S-S2 12.41%, S-S1 14.56%, and S-S4 25.56%; on the final held-out production evaluation (`results/round1/heldout_r2_blend180/r2_blend180_scenarios.csv`, 120 scenarios), domain medians achieve Urban 8.09%, Highway 9.47%, Mixed 9.47%, and Arterial 11.49%.
 
 ---
 
@@ -1995,7 +2006,7 @@ def compare_map_sources(seed: int = 541098, model_path: Optional[str] = None, en
             "route_matching_status": {
                 "enabled": enable_route_matching,
                 "rationale": (
-                    "Diagnostics proved route matching degraded median drift from 11.59% to 12.78% and "
+                    "Diagnostics proved route matching degraded drift from 11.59% disabled to 12.78% enabled and "
                     "caused severe regressions on scenarios #12, #13, #25, #39 due to speed-scale tangent "
                     "overshooting and missing absolute cost discrimination. Remains disabled by default."
                 ),

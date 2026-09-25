@@ -36,6 +36,19 @@ def test_benchmark_script_has_no_stale_literals():
     assert "43.8% relative error reduction" not in code, "Stale 43.8% reduction literal found in run_final_benchmark.py"
     assert "0.66°" not in code, "Stale heading literal 0.66° found in run_final_benchmark.py"
 
+    # Ban stale historical numbers (11.59, 35.80, 26.31) near median, p90, or pure
+    stale_patterns = [
+        r"11\.59.*?(?:median|p90|pure)",
+        r"(?:median|p90|pure).*?11\.59",
+        r"35\.80.*?(?:median|p90|pure)",
+        r"(?:median|p90|pure).*?35\.80",
+        r"26\.31.*?(?:median|p90|pure)",
+        r"(?:median|p90|pure).*?26\.31",
+        r"17\s+passes\s*<\s*10%",
+    ]
+    for pat in stale_patterns:
+        assert not re.search(pat, code, re.IGNORECASE), f"Stale pattern '{pat}' found in run_final_benchmark.py"
+
 
 def test_executive_summary_matches_csv_exactly():
     df = pd.read_csv(CSV_PATH)
