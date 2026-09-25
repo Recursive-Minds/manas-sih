@@ -442,29 +442,28 @@ At street intersections and sharp branching turns, along-track integration error
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
-| **Canonical Dev Seeds (6 Seeds, 236 Scenarios)** | **22.18% ± 2.67%** | **10.86 ± 2.47 %** (median of seed medians 11.76 %, range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **NEAR TARGET** |
+| **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
-| **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
-| **P90 (Worst Decile) Drift** | **59.20%** | **27.94%** (Canonical Seed) / **36.60% ± 7.42%** (Multi-Seed) | Sub-35% | **PASSED** |
-| **Tier 1 Pass Rate (< 10%)** | 17.5% (7 / 40) | **45.0% (18 / 40)** (Canonical Seed) / **47.9% (19.2 / 40)** (Multi-Seed) | > 50% | **NEAR TARGET** |
-| **High Reliability (<= 30%)** | 65.0% (26 / 40) | **92.5% (37 / 40)** (Canonical Seed) / **84.6% (33.8 / 40)** (Multi-Seed) | > 85% | **PASSED** |
-| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **56.91°** (Speed-Regime GPS Vector) | < 20.0° | **PASSED** |
+| **P90 (Worst Decile) Drift** | **59.20%** | **27.94%** (Canonical Seed) / **36.60% ± 7.42%** (Multi-Seed) | Sub-35% | **PASSED (Canonical) / NOT MET (Multi-Seed)** |
+| **Share < 10% Drift** | 17.5% (7 / 40) | **45.0% (18 / 40)** (Canonical Seed) / **47.9% (19.2 / 40)** (Multi-Seed) | > 50% | **NOT MET (Canonical) / NOT MET (Multi-Seed)** |
+| **High Reliability (<= 30%)** | 65.0% (26 / 40) | **92.5% (37 / 40)** (Canonical Seed) / **84.6% (33.8 / 40)** (Multi-Seed) | > 85% | **PASSED (Canonical) / NOT MET (Multi-Seed)** |
+| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **17.15°** (Speed-Regime GPS Vector) | < 20.0° | **PASSED** |
 
 ---
 
 ### Multi-Seed Statistical Validation (6 Diverse Random Seeds)
 
-To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the development evaluation was verified across 6 canonical dev seeds (236 total blackout scenarios):
+To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across 6 independent random seeds (240 total blackout scenarios):
 
-| Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Tier 1 Pass Rate (< 10%) | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
+| Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Share < 10% Drift | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Seed 541098 | **11.85%** | 27.94% | 26.97% | 18 / 40 (45.0%) | 37 / 40 (92.5%) | 10.87% | 14.48% | 14.56% | **NEAR TARGET** |
 | Seed 75496 | **11.67%** | 46.42% | 21.99% | 19 / 40 (47.5%) | 31 / 40 (77.5%) | 6.88% | 12.32% | 11.67% | **NEAR TARGET** |
-| Seed 45736 | **6.53%** | 28.88% | 20.56% | 23 / 38 (60.5%) | 35 / 38 (92.1%) | 4.57% | 9.34% | 11.43% | **PASSED** |
-| Seed 12345 | **13.54%** | 44.49% | 21.62% | 16 / 39 (41.0%) | 32 / 39 (82.1%) | 21.59% | 8.27% | 10.16% | **NEAR TARGET** |
-| Seed 987654 | **12.92%** | 40.21% | 23.62% | 18 / 39 (46.2%) | 34 / 39 (87.2%) | 14.88% | 18.59% | 7.24% | **NEAR TARGET** |
+| Seed 45736 | **6.53%** | 28.88% | 20.56% | 23 / 40 (57.5%) | 35 / 40 (87.5%) | 4.57% | 9.34% | 11.43% | **PASSED** |
+| Seed 12345 | **13.54%** | 44.49% | 21.62% | 16 / 40 (40.0%) | 32 / 40 (80.0%) | 21.59% | 8.27% | 10.16% | **NEAR TARGET** |
+| Seed 987654 | **12.92%** | 40.21% | 23.62% | 18 / 40 (45.0%) | 34 / 40 (85.0%) | 14.88% | 18.59% | 7.24% | **NEAR TARGET** |
 | Seed 314159 | **8.63%** | 31.68% | 18.33% | 21 / 40 (52.5%) | 34 / 40 (85.0%) | 6.09% | 10.89% | 11.99% | **PASSED** |
-| **Canonical Dev Seeds Summary** | **10.86 ± 2.47 %** (median: 11.76%, range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.32%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
+| **Grand Multi-Seed Summary** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.31%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
 
 ---
 
@@ -486,9 +485,9 @@ Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives 
 
 To isolate how velocity estimation errors translate to endpoint position drift across vehicle operational regimes, scenarios are partitioned by mean vehicle velocity:
 
-| Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Tier-1 Passes (< 10%) | Position Error Dynamics |
+| Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | Velocity entry clamping and ZUPT prevent low-speed stationary drift |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT and speed smoothing mitigate low-speed stationary drift |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | 26 | **12.00%** | 22.48% | 11 / 26 | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | 7 | **8.62%** | 28.58% | 4 / 7 | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 
@@ -499,7 +498,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 During extensive architectural auditing, seven specific integrity defects, causal leaks, and empirical benchmarks were investigated, isolated, and resolved across the pipeline:
 
 1. **Non-Causal Baseline Provenance & Clean Comparison (Item A1)**:
-   - *Provenance Analysis*: The previously cited "11.59% / 35.80% / 17 / pure 26.31%" baseline did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
+   - *Provenance Analysis*: The previously cited historical baseline (11.59% median, 35.80% P90, 17 passes < 10%, pure DR 26.31%) did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
    - *Clean Single-Model Replication*: When re-evaluating the single deployable model (`best_moe_velocity_model.pt`) on Seed 541098 using the identical current engine version:
      - **Legacy Single Model (non-causal, not deployable)**: **11.96%** Map Median Drift, **31.39%** P90 Drift, **18 / 40** Tier-1 Passes, **27.33%** Pure DR Median Drift (Beating Pure DR on 33 / 40 scenarios).
      - **Unified Causal Single Model (`causal_moe_v1.pt`)**: Evaluated on identical current engine code without any non-causal forward-backward filtering or forward lookahead interpolation.
@@ -607,9 +606,9 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Operational Regime | Speed & Distance Scale | Blackout Duration | Pipeline Performance (Multi-Trip Benchmark) | Official SIH Benchmark Target | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200m | 30s – 60s | **27.9m Median Position Error** | &lt; 10m absolute error (&lt; 5m / 50m) | **NEAR TARGET** |
-| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **6.03% Median Drift** | &lt; 15% of distance traveled (Sub-Lane) | **PASSED** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **12.58% Median Drift** (Sub-lane accuracy) | &lt; 100m over 1km (&lt; 10%) | **NEAR TARGET** |
+| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200m | 30s – 60s | **27.9m Median Position Error** | &lt; 10m absolute error (&lt; 5m / 50m) | **NOT MET** |
+| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **6.03% Median Drift** | &lt; 15% of distance traveled (Corridor-level) | **PASSED** |
+| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **12.58% Median Drift** (Corridor-level accuracy) | &lt; 100m over 1km (&lt; 10%) | **NEAR TARGET** |
 
 ---
 
@@ -617,7 +616,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Failure Mode / Physical Phenomenon | Root Cause in Classical Systems | Solution Engineered in Phase 4 Pipeline |
 | :--- | :--- | :--- |
-| **1. Low-Speed Traffic Crawl Overshoot** | Engine idle vibrations trick AI velocity into predicting 25–30 km/h, accumulating phantom distance during crawl. | **Velocity Entry Clamping & ZUPT**: Detects crawl entry (v_entry &lt; 4 m/s) and clamps maximum velocity, freezing integration when acceleration variance drops. |
+| **1. Low-Speed Traffic Crawl Overshoot** | Engine idle vibrations trick AI velocity into predicting 25–30 km/h, accumulating phantom distance during crawl. | **Physical Rest ZUPT & ZARU (entry clamp planned for phone phase)**: Freezes integration and zeros velocity when acceleration variance drops below threshold. |
 | **2. Intersection Fork Lock-in** | Gyro turn lag causes map matcher to snap to the straight street before turn is completed, with straight re-anchoring trapping the car. | **Branch Multi-Hypothesis Gating**: Disables premature heading re-anchoring whenever road segments diverge at junctions until the turn angle is confirmed. |
 | **3. Highway Cruising Shortfall** | Ultra-smooth highway asphalt reduces chassis vibration, causing open-loop AI speed under-prediction (stopping short of exit). | **Pre-Blackout Dynamic Speed Anchoring**: Learns the pavement-specific scale factor (mean(v_GPS) / mean(v_AI)) in the 20s prior to blackout entry. |
 
@@ -627,7 +626,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 ```
 [Raw Phone IMU] ──► [Mount Auto-Calibrator] ──► [Deep TCN-Attention AI] ──► [15-State ES-EKF] ──► [Topological Map Snapper]
- (Uncalibrated)       (SO(3) Rotation Matrix)    (Invariant Speed Scaling)   (Closed-Loop NHC)    (Sub-Lane Precision)
+ (Uncalibrated)       (SO(3) Rotation Matrix)    (Invariant Speed Scaling)   (Closed-Loop NHC)    (Corridor-Level Precision)
 ```
 
 1. **Phase 1: Ingestion & Geo Engine**: Decoupled Android/sensor coordinate contract supporting 10Hz up to 200Hz IMU rates.
@@ -702,15 +701,15 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 ### Key Scenario Trajectory Spotlights
 
-#### Spotlight #30: Sharp Turn & Intersection Navigation (S-S3a - Mixed, 244m Outage)
-* Vehicle executed an abrupt 171° cornering turn during a 60s GNSS blackout.
-* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (**2.88% drift** vs Pure DR **7.94%**).
+#### Spotlight #10: Sharp Turn & Intersection Navigation (S-S2 (Arterial) - Arterial, 246m Outage)
+* Vehicle executed an abrupt 88° cornering turn during a 30s GNSS blackout.
+* With dual energy-correlation yaw locking and topological successor extension, Map Matching stayed securely locked within the corridor (**13.03% drift** vs Pure DR **46.27%**).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Spotlight Sharp Turn Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #34: Highway Branch & Off-Ramp Fork Disambiguation (S-S4 - Arterial, 328m Outage)
+#### Spotlight #34: Highway Branch & Off-Ramp Fork Disambiguation (S-S4 (Arterial) - Arterial, 328m Outage)
 * Pure 6-Axis diverged to **58.22% drift (191.1m error)** (Red Dotted Line).
 * Phase 4 Map Matching tracked the correct diverging branch to **0.93% drift (3.1m error)** (Blue Solid Line).
 
@@ -718,7 +717,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
   <img src="artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Spotlight Fork Split Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #03: Long-Distance Highway Cruising Blackout (S-M - Highway, 1175m Outage)
+#### Spotlight #03: Long-Distance Highway Cruising Blackout (S-M (Highway) - Highway, 1175m Outage)
 * High-speed highway outage spanning 1175 meters over 75 seconds without GPS fixes.
 * Pre-blackout speed scale anchoring and closed-loop NHC achieved **8.56% drift (100.5m error)**.
 
@@ -726,15 +725,15 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
   <img src="artifacts/map_scenario_spotlight_highway_cruise.png" width="750" alt="Spotlight Highway Cruise Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #15: Dense Urban Grid & Chicane Navigation (S-S1 - Urban, 400m Outage)
+#### Spotlight #18: Dense Urban Grid & Chicane Navigation (S-S1 (Urban) - Urban, 99m Outage)
 * Complex urban turns under severe multipath and stop-and-go driving conditions.
-* Phase 4 corner projection and topological snapping maintained sub-lane corridor tracking (**17.98% drift**).
+* Phase 4 corner projection and topological snapping maintained corridor-level tracking (**10.68% drift**).
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_urban_chicane.png" width="750" alt="Spotlight Urban Chicane Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #27: Sub-Lane Ultra-Precision Outage (S-S3a - Mixed, 592m Outage)
+#### Spotlight #27: High-Precision Corridor Outage (S-S3a (Mixed) - Mixed, 592m Outage)
 * Continuous dead-reckoning navigation spanning 592 meters of complete satellite blackout.
 * Blue line achieved **0.59% drift (3.5m error)** over more than a quarter-mile outage.
 
@@ -789,13 +788,13 @@ To guarantee authentic scientific validity and real-world generalizability:
      - **Arterial Corridors (`S-S2`, `S-S4`)**: Multi-lane arterial maneuvers (40–60 km/h) -> **14.48% drift**
      - **Urban City Grid (`S-S1`)**: Stop-and-go dense street grid with 90° intersections -> **14.56% drift**
      - **Mixed Urban/Suburban (`S-S3a`)**: Varied driving dynamics -> **4.30% drift**
-   - Simultaneous sub-10% performance across all disparate environments is definitive proof of structural generalization without overfitting.
+   - Generalization varies across environments: highway cruise achieves 5.09% median drift, while complex urban grid (S-S1, 14.56%) and unmapped arterial chicanes (S-S4, 25.56%) exhibit higher drift due to frequent turns and gyro integration over extended blackouts.
 
 ---
 
 ### Verification and Compliance
 
-- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %)), establishing a verified leak-free baseline.
+- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (multi-seed mean 10.86% ± 2.48% across 6 seeds), establishing a verified leak-free baseline.
 
 <!-- END GENERATED BENCHMARK SECTION -->
 

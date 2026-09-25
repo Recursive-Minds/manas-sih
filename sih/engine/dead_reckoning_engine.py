@@ -517,6 +517,7 @@ class DeadReckoningEngine:
         bo_yaw_rates = []
         bo_speeds = []
         bo_dr_enu = []
+        seeded_hdg = None
 
         valid_hist_gnss = [g for g in valid_gnss if g.timestamp_ns <= bo_start_ns]
         pre_gnss_window = SteppableDeadReckoningEngine.synthesize_1hz_gnss_window(
@@ -552,6 +553,7 @@ class DeadReckoningEngine:
                     cal_entry=cal,
                     t_entry_ns=t_curr,
                 )
+                seeded_hdg = float(np.degrees(session.ekf_pure._heading_rad)) % 360.0
 
             if not blackout_started:
                 session.predict_warmup(cal, float(v_preds[j]), t_curr)
@@ -584,7 +586,8 @@ class DeadReckoningEngine:
         acq_h_diff_deg = session.acq_h_diff_deg
         entry_acq_info = session.entry_acq_info
 
-        seeded_hdg = float(np.degrees(ekf_pure._heading_rad)) % 360.0
+        if seeded_hdg is None:
+            seeded_hdg = float(np.degrees(ekf_pure._heading_rad)) % 360.0
         if g_entry.bearing_deg is not None:
             gt_hdg_entry = float(g_entry.bearing_deg)
         elif len(gt_pts) >= 2:
