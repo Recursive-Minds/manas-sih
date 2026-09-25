@@ -60,9 +60,9 @@ Round 2 optimized the pre-blackout observation windows and unified batch/live be
 - **Exact Streaming/Batch Parity**: 0.0000 m endpoint and trajectory diff across all 5 canonical scenarios in `scripts/quick_parity.py`.
 - **Final Release**: Tag `round2-release` marks the frozen production state.
 
-## Also noticed
+## Heading Seeding Diagnostic Status
 
-`run_scenario` reports `hdg_seed_err` from `ekf_pure._heading_rad` after the blackout loop. That makes it the final heading minus the entry heading, not the seeding error. It is a diagnostic only, and this pack does not change it.
+`run_scenario` previously recorded `hdg_seed_err` from `ekf_pure._heading_rad` after the blackout loop, which measured drifted exit heading. In commit `51a5e89` (A1 diagnostic fix), `seeded_hdg` was relocated to `session.start_blackout`, recording true seeded heading error at blackout onset (**18.18° mean / 7.05° median** over 236 dev scenarios, `results/round1/hdg_seed/production_scenarios.csv`; 17.15° mean / 8.30° median on Seed 541098).
 
 ## Known limits & Operations
 

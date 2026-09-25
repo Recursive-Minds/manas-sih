@@ -29,7 +29,7 @@ The problem statement defines three operational regimes:
 2. **Tier 2: City Maneuvers (20 – 50 km/h, 200m – 500m)**:
    - Evaluates 90-degree intersection turns, roundabouts, lane changes, and short underpasses.
    - Challenge: Uncompensated gyroscope bias rapidly rotates forward velocity into the lateral plane, inducing quadratic trajectory curvature.
-   - Target: Drift < 15% of distance travelled (sub-lane positioning).
+   - Target: Drift < 15% of distance travelled (lane-level positioning).
 3. **Tier 3: Highway Cruising (> 50 km/h, 500m – 1.2km)**:
    - Evaluates high-speed tunnel transits (e.g. Mumbai-Pune Expressway tunnels) at 60 – 100 km/h.
    - Challenge: Ultra-smooth asphalt attenuates chassis vibrations, causing neural speed under-prediction, while small angular drift accumulates massive cross-track error over 1 km.
@@ -61,15 +61,14 @@ The project was originally structured into five sequential development phases:
 ### Phase 1: Core Contracts & Naive Baseline
 * **Goal**: Build data infrastructure and measure pure classical double integration drift.
 * **Outcome**: Tested on IO-VNBD sequence `S-S1.csv` (51,746 samples, 37.16 km drive).
-  - 30-second blackout drift: **158.97%** (811m error over 510m).
-  - 60-second blackout drift: **424.13%** (3,453m error over 814m).
+  - Open-loop double integration of raw smartphone accelerometer data produced unbounded quadratic error growth, compounding to hundreds of percent drift and multiple kilometers of position error within 30 to 60 seconds.
 * **Lesson Learned**: Open-loop double integration of raw smartphone accelerometer data is completely unusable for navigation. A persistent 0.05 m/s^2 bias produces quadratic divergence, compounding to kilometers of error in under a minute.
 
 ### Phase 2: 15-State Error-State EKF with Non-Holonomic Constraints (NHC)
 * **Goal**: Constrain divergence using vehicle kinematic constraints (cars cannot drive sideways or fly).
 * **Outcome**:
-  - 60-second blackout drift reduced from **424.13% to 178.79%** (> 4.5x improvement).
-  - 30-second blackout drift reduced to **115.21%**.
+  - Non-holonomic constraints (NHC) successfully arrested lateral and vertical divergence.
+  - Longitudinal error remained massive because noisy accelerometer integration without an independent forward speed measurement still drifts quadratically.
 * **Lesson Learned**: While NHC successfully arrested lateral and vertical divergence, longitudinal error remained massive because noisy accelerometer integration without an independent speed measurement still drifts quadratically. Independent AI speed prediction was strictly mandatory.
 
 ### Phase 3: AI Velocity Estimation (Dual-Brain Bayesian Mixture-of-Experts)
@@ -85,7 +84,7 @@ The project was originally structured into five sequential development phases:
 * **Outcome**:
   - Implemented Rodrigues 3D gravity leveling to decouple pitch and roll from the yaw axis.
   - Developed centripetal acceleration correlation (`a_lat = v * omega_z`) to lock the forward driving axis.
-  - Engineered the Speed-Regime GPS Vector Seeder, cutting initial heading error from 28.4° (magnetic compass) to **0.14° average (0.0002° median)**.
+  - Engineered the Speed-Regime GPS Vector Seeder, achieving **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (17.15° mean / 8.30° median on Seed 541098, `results/round1/hdg_seed/production_scenarios.csv`).
 * **Lesson Learned**: Magnetometers inside vehicle cabins are permanently corrupted (+28° to +76° error) by vehicle steel, speakers, and chassis currents. Heading MUST be seeded from dynamic pre-blackout GNSS displacement vectors.
 
 ### Phase 5: Topological Map-Matching & Kinematic Road Governor
@@ -193,7 +192,7 @@ Initial Assumption                        Real-Data Finding                     
 
 Across real-world testing on diverse road sequences, the engineering team diagnosed and eliminated 20 distinct physical failure modes:
 
-1. **Magnetometer Cabin Distortion (+28.4° deviation)**: Phone internal magnetometers are corrupted by vehicle steel and speakers. Hardened via the **Speed-Regime GPS Vector Seeder**, cutting initial azimuth error to **0.14° average (0.0002° median)**.
+1. **Magnetometer Cabin Distortion (+28.4° deviation)**: Phone internal magnetometers are corrupted by vehicle steel and speakers. Hardened via the **Speed-Regime GPS Vector Seeder**, achieving **18.18° mean / 7.05° median** initial heading seeding error over 236 dev scenarios (17.15° mean / 8.30° median on Seed 541098, `results/round1/hdg_seed/production_scenarios.csv`).
 2. **Mount Orientation Indeterminacy**: Smartphones sit at arbitrary angles. Hardened via Rodrigues 3D gravity leveling + dual-metric centripetal acceleration correlation (`|r_a| * E_a`), guaranteeing correct yaw axis locking.
 3. **Turn Polarity Ambiguity**: Solved clockwise/counterclockwise sign ambiguity directly via dynamic least-squares regression slope `Cov(omega_z, psi_dot) / Var(omega_z)`.
 4. **Low-Speed Traffic Crawl Overshoot**: Engine idle vibrations at traffic lights falsely simulated 25–30 km/h cruising. Hardened via **Velocity Entry Clamping** (`v_fwd <= max(v_entry + 1.2 m/s, 3.5 m/s)`), eliminating phantom distance accumulation.
@@ -209,7 +208,7 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 14. **High-Speed Straight-Line Yaw Wander**: At speeds v > 15 m/s, residual micro-gyro bias causes unobservable phantom curvature. Hardened via **ZARU Highway Straight-Line Lock** (`update_straight_line_lock`), freezing heading drift when `|omega_z| < 0.005 rad/s` for > 2.0s.
 15. **9-Second Phone GPS Stair-Step Optical Illusion**: Sparse phone GPS updates induce apparent curve sagitta distortions and velocity lags. Hardened by supervising the Dual-Brain MoE with **10 Hz Continuous Vehicle CAN-Bus Wheel Speed Ground Truth** (`sih/models/can_dataset.py`) synchronized with cross-correlation offsets.
 16. **High-Frequency AI Speed Jitter (~10 Hz vibration hash)**: Neural MoE speed estimates exhibited high-frequency switching hash. Hardened via `CausalSpeedSmoother` (`sih/fusion/speed_smoother.py`) combining physical acceleration slew rate bounding (`-5.0 m/s^2 <= a <= +3.5 m/s^2`) and causal EMA filtering (`tau = 0.25s`), cutting noise variance by 89% with zero phase delay.
-17. **Junction Deadlock & Boundary Terminal Pinning**: When arriving at the terminus of an incoming road segment (`frac = 1.0`), rigid 35° turn gates rejected perpendicular successors, causing orthogonal projection to clamp and pin the vehicle for 45s while turning (e.g. Scenario #28, 86.46% drift). Hardened via successor turn gate expansion (110°, `sigma_h = 60°`), active segment deprecation (`topo_bonus = 0.05`), **Anti-Boundary Clamping Watchdog** suppressing projection pinning during turns, and **Prompt Corridor Heading Steering** (`0.50 * diff_rad`), slashing Scenario #28 drift down to **5.53% (20.59m error)**.
+17. **Junction Deadlock & Boundary Terminal Pinning**: When arriving at the terminus of an incoming road segment (`frac = 1.0`), rigid 35° turn gates rejected perpendicular successors, causing orthogonal projection to clamp and pin the vehicle for 45s while turning (e.g. Scenario #28, 86.46% drift). Hardened via successor turn gate expansion (110°, `sigma_h = 60°`), active segment deprecation (`topo_bonus = 0.05`), **Anti-Boundary Clamping Watchdog** suppressing projection pinning during turns, and **Prompt Corridor Heading Steering** (`0.50 * diff_rad`), maintaining corridor attachment across corners (Scenario #28 drift reduced to **3.45% / 12.93m error** vs. **27.47% pure DR**, `artifacts/phase4_unseen_sm_benchmark_results.csv`).
 18. **Pre-Blackout Sparse Heading Misalignment**: Traffic signal stops before tunnel entry allowed static GNSS Doppler bearing walk to misalign initial yaw by up to 60°. Hardened via **Pre-Blackout Heading Consistency Gating** (cross-checks against moving GNSS bearing `v >= 2.0 m/s`, overriding if discrepancy > 50°) and **Decisive Straight-Line Innovation** (`gain = 0.85`), eliminating pre-blackout yaw errors.
 19. **CAN-Bus Cross-Correlation Temporal Lag**: Sensor logging latency between smartphone IMU and onboard ECU CAN wheel speeds causes phase offset. Cross-correlation analysis uncovered a -6.90s lag in trip `S-S3a` (r = 0.9704, MAE = 3.51 km/h) and 0.00s in `S-S4`, aligning CAN speed precisely with IMU acceleration events.
 20. **Benchmark Harness Algorithmic Entanglement (Rule 13)**: Inlined dead reckoning, map generation, and heading seeding logic inside benchmark scripts caused silent regressions during experimental testing. Decoupled all production algorithms into modular packages (`sih/engine/dead_reckoning_engine.py`, `sih/map/network.py`), restricting benchmark harnesses strictly to scenario sampling, metrics compilation, and reporting.
@@ -221,7 +220,7 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 | Architectural Subsystem | Initial Planned Concept (Phase 1 Proposals) | Delivered Production Reality | Empirical Benefit |
 | :--- | :--- | :--- | :--- |
 | **Speed Estimation** | Single 1D-CNN regressing forward speed from 20-sample accelerometer windows. | **Dual-Brain Bayesian Mixture-of-Experts (MoE) with T6 Distance Interval Loss & T7 Online Calibration**: ResNet-1D micro-expert (2.0s) + Dilated TCN-Attention macro-expert (6.0s) + Kinematic Delta-v Observer. Checkpoint `round1_interval_lam0.5_s42.pt`. | Speed RMSE reduced to 1.46 m/s; 1.3s lag eliminated; scale ratio = 1.00; median speed underestimation reduced from 1.13 to 1.03. |
-| **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. Unified geometric entry bearing across batch and streaming. | Completely immune to vehicle magnetic distortion (+76°); initial heading error cut to 0.14° average (0.0002° median). |
+| **Heading Estimation** | End-to-end recurrent neural network (LSTM) with phone magnetometer. | **Physics-Based Dynamic Multi-Source Heading**: 3D gravity leveling + Gyro yaw rate + Centripetal lateral acceleration + GNSS displacement track. Unified geometric entry bearing across batch and streaming. | Completely immune to vehicle magnetic distortion (+76°); initial heading seeding error **18.18° mean / 7.05° median** over 236 dev scenarios (17.15° mean / 8.30° median on Seed 541098). |
 | **Mount Calibration** | Manual user calibration or static orientation assumption. | **Dynamic Autonomous SO(3) Leveling**: Rodrigues rotation from gravity + continuous least-squares centripetal acceleration turn correlation. | Zero user calibration required; adapts to arbitrary portrait/landscape/tilted phone orientations. |
 | **Map Matching** | Static perpendicular distance threshold snapping to OpenStreetMap. | **Topological Successor Graph with Curvature Kinematics Governor & T8 Junction Corner Snapping**: Turn-inflated likelihood, branch multi-hypothesis gating, IRC:73 lateral comfort limits, and along-track junction corner snapping. | Eliminates off-road drifting; prevents corner overshoots; handles 90°+ intersection turns. |
 | **Blackout Transition** | Instantaneous hard switch between GPS and dead-reckoning. | **6-State Finite State Machine with C^2 Hermite Smoothstep Reconciliation & 180s History Buffer**. | Portal multipath parameter protection; sub-millimeter geometric C^2 continuity on real sequences; exact 0.0000 m batch vs live parity. |

@@ -5,7 +5,7 @@
 
 ## 1. Executive Summary & Problem Formulation
 
-The **Smartphone Intelligent Dead Reckoning (IDR)** engine maintains continuous, sub-lane vehicle positioning during extended Global Navigation Satellite System (GNSS) blackouts (e.g., tunnels, urban canyons, double-decker expressways, underpasses, dense tree foliage, and signal jamming).
+The **Smartphone Intelligent Dead Reckoning (IDR)** engine maintains continuous, lane-level vehicle positioning during extended Global Navigation Satellite System (GNSS) blackouts (e.g., tunnels, urban canyons, double-decker expressways, underpasses, dense tree foliage, and signal jamming).
 
 ### 1.1 The Physical & Mathematical Challenge
 Under classical inertial navigation, integrating raw smartphone micro-electromechanical systems (MEMS) sensors without external aiding causes rapid divergence:
@@ -20,7 +20,7 @@ All empirical benchmark scores, multi-seed statistical distributions (6 random s
 
 **Official SIH 26168 Benchmark Criteria**:
 * **Grand Dead-Reckoning Drift Target**: Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km).
-* **Tier 1 (Traffic Crawl, < 20 km/h, < 200m)**: Sub-lane stopping and crawl drift suppression via Physical Rest ZUPT.
+* **Tier 1 (Traffic Crawl, < 20 km/h, < 200m)**: Stopping and crawl drift suppression via Physical Rest ZUPT.
 * **Tier 2 (City Maneuvers, 20-50 km/h, 200-500m)**: Heading drift < 10% through dynamic multi-source heading and topological road governing.
 * **Tier 3 (Highway Cruising, > 50 km/h, 500m-1.2km)**: Speed scale fidelity sum(v_hat)/sum(v_GT) approx 1.00 and high-speed gyro drift suppression.
 
@@ -441,7 +441,7 @@ At street intersections and sharp branching turns, along-track integration error
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
+| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.93% ± 0.69%** | **10.71% ± 1.17%** (Range: 9.11% - 11.86%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
 | **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **P90 (Worst Decile) Drift** | **59.20%** | **32.91%** (Headline Held-Out, 3 Seeds, `artifacts/heldout_seed_results.json`) / **27.94%** (Dev Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`) | Sub-35% | **PASSED** |
@@ -804,21 +804,21 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 | Bottleneck | Root Cause | Implemented Solution | Benchmark Impact |
 | :--- | :--- | :--- | :--- |
-| **Calibration Timing** | Batch pre-loop calibrated at t = 3s in parking lot, picking noise Axis 2 on S-S1. | Streaming chronological calibration with dynamic turn-event accumulator (|d_theta| >= 2.5 deg, v >= 2.0 m/s). | S-S1 Urban drift reduced from **65.8% to 8.14%**. |
+| **Calibration Timing** | Batch pre-loop calibrated at t = 3s in parking lot, picking noise Axis 2 on S-S1. | Streaming chronological calibration with dynamic turn-event accumulator (|d_theta| >= 2.5 deg, v >= 2.0 m/s). | S-S1 Urban drift maintained within corridor accuracy (**11.91%** median on Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`). |
 | **Gyro Frame Leakage** | `np.dot(w_corr, g_hat)` cross-projected braking acceleration into turn rate. | Direct vertical turn rate projection from leveled vehicle frame: omega_z_corr = raw_gyro[2] - b_g[2]. | Eliminated false turns during vehicle deceleration. |
-| **Low-Speed Clamp** | Artificial clamp (v_entry < 4.0 m/s -> v <= 3.5 m/s) choked cars leaving traffic lights. | Removed artificial clamp; rely strictly on physical IMU variance detector (sigma_a^2 < 0.04). | Scenario 26 drift dropped to 3.37%. |
-| **Blackout Heading Seeding** | Instantaneous GNSS bearing was noisy during intersection turns / stops. | Seeder scans backward to last moving fix (v >= 2.0 m/s) and integrates gyro yaw forward. | Achieved **0.66°** initial heading error. |
-| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 60° heading gate + strict centerline projection p_map = p_proj. | Scenario #03 drift reduced from **51.4% to 16.59%**, 100% attached to corridor; Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %) (held-out mean **10.71% ± 1.17%**, median **11.15%**). |
+| **Low-Speed Clamp** | Artificial clamp (v_entry < 4.0 m/s -> v <= 3.5 m/s) choked cars leaving traffic lights. | Removed artificial clamp; rely strictly on physical IMU variance detector (sigma_a^2 < 0.04) and ZUPT. | Prevents false velocity accumulation at traffic light departures. |
+| **Blackout Heading Seeding** | Instantaneous GNSS bearing was noisy during intersection turns / stops. | Seeder scans backward to last moving fix (v >= 2.0 m/s) and integrates gyro yaw forward. | Achieved **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (`results/round1/hdg_seed/production_scenarios.csv`, Seed 541098: 17.15° mean / 8.30° median). |
+| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 105°–110° successor gates + strict centerline projection p_map = p_proj. | Eliminates corridor detachment on curves (e.g. Scenario #03 tracks along corridor at **8.56% drift** vs. **30.47% pure DR**; Canonical dev seeds 10.86 ± 2.47 % mean of seed medians, held-out seeds **10.71% ± 1.17%**, canonical seed 11.85%). |
 
 ---
 
 ## 11. Map Matching Road Attachment & Topological Network Traversal
 
 ### 11.1 The Attachment Failure & User Finding
-During evaluation of sharp curve scenarios (e.g., Scenario #03, 472m outage with a 48° right turn):
+During evaluation of sharp curve scenarios (e.g., Scenario #03, 1175m outage on S-M):
 * Fractional lateral damping (`p = p - 0.35 * d_cross * u_perp`) only pulled coordinates 35% toward the road, leaving the matched trajectory floating 65% off the road.
 * When dead reckoning drifted laterally past 30m or when the road curved by > 40°, rigid spatial search gates rejected the turning segment.
-* With zero candidates, map matching stopped snapping, and the blue line diverged into open space alongside the unconstrained red line (51.4% drift).
+* With zero candidates, map matching stopped snapping, and unguided dead reckoning drifted freely off the highway corridor (30.47% pure DR drift).
 
 ### 11.2 The Solution: Topological Successor Traversal & Strict Centerline Snapping
 1. **Directed Topological Graph (`succ_map`)**:
@@ -837,78 +837,79 @@ During evaluation of sharp curve scenarios (e.g., Scenario #03, 472m outage with
 6. **Velocity-Realigned Guidance**:
    Heading alignment via `reanchor_heading` realigns the body velocity vector: `v_ENU = C_b_n * [v_fwd, 0, 0]^T`, eliminating filter conflict with Non-Holonomic Constraints (NHC).
 
-### 11.3 Empirical Impact Across 40 Scenarios
-* **Scenario #03 (Sharp 48° Highway Curve, 472m)**: The blue line tracks dead center along the road corridor, reducing drift from **51.4% (242.8m error) down to 16.59% (78.4m error)**.
-* **Scenario #19 (Arterial Maneuver, 186m)**: Drift dropped from **14.16% down to 4.21% (14.9m error)**.
+### 11.3 Empirical Impact Across 40 Scenarios (Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`)
+* **Scenario #03 (Highway Cruising, 1174.6m Outage)**: The blue line tracks dead center along the road corridor, reducing drift from **30.47% (357.85m error) down to 8.56% (100.52m error)**.
+* **Scenario #19 (Urban Outage, 361.8m Outage)**: Drift reduced from **10.48% (37.92m error) down to 3.77% (13.64m error)**.
+* **Scenario #28 (Mixed Double-Turn, 374.5m Outage)**: Drift reduced from **27.47% (102.87m error) down to 3.45% (12.93m error)**.
+* **Scenario #30 (Mixed Fork Split, 244.2m Outage)**: Drift reduced from **7.94% (19.39m error) down to 2.88% (7.04m error)**.
+* **Scenario #34 (Arterial Corridor, 328.3m Outage)**: Drift reduced from **58.22% (191.14m error) down to 0.93% (3.05m error)**.
 * **Headline Benchmark Result (Held-Out Seeds, 120 Scenarios)**: **10.71% ± 1.17%** mean drift, **11.15%** median drift (NEAR TARGET).
 * **Canonical dev seeds (6 seeds, 236 scenarios)**: mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %).
 * **Canonical Reference Seed 541098**: **11.85%** Median Drift (Supporting Single-Seed Detail).
 * **Tier 1 (< 10% drift) Pass Rate**: **48.33% (58 / 120 held-out)** / **47.9% (19.2 / 40 multi-seed avg)**.
 * **Beats Pure DR Rate**: **86.67% (104 / 120 held-out)**.
 
-### 11.4 Key Scenario Trajectory Spotlights
+### 11.4 Key Scenario Trajectory Spotlights (Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`)
 
-#### Scenario #15: Sharp Off-Ramp Intersection & Turn Navigation (517m Outage)
-* **Vehicle Maneuver**: Abrupt ~80° right intersection turn connecting onto a highway feeder ramp after crawling to a stop.
-* **Algorithmic Hardening**: Dual energy-correlation yaw locking (Axis 1) + topological successor extension (105°) eliminated premature turn pruning and dead-reckoning divergence.
-* **Performance**: Map-matched drift maintained at **6.85% (35.4m error over 517m)**; pure dead-reckoning turn predicted cleanly (**20.41% drift**).
+#### Scenario #15: Urban Intersection & Turn Navigation (399.7m Outage)
+* **Vehicle Maneuver**: Right intersection turn connecting onto a feeder road after crawling to a stop.
+* **Performance**: Map-matched drift maintained at **17.98% (71.89m error over 399.7m)** vs. pure dead reckoning **19.57% drift (78.24m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 15 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #30: Highway Off-Ramp Fork Split (403m Outage)
-* **Pure 6-Axis Baseline**: Diverged to **88.77% drift** (Red Dotted Line).
-* **Phase 4 Map-Matched EKF**: Snapped cleanly to the exiting branch corridor, achieving **1.42% drift (5.7m error)** (Blue Solid Line).
+#### Scenario #30: Fork Split Disambiguation (244.2m Outage)
+* **Pure 6-Axis Baseline**: Diverged with **7.94% drift (19.39m error)**.
+* **Phase 4 Map-Matched EKF**: Snapped cleanly to the exiting branch corridor, achieving **2.88% drift (7.04m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 30 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #02: 90-Degree Sharp Highway Turn (401m Outage)
-* **Pure 6-Axis Baseline**: Experienced severe gyro scale loss, drifting to **32.40% error**.
-* **Phase 4 Map-Matched EKF**: Topological successor gating tracked the sharp 90-degree right turn, achieving **3.73% drift**.
+#### Scenario #02: Sharp Highway Outage (600.2m Outage)
+* **Pure 6-Axis Baseline**: Experienced open-loop drift of **13.22% (79.35m error)**.
+* **Phase 4 Map-Matched EKF**: Topological successor gating tracked the highway corridor, achieving **9.64% drift (57.84m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_sharp_turn.png" width="750" alt="Scenario 02 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #17: Ultra-Precision Highway Outage (555m Outage)
-* **Pure 6-Axis Baseline**: Drifted by 49.71% over half a kilometer.
-* **Phase 4 Map-Matched EKF**: Perfect corridor adherence yielding **0.00% endpoint drift (4.2m along-track error over 555m)**.
+#### Scenario #17: Urban Outage Navigation (102.8m Outage)
+* **Pure 6-Axis Baseline**: Drifted by **16.61% (17.08m error)** over short stop-and-go section.
+* **Phase 4 Map-Matched EKF**: Maintained corridor alignment with **17.21% drift (17.69m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_precision_outage.png" width="750" alt="Scenario 17 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #10: High-Speed Curve Outage (544m Outage)
-* **Pure 6-Axis Baseline**: High-speed highway turn with centripetal force.
-* **Phase 4 Map-Matched EKF**: Curvature kinematics governor bounded velocity, tracking the arc with **11.30% drift**.
+#### Scenario #10: Arterial Corridor Outage (245.7m Outage)
+* **Pure 6-Axis Baseline**: High lateral drift with **46.27% drift (113.68m error)**.
+* **Phase 4 Map-Matched EKF**: Curvature kinematics governor bounded velocity, reducing drift to **13.03% (32.02m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_highway_cruise.png" width="750" alt="Scenario 10 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #14: Urban Chicane Navigation (968m Outage)
-* **Pure 6-Axis Baseline**: Navigating repeated serpentine curves over nearly 1 kilometer.
-* **Phase 4 Map-Matched EKF**: Maintained lane-level ribbon attachment across all chicanes, achieving **1.45% drift (14.0m error over 968m)**.
+#### Scenario #14: Arterial Navigation (202.6m Outage)
+* **Pure 6-Axis Baseline**: Navigating arterial corridor with **15.93% drift (32.27m error)**.
+* **Phase 4 Map-Matched EKF**: Matched road centerline projection with **15.93% drift (32.27m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_urban_chicane.png" width="750" alt="Scenario 14 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #28: Double-Turn Intersection & Fork Disambiguation (372m Outage, Trip S-S3a)
-* **Pure 6-Axis Baseline**: Severe 110.20% drift (410.3m error) over two consecutive sharp corners (96.8° left turn onto segment `0191` followed by 73.9° right turn onto `0192`).
-* **Un-hardened Map Matcher**: Jammed against segment boundary clamp with 86.46% drift (321.9m error).
-* **Hardened Map-Matched Pipeline**: Anti-boundary clamping watchdog and prompt corridor steering successfully traversed both corners, achieving **5.53% drift (20.59m error)**.
+#### Scenario #28: Double-Turn Intersection & Fork Disambiguation (374.5m Outage, Trip S-S3a)
+* **Pure 6-Axis Baseline**: Drifted to **27.47% (102.87m error)** over two consecutive sharp corners.
+* **Phase 4 Map-Matched EKF**: Anti-boundary clamping watchdog and prompt corridor steering successfully traversed both corners, achieving **3.45% drift (12.93m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_28_s_s3a_mixed_45s.png" width="750" alt="Scenario 28 Double Turn" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
-#### Scenario #31: Acute Highway Branch Fork (350m Outage)
-* **Pure 6-Axis Baseline**: Acute divergence angle caused unguided EKF to bifurcate off-road.
-* **Phase 4 Map-Matched EKF**: Directed successor transition prior correctly identified the route branch, achieving **9.27% drift**.
+#### Scenario #31: Arterial Branching Outage (490.9m Outage)
+* **Pure 6-Axis Baseline**: Unguided EKF drifted with **4.30% drift (21.13m error)**.
+* **Phase 4 Map-Matched EKF**: Directed successor transition prior correctly tracked the arterial corridor, achieving **3.07% drift (15.07m error)**.
 
 <p align="center">
   <img src="artifacts/map_scenario_spotlight_fork_split.png" width="750" alt="Scenario 31 Map" style="max-width:100%; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);" />
@@ -917,10 +918,9 @@ During evaluation of sharp curve scenarios (e.g., Scenario #03, 472m outage with
 ---
 
 ## 12. Real-World Indian Transit Deployment Pillars & Edge Runtime
-
 To ensure production viability across Indian transit conditions (motorcycles, multi-level flyovers, non-lane traffic corridors, and budget Android devices), the system incorporates five dedicated architectural pillars:
 
-### Pillar 1: Motorcycle Roll Dynamics & Virtual Contact Patch Frame
+### Pillar 1: Motorcycle Roll Dynamics & Virtual Contact Patch Frame (DESIGN — planned, not implemented)
 * **The Physical Challenge**: Two-wheelers lean into corners at roll angles theta_roll between 20° and 45°. This violates 4-wheeler Non-Holonomic Constraints (v_lat = 0), projecting Earth gravity into the lateral accelerometer and corrupting lateral velocity updates.
 * **The Mathematical Solution**:
   1. Roll angle estimation via complementary gravity/gyro filter:
@@ -931,7 +931,7 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
      `R_lat(theta_roll) = R_lat_nominal * (1.0 + (theta_roll / 15 deg)^4)`
      Prevents the EKF from fighting the motorcycle's natural leaning dynamics during turns.
 
-### Pillar 2: Real-Time Android Sensor Daemon & NDK Native Bridge
+### Pillar 2: Real-Time Android Sensor Daemon & NDK Native Bridge (DESIGN — planned, not implemented; current app uses Java SensorManager)
 * **The System Challenge**: Android battery optimization kills background threads, and Java Garbage Collection pauses introduce 50ms – 100ms jitter into the 100 Hz IMU processing loop.
 * **The Technical Solution**:
   1. Android Foreground Service running with `FOREGROUND_SERVICE_TYPE_LOCATION`.
@@ -939,7 +939,7 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
   3. Direct sensor acquisition in C++ via Android NDK `ASensorManager` (`ASENSOR_TYPE_ACCELEROMETER`, `ASENSOR_TYPE_GYROSCOPE`, `ASENSOR_TYPE_MAGNETIC_FIELD`, `ASENSOR_TYPE_PRESSURE`).
   4. Circular ring buffer in native memory with zero Java Garbage Collection pauses.
 
-### Pillar 3: Multi-Level Flyover Disambiguation via Barometer Fusion
+### Pillar 3: Multi-Level Flyover Disambiguation via Barometer Fusion (DESIGN — planned, not implemented)
 * **The Physical Challenge**: Indian metropolitan corridors (e.g. Silk Board in Bengaluru, Western Express Highway in Mumbai, Delhi Outer Ring Road) feature elevated flyovers stacked directly above surface service roads. 2D GNSS cannot differentiate whether the vehicle is on the flyover or the surface road.
 * **The Mathematical Solution**:
   1. Smartphone barometric pressure conversion to geopotential altitude:
@@ -948,14 +948,14 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
      `y_alt = h_baro - p_z_pred`
   3. Map matching elevation gating: Vertical separation threshold (`delta_z > 4.5m`) discards surface road polylines when traveling on elevated flyovers.
 
-### Pillar 4: Non-Lane Road Dynamics & Probabilistic Ribbon Corridors
+### Pillar 4: Non-Lane Road Dynamics & Probabilistic Ribbon Corridors (DESIGN — planned, not implemented)
 * **The Physical Challenge**: Indian roads frequently lack painted lane dividers, and vehicles navigate opportunistic trajectories across the road surface. Rigid 1D lane-centerline snapping causes false cross-track heading corrections.
 * **The Technical Solution**:
   1. 2D ribbon corridor bounding:
      `d_perp_effective = max(0.0, |d_perp| - W_road / 2.0)`
   2. As long as the vehicle remains within the physical roadway width `W_road`, cross-track position updates are unconstrained. Perpendicular snapping is only applied when the vehicle trajectory exits the physical road boundary.
 
-### Pillar 5: INT8 / FP16 Quantized Mobile Neural Inference & C++ Engine
+### Pillar 5: INT8 / FP16 Quantized Mobile Neural Inference & C++ Engine (DESIGN — planned, not implemented; FP32 TorchScript exported, on-device runtime planned)
 * **The Hardware Challenge**: Unquantized neural models consume 15% – 25% mobile CPU, causing thermal throttling and battery drain under direct sunlight (> 40°C).
 * **The Technical Solution**:
   1. Export PyTorch neural velocity model to TorchScript (`models/exported/moe_velocity_model.torchscript.pt` -> 2.66 MB).

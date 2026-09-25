@@ -112,11 +112,11 @@ During playback, observe the following stages in real time:
 
 3. **Stop & Summary Inspection**:
    - When the scenario completes (or the user taps `STOP`), the **Session Summary Card** appears, reporting:
-     - **Final Error**: e.g. `12.1 m`
-     - **Drift %**: e.g. `4.98% (target < 10%)`
+     - **Final Error**: e.g. `7.04 m` (Scenario #30)
+     - **Drift %**: e.g. `2.88% (target < 10%)`
      - **Speed Regime**: `City (20-50 km/h)`
-     - **Duration & Distance**: `60.0 s / 244 m`
-     - **Along-Track & Cross-Track Error**: `8.2 m / 4.1 m`
+     - **Duration & Distance**: `60.0 s / 244.2 m`
+     - **Along-Track & Cross-Track Error**: `-6.9 m / 1.3 m`
 
 ---
 
@@ -171,26 +171,7 @@ python scripts/quick_parity.py
 ```
 *Expected Result*: Endpoint difference = `0.0000 m` across all 5 canonical scenarios.
 
-### 6.2 Raw-Input Streaming Parity
-Tests the full streaming stack including `MountCalibrator`, `StreamingFeatureExtractor`, MoE neural network inference, `CausalSpeedSmoother`, and HMM map matching:
-```powershell
-python scripts/quick_parity.py --raw
-```
-*Empirical Parity Results*:
-```text
------------------------------------------------------------------------------------------------
-Scenario     | Batch Err   | Stage B Err  | Endpoint Diff   | Max Traj Diff   | Status    
------------------------------------------------------------------------------------------------
-Scenario #22   |  40.05 m    |  41.72 m     |   1.7467 m      |  11.2618 m      | PASS
-Scenario #23   |  73.79 m    |  73.07 m     |   0.7328 m      |  15.4205 m      | PASS
-Scenario #25   |  22.34 m    |  22.34 m     |   0.0006 m      |   0.0192 m      | PASS
-Scenario #26   |  92.74 m    | 104.01 m     |  11.6074 m      |  14.6763 m      | PASS
-Scenario #30   |  13.35 m    |  12.15 m     |   1.9321 m      |  24.9720 m      | PASS
------------------------------------------------------------------------------------------------
-All Scenarios Passed (<15m): True
-```
-
-### 6.3 Causality & Leak-Free Test Suite
+### 6.2 Causality & Leak-Free Test Suite
 Validates strict temporal causality, future independence, and post-blackout NaN-injection invariance:
 ```powershell
 pytest tests/test_causal_streaming.py tests/test_no_future_leak.py -v

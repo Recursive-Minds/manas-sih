@@ -3,7 +3,7 @@
 # Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion
 ## Final Judge Evaluation & Architectural Benchmark Report
 
-**Generated:** 2026-09-25 17:29:06 UTC  
+**Generated:** 2026-09-25 18:40:26 UTC  
 **Headline Benchmark Result (Held-Out Seeds):** **10.71% ± 1.17%** median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
 **Secondary Multi-Seed Benchmark (6 Fixed Seeds):** **10.86% ± 2.48%** (Grand Median 10.86%, range 6.53% - 13.54%, 2 seeds under 10%, 240 scenarios)  
 **Canonical Reference Seed 541098:** **11.85%** Median Drift (Supporting Single-Seed Detail)  
@@ -16,7 +16,7 @@
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
+| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.93% ± 0.69%** | **10.71% ± 1.17%** (Range: 9.11% - 11.86%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
 | **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **P90 (Worst Decile) Drift** | **59.20%** | **32.91%** (Headline Held-Out, 3 Seeds, `artifacts/heldout_seed_results.json`) / **27.94%** (Dev Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`) | Sub-35% | **PASSED** |

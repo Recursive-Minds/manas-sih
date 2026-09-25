@@ -727,15 +727,45 @@ This log records every command and process executed during Round 1 tuning and ev
      - `scripts/check_latex.py`: 100% PASS (Zero LaTeX syntax across all docs).
      - `pytest`: 124 passed, 1 skipped, 0 failed.
 - **Log Paths**:
-  - `results/round1/hdg_seed/production_scenarios.csv`
-  - `results/round1/parity_check/summary.json`
-  - `README.md`
-  - `benchmarks/run_final_benchmark.py`
-  - `scripts/render_reports_from_results.py`
-  - `tests/test_report_integrity.py`
-  - `FINAL_JUDGE_EVALUATION_REPORT.md`
-  - `FINAL_JUDGE_EVALUATION_REPORT.html`
-  - `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`
+### Step 32: Final Documentation Accuracy Audit, Model Provenance, and Registry Verification
+- **Start Time**: 2026-09-25 23:30:00 +05:30
+- **End Time**: 2026-09-26 00:38:00 +05:30
+- **Summary**:
+  1. Open Question 1 Answered (Heading Seeding Error Diagnostic):
+     - Showed git diff of A1 code change in `sih/engine/dead_reckoning_engine.py` adding line 556 `seeded_hdg = float(np.degrees(session.ekf_pure._heading_rad)) % 360.0` at blackout onset (`start_blackout`).
+     - Executed diagnostic and recomputed on `results/round1/hdg_seed/production_scenarios.csv`:
+       * Dev Seed 541098 (n=40): Mean = 17.15°, Median = 8.30°
+       * All 6 Dev Seeds (n=236): Mean = 18.18°, Median = 7.05°
+     - Proved with scenario 1 log that diagnostic records heading at blackout onset (14.28° error at onset vs 29.85° error after 30s integration).
+     - Proved why Seed 541098 equaled old value: in Step 30, the A1 fix had already updated `phase4_unseen_sm_benchmark_results.csv` on Seed 541098, dropping exit error from 56.91° / 31.98° to 17.15° / 8.30°.
+  2. Open Question 2 Answered (Model Provenance Table):
+     - Mapped all primary result files (`heldout_seed_results.json`, `heldout_seed_results_pre_round1.json`, `benchmark_results.json`, `phase4_unseen_sm_benchmark_results.csv`, `production_scenarios.csv`, etc.) to their writer scripts, git commit dates, and model checkpoints.
+     - Verified that all active files were produced by the production model (`round1_interval_lam0.5_s42.pt` + `production.json`), while baseline comparison files were produced by `pre-round-1` model (`baseline_off.json`).
+  3. Created Automated Number Registry and Checker:
+     - Populated `docs/NUMBER_SOURCES.json` with 99 canonical registered numbers with exact source files, selectors, computation rules, and tolerance.
+     - Built `scripts/check_number_registry.py` with 3-stage validation (recomputation from raw files, cross-document label consistency, and scanning all in-scope docs for unregistered numbers).
+     - Added Pytest wrapper `tests/test_doc_numbers.py` (3/3 passed in 0.60s).
+  4. Sourced, Relabelled, or Removed Untraced Numbers & Claims:
+     - Removed untraced Phase 1 / Phase 2 naive baseline numbers (`158.97%`, `424.13%`, `178.79%`, `115.21%`, `811m`, `510m`, `3,453m`, `814m`) from `README.md` and `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`.
+     - Removed obsolete `--raw` streaming parity tables from `APP_REPORT.md`, `APP_STATUS_REPORT.md`, and `DEMO.md`, updating them to the verified canonical passing parity result (`scripts/quick_parity.py`: 0.0000 m difference across all 5 scenarios).
+     - Removed "sub-lane" overclaims from `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md` and `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`.
+     - Explicitly designated Pillars 1 through 5 as `(DESIGN — planned, not implemented)` across all documentation.
+     - Sourced and registered all scenario spotlights (Sc 02, 03, 10, 14, 15, 18, 19, 22, 23, 25, 26, 27, 28, 30, 31, 34) from `artifacts/phase4_unseen_sm_benchmark_results.csv`.
+  5. Full Verification Suite Executed and Passed:
+     - `scripts/check_number_registry.py`: ALL AUDITS PASSED (0 unregistered, 0 mismatches, 0 conflicts).
+     - `scripts/check_links.py`: 237/237 valid links/anchors PASSED.
+     - `scripts/check_latex.py`: Zero LaTeX syntax PASSED.
+     - `pytest`: 127 passed, 1 skipped, 0 failed.
+     - `round1_eval.py --assert-parity`: PARITY PASS (max diff = 5.68e-14 m).
+     - `quick_parity.py`: 5/5 scenarios PASS (exact 0.0000 m diff).
+     - `git diff --stat main`: Touches only documentation, generator template, check scripts, registry, and tests.
+- **Log Paths**:
+  - `docs/NUMBER_SOURCES.json`
+  - `scripts/build_number_registry.py`
+  - `scripts/check_number_registry.py`
+  - `tests/test_doc_numbers.py`
+  - `logs/ROUND1_TASKLOG.md`
+
 
 
 

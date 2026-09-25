@@ -23,7 +23,7 @@
 <h1>Smartphone Intelligent Dead Reckoning (IDR) with GNSS Fusion</h1>
 <h2>Final Judge Evaluation & Architectural Benchmark Report</h2>
 
-<strong>Generated:</strong> 2026-09-25 17:29:06 UTC  
+<strong>Generated:</strong> 2026-09-25 18:40:26 UTC  
 <strong>Headline Benchmark Result (Held-Out Seeds):</strong> <strong>10.71% ± 1.17%</strong> median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
 <strong>Secondary Multi-Seed Benchmark (6 Fixed Seeds):</strong> <strong>10.86% ± 2.48%</strong> (Grand Median 10.86%, range 6.53% - 13.54%, 2 seeds under 10%, 240 scenarios)  
 <strong>Canonical Reference Seed 541098:</strong> <strong>11.85%</strong> Median Drift (Supporting Single-Seed Detail)  
@@ -35,7 +35,7 @@
 <h3>Executive Performance Summary</h3>
 
 <div class="table-container"><table><thead><tr><th>Evaluation Metric</th><th>Baseline (Pure 6-Axis IMU)</th><th>Phase 4 Production Pipeline (Map-Matched EKF)</th><th>Target Benchmark</th><th>Status</th></tr></thead><tbody>
-<tr><td><strong>Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)</strong></td><td><strong>22.99% ± 1.92%</strong></td><td><strong>10.71% ± 1.17%</strong> (Range: 9.14% - 12.78%, 1 seed under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>10.71% (NEAR TARGET)</strong></td></tr>
+<tr><td><strong>Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)</strong></td><td><strong>22.93% ± 0.69%</strong></td><td><strong>10.71% ± 1.17%</strong> (Range: 9.11% - 11.86%, 1 seed under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>10.71% (NEAR TARGET)</strong></td></tr>
 <tr><td><strong>Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)</strong></td><td><strong>22.18% ± 2.67%</strong></td><td><strong>10.86% ± 2.48%</strong> (Range: 6.53% - 13.54%, 2 seeds under 10%)</td><td><strong>< 10.0%</strong></td><td><strong>10.86% (NEAR TARGET)</strong></td></tr>
 <tr><td><strong>Canonical Reference Seed (Seed 541098)</strong></td><td><strong>26.97%</strong></td><td><strong>11.85%</strong> (Supporting Single-Seed Detail)</td><td><strong>< 10.0%</strong></td><td><strong>NEAR TARGET</strong></td></tr>
 <tr><td><strong>P90 (Worst Decile) Drift</strong></td><td><strong>59.20%</strong></td><td><strong>32.91%</strong> (Headline Held-Out, 3 Seeds, <code>artifacts/heldout_seed_results.json</code>) / <strong>27.94%</strong> (Dev Seed 541098, <code>artifacts/phase4_unseen_sm_benchmark_results.csv</code>)</td><td>Sub-35%</td><td><strong>PASSED</strong></td></tr>

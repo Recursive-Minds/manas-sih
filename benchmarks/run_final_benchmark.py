@@ -992,6 +992,11 @@ def generate_markdown_report(
         heldout_mean = 10.71
         heldout_std = 1.17
         heldout_p90 = 32.91
+        heldout_pure_mean = 22.93
+        heldout_pure_std = 0.69
+        heldout_min = 9.11
+        heldout_max = 11.86
+        heldout_sub10 = 1
         heldout_seeds_str = "[319976, 480577, 473995]"
         if os.path.exists(heldout_json_path):
             try:
@@ -999,7 +1004,15 @@ def generate_markdown_report(
                     hjd = json.load(hjf)
                 heldout_mean = hjd.get("osm_median_drift_mean", 10.71)
                 heldout_std = hjd.get("osm_median_drift_std", 1.17)
+                heldout_pure_mean = hjd.get("pure_dr_median_drift_mean", 22.93)
+                heldout_pure_std = hjd.get("pure_dr_median_drift_std", 0.69)
                 heldout_seeds_str = str(hjd.get("seeds", [319976, 480577, 473995]))
+                pse = hjd.get("per_seed_evaluations", [])
+                if pse:
+                    meds = [s["osm_median_drift_pct"] for s in pse]
+                    heldout_min = min(meds)
+                    heldout_max = max(meds)
+                    heldout_sub10 = sum(1 for m in meds if m < 10.0)
             except Exception:
                 pass
 
@@ -1035,7 +1048,7 @@ def generate_markdown_report(
 
         ms_summary_row_exec = (
             f"| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | "
-            f"**22.99% ± 1.92%** | **{heldout_mean:.2f}% ± {heldout_std:.2f}%** (Range: 9.14% - 12.78%, 1 seed under 10%) | "
+            f"**{heldout_pure_mean:.2f}% ± {heldout_pure_std:.2f}%** | **{heldout_mean:.2f}% ± {heldout_std:.2f}%** (Range: {heldout_min:.2f}% - {heldout_max:.2f}%, {heldout_sub10} seed under 10%) | "
             f"**< 10.0%** | **{heldout_mean:.2f}% (NEAR TARGET)** |\n"
             f"| **Secondary Multi-Seed (6 Fixed Seeds, {len(multi_seed_results)*tot_sc} Scenarios)** | "
             f"**{g_pure_mean:.2f}% ± {g_pure_std:.2f}%** | "
