@@ -48,7 +48,7 @@ The hypothesis was that blackout speed that reaches the EKF (`v_ai * engine.spee
 - `ekf._speed_scale` was suspected of learning a redundant scale in `update_gnss`.
 
 **Empirical Result**: Disproved on real data.
-The real-data autopsy (`scripts/round1_autopsy.py`) revealed that `ekf._speed_scale` is almost exactly 1.000 across all trips and scenarios (standard deviation < 0.002) because the EKF's pre-blackout velocity updates do not inflate scale. Disabling either scale factor produced zero statistical improvement, and T9 was rejected.
+The real-data autopsy (`scripts/round1_autopsy.py`) revealed median EKF internal speed scale 1.000 (autopsy) across all trips and scenarios because the EKF's pre-blackout velocity updates do not inflate scale. Disabling either scale factor produced zero statistical improvement, and T9 was rejected.
 
 ## Round 2: Speed-Scaling Optimization, Parity & Final Release
 

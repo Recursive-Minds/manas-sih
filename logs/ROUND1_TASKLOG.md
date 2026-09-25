@@ -594,5 +594,33 @@ This log records every command and process executed during Round 1 tuning and ev
   - `AUDIT.md`
   - `logs/ROUND1_TASKLOG.md`
 
+---
+
+### Step 28: Documentation Fix-Up (Branch docs/fix2) - Dev Seeds Relabeling & Audit Synchronization
+- **Start Time**: 2026-09-25 12:00:00 +05:30
+- **End Time**: 2026-09-25 12:25:00 +05:30
+- **Branch**: `docs/fix2`
+- **Summary**:
+  1. Mirrored Sections 7-10 of `CLAUDE.md` into `GEMINI.md` with clean plain-text math (Rule 12).
+  2. Relabeled all occurrences of multi-seed grand median 10.86% to:
+     `Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %)`
+     across `README.md`, `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`, `FINAL_JUDGE_EVALUATION_REPORT.md`, `FINAL_JUDGE_EVALUATION_REPORT.html`, `CLAUDE.md`, `GEMINI.md`, `APP_STATUS_REPORT.md`, and `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`. Held-out numbers (`10.71% ± 1.17%` mean, `11.15%` median) remain the headline.
+  3. Cleaned T9 note: retained "median EKF internal speed scale 1.000 (autopsy)" and removed untraced "std < 0.002" across `ROUND1_README.md` and `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`.
+  4. Updated `APP_REPORT.md` and `AUDIT2.md` with clear notes clarifying historical status vs final frozen production parity and promoted model checkpoint (`round1_interval_lam0.5_s42.pt`).
+  5. Verified `python scripts/check_doc_numbers.py` (PASS), `check_links.py` (213 links PASS), and `check_latex.py` (Zero LaTeX syntax PASS).
+- **Log Paths**:
+  - `GEMINI.md`
+  - `CLAUDE.md`
+  - `README.md`
+  - `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`
+  - `FINAL_JUDGE_EVALUATION_REPORT.md`
+  - `FINAL_JUDGE_EVALUATION_REPORT.html`
+  - `ROUND1_README.md`
+  - `PROBLEM_STATEMENT_AND_INITIAL_PLAN.md`
+  - `APP_REPORT.md`
+  - `APP_STATUS_REPORT.md`
+  - `AUDIT2.md`
+  - `logs/ROUND1_TASKLOG.md`
+
 
 

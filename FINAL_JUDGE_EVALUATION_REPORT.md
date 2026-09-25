@@ -5,7 +5,7 @@
 
 **Generated:** 2026-09-24 16:44:52 UTC  
 **Headline Benchmark Result (Held-Out Seeds):** **10.71% ± 1.17%** median drift (NEAR TARGET) across 3 held-out seeds [319976, 480577, 473995] (120 scenarios, zero tuning)  
-**Secondary Multi-Seed Benchmark (6 Fixed Seeds):** **10.86% ± 2.47%** (Grand Median 10.86%, range 6.53% - 13.54%, 2 seeds under 10%, 240 scenarios)  
+**Canonical dev seeds (6 seeds, 236 scenarios):** mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %, range 6.53% - 13.54%, 2 seeds under 10%)  
 **Canonical Reference Seed 541098:** **11.85%** Median Drift (Supporting Single-Seed Detail)  
 **Benchmark Target:** Final Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km)  
 **Evaluation Scope:** Multi-Trip Standardized Evaluation across 5 Real-World Sequences (`S-M`, `S-S2`, `S-S1`, `S-S3a`, `S-S4`), 40 Independent GNSS Blackout Scenarios  
@@ -17,7 +17,7 @@
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
-| **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.47%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
+| **Canonical Dev Seeds (6 Seeds, 236 Scenarios)** | **22.18% ± 2.67%** | **10.86 ± 2.47 %** (median of seed medians 11.76 %, range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **NEAR TARGET** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
 | **P90 (Worst Decile) Drift** | **59.20%** | **27.94%** (Canonical Seed) / **36.60% ± 7.42%** (Multi-Seed) | Sub-35% | **PASSED** |
@@ -29,7 +29,7 @@
 
 ### Multi-Seed Statistical Validation (6 Diverse Random Seeds)
 
-To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across 6 independent random seeds (240 total blackout scenarios):
+To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the development evaluation was verified across 6 canonical dev seeds (236 total blackout scenarios):
 
 | Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Tier 1 Pass Rate (< 10%) | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -39,7 +39,7 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 | Seed 12345 | **13.54%** | 44.49% | 21.62% | 16 / 39 (41.0%) | 32 / 39 (82.1%) | 21.59% | 8.27% | 10.16% | **NEAR TARGET** |
 | Seed 987654 | **12.92%** | 40.21% | 23.62% | 18 / 39 (46.2%) | 34 / 39 (87.2%) | 14.88% | 18.59% | 7.24% | **NEAR TARGET** |
 | Seed 314159 | **8.63%** | 31.68% | 18.33% | 21 / 40 (52.5%) | 34 / 40 (85.0%) | 6.09% | 10.89% | 11.99% | **PASSED** |
-| **Grand Multi-Seed Summary** | **10.86% ± 2.47%** (Range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.32%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
+| **Canonical Dev Seeds Summary** | **10.86 ± 2.47 %** (median: 11.76%, range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.32%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
 
 ---
 
@@ -370,6 +370,6 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 ### Verification and Compliance
 
-- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (multi-seed mean 10.86% ± 2.47% across 6 seeds), establishing a verified leak-free baseline.
+- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %)), establishing a verified leak-free baseline.
 
 <!-- END GENERATED BENCHMARK SECTION -->

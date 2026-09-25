@@ -443,7 +443,7 @@ All Scenarios Passed (<15m): True
 Extracted from `FINAL_NUMBERS_FOR_PPT.md` and `FINAL_JUDGE_EVALUATION_REPORT.md`:
 - **Headline Benchmark Result (Held-Out Seeds, Final Production):** **10.71% ± 1.17%** mean drift, **11.15%** median drift across 3 held-out seeds (`319976`, `480577`, `473995`) (120 scenarios, zero tuning; P90: 32.91%, Tier 1 Pass Rate: 58/120 = 48.33%, Beats Pure DR: 104/120 = 86.67%, Unseen Trips Median: 9.66%)
 - **Pre-Round-1 Baseline (Held-Out Seeds):** **11.13% ± 1.50%** mean drift, **11.48%** median drift (P90: 37.25%, Tier 1: 51/120 = 42.50%)
-- **Secondary Multi-Seed Benchmark (6 Fixed Seeds, 240 Scenarios):** **10.86% ± 2.47%** grand median drift
+- **Canonical dev seeds (6 seeds, 236 scenarios):** mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %)
 - **Canonical Reference Seed 541098:** **11.85%** Median Drift (P90: 27.94%, Tier 1 Pass Rate: 18/40 = 45.0%)
 - **Multi-Trip Domain Breakdown (Held-Out Seeds):**
   - Highway Cruising (`S-M.csv`): **10.87%**
