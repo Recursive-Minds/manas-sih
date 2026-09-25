@@ -5,7 +5,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-21%20Round1%20%7C%20123%20Total%20Passing-brightgreen.svg)](#19-quickstart-reproduction-guide--test-verification)
 [![Held-Out Benchmark](https://img.shields.io/badge/Held--Out%20Benchmark-10.71%25%20%C2%B1%201.17%25%20(Near%20Target)-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
-[![Multi-Seed Benchmark](https://img.shields.io/badge/Multi--Seed%20Matrix-10.86%25%20%C2%B1%202.47%25%20Grand%20Median-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
+[![Dev Seeds Matrix](https://img.shields.io/badge/Dev%20Seeds%20(6%20seeds)-10.86%25%20%C2%B1%202.47%25-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
 [![Production Release](https://img.shields.io/badge/Production%20Release-Round%202%20Frozen-brightgreen.svg)](#17-active-tuned-parameters--configuration-registry)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -712,7 +712,7 @@ At street intersections and sharp branching turns, along-track integration error
 ### 9.3 Historical Development Baseline (Leaked Trip Road Network - Superseded & Invalid)
 
 > [!WARNING]
-> **Historical Leaked Baseline (Invalid)**: The table below reflects Phase 4 development results where road network geometry was constructed from the trip's own recorded GNSS fixes (`build_road_network_from_trip`), creating an implicit data leak inside blackout windows (yielding synthetic 0.00% - 0.24% drift on scenarios such as #28 and #24). This leak has been excised. See Section 16 for the authoritative leak-free OpenStreetMap multi-seed benchmark (**10.86% ± 2.47%** median drift across 240 scenarios, **10.71% ± 1.17%** held-out seeds, 11.85% canonical seed).
+> **Historical Leaked Baseline (Invalid)**: The table below reflects Phase 4 development results where road network geometry was constructed from the trip's own recorded GNSS fixes (`build_road_network_from_trip`), creating an implicit data leak inside blackout windows (yielding synthetic 0.00% - 0.24% drift on scenarios such as #28 and #24). This leak has been excised. See Section 16 for the authoritative leak-free OpenStreetMap benchmark (Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %), **10.71% ± 1.17%** held-out seeds, 11.85% canonical seed).
 
 | Scenario ID | Domain & Sequence | Duration | Distance | Pure 6-Axis Drift | Phase 4 Map Drift (Invalid - Leaked Network) | Accuracy Gain |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -841,7 +841,7 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
 | **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
-| **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.47%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
+| **Canonical Dev Seeds (6 Seeds, 236 Scenarios)** | **22.18% ± 2.67%** | **10.86 ± 2.47 %** (median of seed medians 11.76 %, range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **NEAR TARGET** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
 | **P90 (Worst Decile) Drift** | **59.20%** | **27.94%** (Canonical Seed) / **36.60% ± 7.42%** (Multi-Seed) | Sub-35% | **PASSED** |
@@ -853,7 +853,7 @@ To ensure production viability across Indian transit conditions (motorcycles, mu
 
 ### Multi-Seed Statistical Validation (6 Diverse Random Seeds)
 
-To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across 6 independent random seeds (240 total blackout scenarios):
+To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the development evaluation was verified across 6 canonical dev seeds (236 total blackout scenarios):
 
 | Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Tier 1 Pass Rate (< 10%) | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -863,7 +863,7 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 | Seed 12345 | **13.54%** | 44.49% | 21.62% | 16 / 39 (41.0%) | 32 / 39 (82.1%) | 21.59% | 8.27% | 10.16% | **NEAR TARGET** |
 | Seed 987654 | **12.92%** | 40.21% | 23.62% | 18 / 39 (46.2%) | 34 / 39 (87.2%) | 14.88% | 18.59% | 7.24% | **NEAR TARGET** |
 | Seed 314159 | **8.63%** | 31.68% | 18.33% | 21 / 40 (52.5%) | 34 / 40 (85.0%) | 6.09% | 10.89% | 11.99% | **PASSED** |
-| **Grand Multi-Seed Summary** | **10.86% ± 2.47%** (Range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.32%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
+| **Canonical Dev Seeds Summary** | **10.86 ± 2.47 %** (median: 11.76%, range: 6.53% - 13.54%) | **36.60% ± 7.42%** | **22.18% ± 2.67%** | **19.2 / 40 (47.9%)** | **33.8 / 40 (84.6%)** | **10.81%** | **12.32%** | **11.17%** | **10.86% (NEAR TARGET / 2 SEEDS PASSED)** |
 
 ---
 
@@ -1194,7 +1194,7 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 ### Verification and Compliance
 
-- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (multi-seed mean 10.86% ± 2.47% across 6 seeds), establishing a verified leak-free baseline.
+- **SIH Benchmark Goal**: Achieved **canonical reference seed median drift 11.85%** (Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %)), establishing a verified leak-free baseline.
 
 <!-- END GENERATED BENCHMARK SECTION -->
 
@@ -1208,7 +1208,7 @@ To guarantee authentic scientific validity and real-world generalizability:
 | **Gyro Frame Leakage** | `np.dot(w_corr, g_hat)` cross-projected braking acceleration into turn rate. | Direct vertical turn rate projection from leveled vehicle frame: omega_z_corr = raw_gyro[2] - b_g[2]. | Eliminated false turns during vehicle deceleration. |
 | **Low-Speed Clamp** | Artificial clamp (v_entry < 4.0 m/s -> v <= 3.5 m/s) choked cars leaving traffic lights. | Removed artificial clamp; rely strictly on physical IMU variance detector (sigma_a^2 < 0.04). | Scenario 26 drift dropped to 3.37%. |
 | **Blackout Heading Seeding** | Instantaneous GNSS bearing was noisy during intersection turns / stops. | Seeder scans backward to last moving fix (v >= 2.0 m/s) and integrates gyro yaw forward. | Achieved **0.66°** initial heading error on test corridor (**17.15°** cross-scenario mean). |
-| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 105°–110° successor gates + strict centerline projection p_map = p_proj. | Scenario #03 drift reduced from **51.4% to 16.59%**, 100% attached to corridor; multi-seed median drift reached **10.86% ± 2.47%** (**10.71% ± 1.17%** held-out seeds, 11.85% canonical seed). |
+| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 105°–110° successor gates + strict centerline projection p_map = p_proj. | Scenario #03 drift reduced from **51.4% to 16.59%**, 100% attached to corridor; Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %) (**10.71% ± 1.17%** held-out seeds, 11.85% canonical seed). |
 
 ### Active Production Configuration Profile (`config/round1/production.json`)
 

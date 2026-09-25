@@ -94,13 +94,13 @@ The complete algorithmic pipeline is implemented through Phase 6 and adheres str
 
 ## 8. Master Benchmark Results (Empirical Single Source of Truth)
 
-All benchmark scores, multi-seed statistical validations (6 random seeds x 40 scenarios = 240 evaluation runs), domain breakdowns, and trajectory maps are maintained exclusively in:
+All benchmark scores, multi-seed statistical validations (held-out 3 seeds x 40 scenarios = 120 evaluation runs, and 6 canonical dev seeds = 236 scenarios), domain breakdowns, and trajectory maps are maintained exclusively in:
 👉 [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe\SIH\FINAL_JUDGE_EVALUATION_REPORT.md)
 👉 [FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe\SIH\FINAL_NUMBERS_FOR_PPT.md)
 
 **Official SIH Benchmark Criteria & Final Frozen Results (Tag `round2-release`)**:
 - **Headline Benchmark Result (Held-Out Seeds, 120 Scenarios)**: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share (<10%), **9.66%** unseen trips median, **86.67%** beats pure DR rate.
-- **Secondary Multi-Seed Benchmark (6 Fixed Seeds, 240 Scenarios)**: **10.86% ± 2.47%** grand median drift.
+- **Canonical dev seeds (6 seeds, 236 scenarios)**: mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %).
 - **Canonical Reference Seed 541098**: **11.85%** Median Drift (P90: 27.94%, Tier 1: 18/40 = 45.0%).
 - **Streaming/Batch Parity**: Exact 0.0000 m endpoint and trajectory diff across all 5 canonical scenarios in `scripts/quick_parity.py`.
 - **Grand Target**: Dead Reckoning Drift < 10% of total distance travelled during GNSS blackout (< 5m over 50m, or < 100m over 1km).

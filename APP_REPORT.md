@@ -3,7 +3,7 @@
 **Author**: Senior Embedded Systems & Sensor Fusion Engineer  
 **Project**: SIH PS 26168 (ISRO) - Team Recursive Minds  
 **Phase**: Android Demo App, Python Server & Live Evaluator Architecture  
-**Status**: Step 0 Completed (Verification, Architecture Audit, Tooling Setup)
+**Status**: Steps 0–6 Completed (Architecture Audit, Android App, Streaming Server, Live Replayer, Bitwise Parity Verified; Final Production Parity Synchronized in Round 1 & Round 2)
 
 ---
 
@@ -127,6 +127,9 @@ This heuristic assumes the vehicle yaw axis coincides with the gyro axis exhibit
 ## 6. Deployment Assumptions
 
 ### 6.1 Benchmark Headline Assumptions
+> [!NOTE]
+> **Historical Context**: The 14.31% median drift reported below reflects the initial uncalibrated warm-up sensitivity benchmark on Seed 541098 during Step 1. In the finalized production system (tag `round2-release`), canonical reference seed median drift is **11.85%** (P90: 27.94%, Tier 1: 18/40 = 45.0%), and the strictly held-out 3-seed evaluation achieves **10.71% ± 1.17%** mean drift (11.15% median drift, 48.33% Tier 1 share).
+
 The canonical benchmark headline results (14.31% median drift, 32.87% P90, 17 / 40 Tier-1 <10% drift) assume a smartphone mounted in a vehicle cradle that has undergone prior driving:
 1. **Mount Yaw-Lock**: The vehicle has completed sufficient turns prior to entering GNSS blackout, accumulating >= 8 turn events. This guarantees the 3D rotation matrix, yaw axis index, and directional sign (+1.0 vs -1.0) are fully determined and locked.
 2. **Speed Scaling Calibration**: Pre-blackout GNSS fixes (>= 3 fixes at speed > 2.0 m/s over >= 10 AI inference windows) have calibrated the pavement speed scaling factor alpha.
@@ -305,7 +308,7 @@ The streaming engine adapter `EngineAdapterStageB` in [server/engine_adapter.py]
 | :--- | :--- | :--- | :--- |
 | **MountCalibrator / calibrate_stream** | [sih/calibration/mount.py](file:///c:/Users/carpe/SIH/sih/calibration/mount.py) | Import L36, Init L440, observe_gnss L606, update L823 | **IMPORTED**: Uses production SO(3) gravity leveling, 8-turn detection, and persistent alignment reuse. |
 | **StreamingFeatureExtractor** | [sih/features/streaming.py](file:///c:/Users/carpe/SIH/sih/features/streaming.py) | Import L40, Init L436, push L757 | **IMPORTED**: Maintains causal 12-channel rolling feature buffer (window 60 samples, spectral stride 5). |
-| **causal_moe_v1 Inference** | [sih/models/causal_moe_v1.py](file:///c:/Users/carpe/SIH/sih/models/causal_moe_v1.py) | Forward call L784 (`self.model(ts_s, ts_l)`) | **IMPORTED**: Invokes the PyTorch `CausalMoE` dual-window neural velocity model without lookahead. |
+| **Neural Velocity Model** | [sih/models/inference.py](file:///c:/Users/carpe/SIH/sih/models/inference.py) / [sih/models/moe_fusion.py](file:///c:/Users/carpe/SIH/sih/models/moe_fusion.py) | Forward call L784 | **IMPORTED**: Production dual-window MoE (`round1_interval_lam0.5_s42.pt`, exported to TorchScript graph `moe_velocity_model.torchscript.pt`). |
 | **KinematicSpeedObserver** | [sih/engine/speed_observer.py](file:///c:/Users/carpe/SIH/sih/engine/speed_observer.py) | Import L41, Init L453, reset L711, update L850 | **IMPORTED**: Forward vehicle acceleration integration anchored to entry speed. |
 | **Speed Scaling Factor (alpha)** | [sih/engine/dead_reckoning_engine.py](file:///c:/Users/carpe/SIH/sih/engine/dead_reckoning_engine.py#L301-L308) | L702-L709 | **VERIFIED IDENTICAL**: Computes pre-blackout alpha = mean(v_GNSS) / mean(v_AI) clipped to [0.85, 1.25/1.35]. |
 | **Heading Seeder** | [sih/fusion/es_ekf.py](file:///c:/Users/carpe/SIH/sih/fusion/es_ekf.py#L234) | Called on EKF L744 | **IMPORTED**: `seed_pre_blackout_heading` directly on `ErrorStateEKF`. |
@@ -314,6 +317,9 @@ The streaming engine adapter `EngineAdapterStageB` in [server/engine_adapter.py]
 | **HMMMapMatcher** | [sih/map/matcher.py](file:///c:/Users/carpe/SIH/sih/map/matcher.py) | Import L43, Init L461, match L876, returns MatchedPosition L879-L886 | **IMPORTED**: Three-stage confidence gated HMM map matcher; returned MatchedPosition geodetic coordinates explicitly ingested. |
 
 ### 10.2 Quick Parity Benchmark (Trip S-S3a, 5 Canonical Scenarios)
+> [!NOTE]
+> **Subsequent Full Parity Resolution (Round 1 & Round 2)**: The initial benchmark below reflects Step 5 prior to the introduction of the 180s pre-blackout history buffer and unified entry bearing. In the finalized production system (tag `round2-release`), `scripts/quick_parity.py` achieves **exact 0.0000 m endpoint difference and 0.0000 m max trajectory difference** across all 5 canonical scenarios in both production mode and `SIH_ROUND1_CONFIG=off` mode.
+
 Evaluated via `scripts/quick_parity.py` comparing batch `run_dead_reckoning_scenario` against streaming `EngineAdapterStageB` on canonical Seed 541098:
 
 | Scenario ID | Duration | Distance | Batch Endpoint Err | Stage B Endpoint Err | Endpoint Difference | Max Trajectory Diff | Parity Status |

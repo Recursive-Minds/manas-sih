@@ -88,7 +88,7 @@ norm_weights = raw_weights / np.maximum(sum_weights, 1e-9)
 ---
 
 ### e. Canonical Benchmark with Single TorchScript Mobile Checkpoint
-- **Setup**: `model_path = "models/checkpoints/best_moe_velocity_model.pt"` (the exact single dual-expert MoE exported to `moe_velocity_model.torchscript.pt`).
+- **Setup**: `model_path = "models/checkpoints/best_moe_velocity_model.pt"` (the pre-round-1 baseline single dual-expert MoE exported to `moe_velocity_model.torchscript.pt`; in Round 1/2, `round1_interval_lam0.5_s42.pt` was promoted to production).
 - **Results (Seed 541098, 40 Scenarios, OSM Map)**:
   - **Median Drift**: **11.96%** (vs **11.59%** baseline, **+0.37% difference**)
   - **P90 Drift**: **31.39%** (vs **32.56%** baseline, **-1.17% improvement**)
@@ -108,7 +108,7 @@ norm_weights = raw_weights / np.maximum(sum_weights, 1e-9)
 | :--- | :---: | :---: | :---: | :--- |
 | **Canonical Baseline (LOTO D=0.50)** | **11.59%** | **32.56%** | **16 / 40** | Folds trained on test trip receive 66.7% weight |
 | **Q1d: Pure Held-Out Only (LOTO D=0.0)** | **15.56%** | **52.36%** | **12 / 40** | Zero leakage; only unseen fold evaluated |
-| **Q1e: Single TorchScript Mobile Model** | **11.96%** | **31.39%** | **18 / 40** | Production edge model (`best_moe_velocity_model.pt`) |
+| **Q1e: Single TorchScript Mobile Model** | **11.96%** | **31.39%** | **18 / 40** | Pre-round-1 baseline model (`best_moe_velocity_model.pt`; production model promoted in Round 1/2 is `round1_interval_lam0.5_s42.pt` at 11.85% canonical / 10.71% ± 1.17% held-out) |
 
 ---
 
@@ -164,6 +164,9 @@ For a scenario with blackout window `[t0, t1]`:
 
 ### Causality Verdict
 - **PARTIALLY REFUTED**: State propagation and filter measurement updates during blackout are strictly causal. However, strict sequence causality is broken in two pre-processing steps: (1) `np.mean(g_hat, axis=0)` in `InvariantFeatureExtractor.extract:231`, and (2) full-trip bounding box calculation for OSM road loading in `sih/map/network.py:935`.
+
+> [!NOTE]
+> **Subsequent Resolution (Phase 6, Phase 7 & Round 1)**: Both pre-processing steps were subsequently resolved in production: (1) `InvariantFeatureExtractor` was replaced in the active streaming pipeline by `StreamingFeatureExtractor` and `MountCalibrator` with causal Rodrigues leveling, and (2) full-trip bounding box loading was replaced by the speed-adaptive predictive corridor caching engine (`sih/map/corridor_manager.py`) and live Overpass OSM client, verified leak-free in `tests/test_causal_streaming.py` and `tests/test_no_future_leak.py`.
 
 ---
 

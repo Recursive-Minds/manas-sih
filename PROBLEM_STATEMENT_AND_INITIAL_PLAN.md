@@ -132,7 +132,7 @@ Every candidate technique was evaluated honestly against paired real-data baseli
 | **T3 Sticky Stop Detector** | Rejected | Never fired (0 activations across all scenarios; ZUPT variance detector already handles physical stops). |
 | **T4 Pre-Blackout Gyro Scale** | Rejected | Hurt performance (worsened cross-track error due to pre-blackout turn noise). |
 | **T5 Hold / Decay Speed Mode** | Rejected | Hurt performance (caused premature deceleration and along-track lag). |
-| **T9 Double-Scale Bug Fix** | Rejected | The suspected double-scale bug does not occur on real data; EKF pre-blackout scale is ~1.000 (std < 0.002). |
+| **T9 Double-Scale Bug Fix** | Rejected | The suspected double-scale bug does not occur on real data; median EKF internal speed scale 1.000 (autopsy). |
 | **T10 Wider Speed Clip Bounds** | Rejected | Hurt performance (P90 tail blew out by +2.0 to +4.1 percentage points). |
 | **3-Model Checkpoint Ensemble** | Rejected | Worse tail on held-out seeds (P90 35.3% vs 32.9% single model s42). |
 | **Doppler Entry Bearing** | Rejected | Lost empirical sweep against geometric bearing (16 better vs 23 worse, p = 0.337). |
@@ -237,4 +237,4 @@ Across real-world testing on diverse road sequences, the engineering team diagno
 * [x] **Road Network & Governor**: Spatial polyline index, curvature governor, Overpass API client (`sih/map/`).
 * [x] **GNSS-INS Handoff**: 6-state FSM with C^2 Hermite smoothstep reconciliation (`sih/handoff/`).
 * [x] **Edge Streaming Pipeline**: Causal real-time stream for mobile with 180s history buffer and exact 0.0000 m batch parity (`server/engine_adapter.py`, `scripts/quick_parity.py`).
-* [x] **Empirical Benchmark Verification**: Held-out 120-scenario evaluation across 3 seeds: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share, **9.66%** unseen trips median, and **86.67%** beats pure DR rate. Multi-seed 240-scenario evaluation: **10.86% ± 2.47%** grand median drift ([FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe/SIH/FINAL_NUMBERS_FOR_PPT.md), [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md)).
+* [x] **Empirical Benchmark Verification**: Held-out 120-scenario evaluation across 3 seeds: **10.71% ± 1.17%** mean drift, **11.15%** median drift, **32.91%** P90 drift, **48.33%** Tier 1 share, **9.66%** unseen trips median, and **86.67%** beats pure DR rate. Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %) ([FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe/SIH/FINAL_NUMBERS_FOR_PPT.md), [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md)).
