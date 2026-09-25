@@ -65,17 +65,18 @@ def detect_dynamic_spotlights(detailed_results):
     5. precision: Lowest map drift % with distance >= 300m.
     """
     for r in detailed_results:
-        gt_pts = r["gt_pts"]
-        if len(gt_pts) >= 5:
+        gt_pts = r.get("gt_pts", [])
+        if gt_pts is not None and len(gt_pts) >= 5:
             v_start = gt_pts[min(4, len(gt_pts)-1)] - gt_pts[0]
             v_end = gt_pts[-1] - gt_pts[max(0, len(gt_pts)-5)]
             h_s = float(np.degrees(np.arctan2(v_start[0], v_start[1])) % 360.0)
             h_e = float(np.degrees(np.arctan2(v_end[0], v_end[1])) % 360.0)
             r["hdg_diff"] = float(abs((h_e - h_s + 180.0) % 360.0 - 180.0))
-        else:
+        elif "hdg_diff" not in r:
             r["hdg_diff"] = 0.0
         r["gain"] = float(r["pure_drift_pct"] - r["map_drift_pct"])
-        r["peak_turn"] = float(np.max(np.abs(r["cross_track_series"])))
+        cts = r.get("cross_track_series", [0.0])
+        r["peak_turn"] = float(np.max(np.abs(cts))) if (cts is not None and len(cts) > 0) else 0.0
 
     chosen_ids = set()
 
@@ -898,12 +899,13 @@ def generate_markdown_report(
     pr_rel = "artifacts/map_scenario_spotlight_precision_outage.png"
 
     status_med = "PASSED" if med_drift <= 10.0 else "NEAR TARGET"
-    status_p90 = "PASSED" if p90_drift <= 35.0 else "NEAR TARGET"
-    status_t1  = "PASSED" if t1_count/tot_sc >= 0.50 else "NEAR TARGET"
-    status_sub30 = "PASSED" if (t1_count+t2_count)/tot_sc >= 0.85 else "HIGH RELIABILITY"
+    status_p90 = "PASSED" if p90_drift <= 35.0 else "NOT MET"
+    status_t1  = "PASSED" if t1_count/tot_sc >= 0.50 else "NOT MET"
+    status_sub30 = "PASSED" if (t1_count+t2_count)/tot_sc >= 0.85 else "NOT MET"
+    status_hdg = "PASSED" if mean_hdg_seed_err < 20.0 else "NOT MET"
 
-    status_tier1 = "PASSED" if crawl_err_m <= 10.0 else "NEAR TARGET"
-    status_tier2 = "PASSED" if city_drift <= 10.0 else "SUB-LANE ACCURACY"
+    status_tier1 = "PASSED" if crawl_err_m <= 10.0 else "NOT MET"
+    status_tier2 = "PASSED" if city_drift <= 10.0 else "Corridor-level accuracy"
     status_tier3 = "PASSED" if hwy_drift <= 10.0 else "NEAR TARGET"
 
     hwy_status = "PASSED" if hwy_dom_drift <= 10.0 else f"{hwy_dom_drift:.1f}% (NEAR TARGET)"
@@ -1032,6 +1034,9 @@ def generate_markdown_report(
         ms_p90_str = f"**{p90_drift:.2f}%** (Canonical Seed) / **{g_p90_mean:.2f}% ± {g_p90_std:.2f}%** (Multi-Seed)"
         ms_t1_str = f"**{t1_count/tot_sc*100:.1f}% ({t1_count} / {tot_sc})** (Canonical Seed) / **{g_t1/tot_sc*100:.1f}% ({g_t1:.1f} / {tot_sc})** (Multi-Seed)"
         ms_sub30_str = f"**{(t1_count+t2_count)/tot_sc*100:.1f}% ({t1_count+t2_count} / {tot_sc})** (Canonical Seed) / **{g_sub30/tot_sc*100:.1f}% ({g_sub30:.1f} / {tot_sc})** (Multi-Seed)"
+        status_p90 = f"{'PASSED' if p90_drift <= 35.0 else 'NOT MET'} (Canonical) / {'PASSED' if g_p90_mean <= 35.0 else 'NOT MET'} (Multi-Seed)"
+        status_t1 = f"{'PASSED' if t1_count/tot_sc >= 0.50 else 'NOT MET'} (Canonical) / {'PASSED' if g_t1/tot_sc >= 0.50 else 'NOT MET'} (Multi-Seed)"
+        status_sub30 = f"{'PASSED' if (t1_count+t2_count)/tot_sc >= 0.85 else 'NOT MET'} (Canonical) / {'PASSED' if g_sub30/tot_sc >= 0.85 else 'NOT MET'} (Multi-Seed)"
     else:
         ms_summary_row_exec = ""
         ms_p90_str = f"**{p90_drift:.2f}%**"
@@ -1048,7 +1053,7 @@ def generate_markdown_report(
 
 To guarantee that benchmark metrics reflect generalized, reproducible dead-reckoning performance across the road network rather than favorable scenario selection, the complete 40-scenario evaluation was verified across {len(multi_seed_results)} independent random seeds (240 total blackout scenarios):
 
-| Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Tier 1 Pass Rate (< 10%) | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
+| Evaluation Seed | OSM Map Drift (Median) | OSM P90 Drift | Pure 6-Axis Drift | Share < 10% Drift | Sub-30% Consistency | Highway Cruising | Arterial Corridors | Urban Grid & Crawl | Target Compliance |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 {"\n".join(ms_rows)}
 {summary_row}
@@ -1072,11 +1077,10 @@ To guarantee that benchmark metrics reflect generalized, reproducible dead-recko
 | :--- | :--- | :--- | :--- | :--- |
 {ms_summary_row_exec}
 | **Canonical Reference Seed (Seed 541098)** | **{base_med:.2f}%** | **{med_drift:.2f}%** (Supporting Single-Seed Detail) | **< 10.0%** | **{status_med}** |
-| **Legacy Single Model (non-causal, not deployable)** | **27.33%** | **11.96%** (P90: 31.39%, Tier-1: 18/40, Beats Pure: 33/40) | **< 10.0%** | **Non-Causal Reference** |
 | **P90 (Worst Decile) Drift** | **{base_p90:.2f}%** | {ms_p90_str} | Sub-35% | **{status_p90}** |
-| **Tier 1 Pass Rate (< 10%)** | {base_t1_count/tot_sc*100:.1f}% ({base_t1_count} / {tot_sc}) | {ms_t1_str} | > 50% | **{status_t1}** |
+| **Share < 10% Drift** | {base_t1_count/tot_sc*100:.1f}% ({base_t1_count} / {tot_sc}) | {ms_t1_str} | > 50% | **{status_t1}** |
 | **High Reliability (<= 30%)** | {(base_t1_count+base_t2_count)/tot_sc*100:.1f}% ({base_t1_count+base_t2_count} / {tot_sc}) | {ms_sub30_str} | > 85% | **{status_sub30}** |
-| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **{mean_hdg_seed_err:.2f}°** (Speed-Regime GPS Vector) | < 20.0° | **PASSED** |
+| **Initial Heading Seeding Error**| 28.4° (unobservable magnetometer) | **{mean_hdg_seed_err:.2f}°** (Speed-Regime GPS Vector) | < 20.0° | **{status_hdg}** |
 {ms_table_str}
 ---
 
@@ -1094,9 +1098,9 @@ Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives 
 
 To isolate how velocity estimation errors translate to endpoint position drift across vehicle operational regimes, scenarios are partitioned by mean vehicle velocity:
 
-| Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Tier-1 Passes (< 10%) | Position Error Dynamics |
+| Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | Velocity entry clamping and ZUPT prevent low-speed stationary drift |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 < 20.0])} | ZUPT and speed smoothing mitigate low-speed stationary drift |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | **{float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'].median()):.2f}%** | {float(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)]['map_drift_pct'] < 10.0))} / {len(df[((df['distance_m']/df['duration_s'])*3.6 >= 20.0) & ((df['distance_m']/df['duration_s'])*3.6 <= 50.0)])} | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | **{float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'].median()):.2f}%** | {float(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['pure_drift_pct'].median()):.2f}% | {int(np.sum(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0]['map_drift_pct'] < 10.0))} / {len(df[(df['distance_m']/df['duration_s'])*3.6 > 50.0])} | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 
@@ -1107,7 +1111,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 During extensive architectural auditing, seven specific integrity defects, causal leaks, and empirical benchmarks were investigated, isolated, and resolved across the pipeline:
 
 1. **Non-Causal Baseline Provenance & Clean Comparison (Item A1)**:
-   - *Provenance Analysis*: The previously cited "11.59% / 35.80% / 17 / pure 26.31%" baseline did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
+   - *Provenance Analysis*: The previously cited historical baseline (11.59% median, 35.80% P90, 17 passes < 10%, pure DR 26.31%) did not originate from a deployable single model. The 11.59% median drift was produced by a 5-fold LOTO ensemble (`LOTOEnsembleVelocityEstimator`, discount D=0.50), where folds trained on the evaluation trip contributed 66.7% of the ensemble weight (documented in AUDIT2.md).
    - *Clean Single-Model Replication*: When re-evaluating the single deployable model (`best_moe_velocity_model.pt`) on Seed 541098 using the identical current engine version:
      - **Legacy Single Model (non-causal, not deployable)**: **11.96%** Map Median Drift, **31.39%** P90 Drift, **18 / 40** Tier-1 Passes, **27.33%** Pure DR Median Drift (Beating Pure DR on 33 / 40 scenarios).
      - **Unified Causal Single Model (`causal_moe_v1.pt`)**: Evaluated on identical current engine code without any non-causal forward-backward filtering or forward lookahead interpolation.
@@ -1216,8 +1220,8 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | Operational Regime | Speed & Distance Scale | Blackout Duration | Pipeline Performance (Multi-Trip Benchmark) | Official SIH Benchmark Target | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200m | 30s – 60s | **{crawl_err_m:.1f}m Median Position Error** | &lt; 10m absolute error (&lt; 5m / 50m) | **{status_tier1}** |
-| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **{city_drift:.2f}% Median Drift** | &lt; 15% of distance traveled (Sub-Lane) | **{status_tier2}** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **{hwy_drift:.2f}% Median Drift** (Sub-lane accuracy) | &lt; 100m over 1km (&lt; 10%) | **{status_tier3}** |
+| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **{city_drift:.2f}% Median Drift** | &lt; 15% of distance traveled (Corridor-level) | **{status_tier2}** |
+| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **{hwy_drift:.2f}% Median Drift** (Corridor-level accuracy) | &lt; 100m over 1km (&lt; 10%) | **{status_tier3}** |
 
 ---
 
@@ -1225,7 +1229,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Failure Mode / Physical Phenomenon | Root Cause in Classical Systems | Solution Engineered in Phase 4 Pipeline |
 | :--- | :--- | :--- |
-| **1. Low-Speed Traffic Crawl Overshoot** | Engine idle vibrations trick AI velocity into predicting 25–30 km/h, accumulating phantom distance during crawl. | **Velocity Entry Clamping & ZUPT**: Detects crawl entry (v_entry &lt; 4 m/s) and clamps maximum velocity, freezing integration when acceleration variance drops. |
+| **1. Low-Speed Traffic Crawl Overshoot** | Engine idle vibrations trick AI velocity into predicting 25–30 km/h, accumulating phantom distance during crawl. | **Physical Rest ZUPT & ZARU (entry clamp planned for phone phase)**: Freezes integration and zeros velocity when acceleration variance drops below threshold. |
 | **2. Intersection Fork Lock-in** | Gyro turn lag causes map matcher to snap to the straight street before turn is completed, with straight re-anchoring trapping the car. | **Branch Multi-Hypothesis Gating**: Disables premature heading re-anchoring whenever road segments diverge at junctions until the turn angle is confirmed. |
 | **3. Highway Cruising Shortfall** | Ultra-smooth highway asphalt reduces chassis vibration, causing open-loop AI speed under-prediction (stopping short of exit). | **Pre-Blackout Dynamic Speed Anchoring**: Learns the pavement-specific scale factor (mean(v_GPS) / mean(v_AI)) in the 20s prior to blackout entry. |
 
@@ -1235,7 +1239,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 ```
 [Raw Phone IMU] ──► [Mount Auto-Calibrator] ──► [Deep TCN-Attention AI] ──► [15-State ES-EKF] ──► [Topological Map Snapper]
- (Uncalibrated)       (SO(3) Rotation Matrix)    (Invariant Speed Scaling)   (Closed-Loop NHC)    (Sub-Lane Precision)
+ (Uncalibrated)       (SO(3) Rotation Matrix)    (Invariant Speed Scaling)   (Closed-Loop NHC)    (Corridor-Level Precision)
 ```
 
 1. **Phase 1: Ingestion & Geo Engine**: Decoupled Android/sensor coordinate contract supporting 10Hz up to 200Hz IMU rates.
@@ -1306,13 +1310,13 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 #### Spotlight #{uc['scenario_id']:02d}: Dense Urban Grid & Chicane Navigation ({uc['trip_id']} - {uc['domain']}, {uc['dist_m']:.0f}m Outage)
 * Complex urban turns under severe multipath and stop-and-go driving conditions.
-* Phase 4 corner projection and topological snapping maintained sub-lane corridor tracking (**{uc['map_drift_pct']:.2f}% drift**).
+* Phase 4 corner projection and topological snapping maintained corridor-level tracking (**{uc['map_drift_pct']:.2f}% drift**).
 
 <p align="center">
   <img src="{uc_rel}" width="750" alt="Spotlight Urban Chicane Map" style="max-width:100%; border-radius:8px;" />
 </p>
 
-#### Spotlight #{pr['scenario_id']:02d}: Sub-Lane Ultra-Precision Outage ({pr['trip_id']} - {pr['domain']}, {pr['dist_m']:.0f}m Outage)
+#### Spotlight #{pr['scenario_id']:02d}: High-Precision Corridor Outage ({pr['trip_id']} - {pr['domain']}, {pr['dist_m']:.0f}m Outage)
 * Continuous dead-reckoning navigation spanning {pr['dist_m']:.0f} meters of complete satellite blackout.
 * Blue line achieved **{pr['map_drift_pct']:.2f}% drift ({pr['map_err_m']:.1f}m error)** over more than a quarter-mile outage.
 
@@ -1334,7 +1338,7 @@ The pipeline achieves an overall median drift of **{med_drift:.2f}%** (Highway *
 3. **Pre-Blackout Dynamic Speed Scale Anchoring**:
    - In the 20 seconds prior to outage entry, learns the pavement-specific scale factor (mean(v_GPS) / mean(v_AI)) to adapt for asphalt vibration damping, bounded physically to [0.85, 1.35] on Highway.
 4. **Speed-Regime GPS Heading Seeding**:
-   - Directional heading vector seeded from moving GPS fixes (v > 2.5 m/s) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **17.15° mean initial heading accuracy** across all 40 scenarios.
+   - Directional heading vector seeded from moving GPS fixes (v > 2.5 m/s) combined with high-rate forward gyro integration, bypassing static magnetometer magnetic distortions and achieving **{mean_hdg_seed_err:.2f}° mean initial heading accuracy** across all 40 scenarios.
 5. **Real-Time Mount Auto-Calibration**:
    - SO(3) 3D coordinate frame transformation decoupling arbitrary smartphone cradle pitch, roll, and yaw from the vehicle chassis frame.
 6. **Closed-Loop 15-State Error-State Kalman Filter (ES-EKF)**:
@@ -1367,7 +1371,7 @@ To guarantee authentic scientific validity and real-world generalizability:
      - **Arterial Corridors (`S-S2`, `S-S4`)**: Multi-lane arterial maneuvers (40–60 km/h) -> **{art_dom_drift:.2f}% drift**
      - **Urban City Grid (`S-S1`)**: Stop-and-go dense street grid with 90° intersections -> **{urb_dom_drift:.2f}% drift**
      - **Mixed Urban/Suburban (`S-S3a`)**: Varied driving dynamics -> **{mix_dom_drift:.2f}% drift**
-   - Simultaneous sub-10% performance across all disparate environments is definitive proof of structural generalization without overfitting.
+   - Generalization varies across environments: highway cruise achieves 5.09% median drift, while complex urban grid (S-S1, 14.56%) and unmapped arterial chicanes (S-S4, 25.56%) exhibit higher drift due to frequent turns and gyro integration over extended blackouts.
 
 ---
 

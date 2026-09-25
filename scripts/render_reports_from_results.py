@@ -21,6 +21,7 @@ def main():
     detailed_results = []
     for r in df.to_dict(orient="records"):
         r["dist_m"] = r["distance_m"]
+        r["trip_id"] = r.get("trip", r.get("trip_id"))
         r["hdg_diff"] = r.get("hdg_seed_err", 0.0)
         detailed_results.append(r)
 
