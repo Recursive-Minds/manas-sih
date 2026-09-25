@@ -622,5 +622,22 @@ This log records every command and process executed during Round 1 tuning and ev
   - `AUDIT2.md`
   - `logs/ROUND1_TASKLOG.md`
 
+---
+
+### Step 29: Read-Only Code Reality Audit (Branch audit/code-reality)
+- **Start Time**: 2026-09-25 12:40:00 +05:30
+- **End Time**: 2026-09-25 13:12:00 +05:30
+- **Branch**: `audit/code-reality`
+- **Summary**:
+  1. Conducted rigorous read-only code reality audit treating active repository code as the sole ground truth.
+  2. Traced all 4 operational execution paths end-to-end with exact `file:line` citations (benchmark path, live app path, benchmark replay path, and standalone CSV logging path).
+  3. Audited warm-up and START button gating in Kotlin: proved START button is unconditionally enabled (`!isInBlackout`) regardless of mount lock (0/8 turns), leveling, or buffer warm-up.
+  4. Identified 5 critical architectural gaps: post-blackout exit heading error miscomputation (`hdg_seed_err`), disconnected Phase 6 handoff FSM and Hermite reconciler, missing low-speed crawl clamp, unused highway straight-line lock, and hardcoded benchmark strings / ghost hardware features.
+  5. Extracted all top-level classes and functions across 6 core modules, recorded script CLI flags, and conducted full pytest verification (125 collected, 123 passed, 1 failed on stale template literal regex, 1 skipped).
+  6. Generated comprehensive reference audit report `CODE_REALITY_REPORT.md` with complete "Claims to check" audit matrix.
+- **Log Paths**:
+  - `CODE_REALITY_REPORT.md`
+  - `logs/ROUND1_TASKLOG.md`
+
 
 
