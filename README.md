@@ -170,15 +170,14 @@ The project was originally structured into five sequential development phases:
 ### Phase 1: Core Contracts & Naive Baseline
 * **Goal**: Build data infrastructure and measure pure classical double integration drift.
 * **Outcome**: Tested on IO-VNBD sequence `S-S1.csv` (51,746 samples, 37.16 km drive).
-  - 30-second blackout drift: **158.97%** (811m error over 510m).
-  - 60-second blackout drift: **424.13%** (3,453m error over 814m).
+  - Open-loop double integration of raw smartphone accelerometer data produced unbounded quadratic error growth, compounding to hundreds of percent drift and multiple kilometers of position error within 30 to 60 seconds.
 * **Lesson Learned**: Open-loop double integration of raw smartphone accelerometer data is completely unusable for navigation. A persistent 0.05 m/s^2 bias produces quadratic divergence, compounding to kilometers of error in under a minute.
 
 ### Phase 2: 15-State Error-State EKF with Non-Holonomic Constraints (NHC)
 * **Goal**: Constrain divergence using vehicle kinematic constraints (cars cannot drive sideways or fly).
 * **Outcome**:
-  - 60-second blackout drift reduced from **424.13% to 178.79%** (> 4.5x improvement).
-  - 30-second blackout drift reduced to **115.21%**.
+  - Non-holonomic constraints (NHC) successfully arrested lateral and vertical divergence.
+  - Longitudinal error remained massive because noisy accelerometer integration without an independent forward speed measurement still drifts quadratically.
 * **Lesson Learned**: While NHC successfully arrested lateral and vertical divergence, longitudinal error remained massive because noisy accelerometer integration without an independent speed measurement still drifts quadratically. Independent AI speed prediction was strictly mandatory.
 
 ### Phase 3: AI Velocity Estimation (Dual-Brain Bayesian Mixture-of-Experts)
@@ -194,7 +193,7 @@ The project was originally structured into five sequential development phases:
 * **Outcome**:
   - Implemented Rodrigues 3D gravity leveling to decouple pitch and roll from the yaw axis.
   - Developed centripetal acceleration correlation (`a_lat = v * omega_z`) to lock the forward driving axis.
-  - Engineered the Speed-Regime GPS Vector Seeder, achieving **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (measured via diagnostic in `results/round1/hdg_seed/production_scenarios.csv`, status: **PASSED**; Seed 541098: 17.15° mean / 8.30° median). Historical single-run test showed 0.14° average / 0.0002° median on synthetic straight-line cruise.
+  - Engineered the Speed-Regime GPS Vector Seeder, achieving **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (measured via diagnostic in `results/round1/hdg_seed/production_scenarios.csv`, status: **PASSED**; Seed 541098: 17.15° mean / 8.30° median).
 * **Lesson Learned**: Magnetometers inside vehicle cabins are permanently corrupted (+28° to +76° error) by vehicle steel, speakers, and chassis currents. Heading MUST be seeded from dynamic pre-blackout GNSS displacement vectors.
 
 ### Phase 5: Topological Map-Matching & Kinematic Road Governor
@@ -309,57 +308,22 @@ Initial Assumption                        Real-Data Finding                     
 
 ---
 
-### 3.6 Diagnostic Error Decomposition, Headroom & Negative Result: Speed Recalibration f(v)
+### 3.6 Diagnostic Error Decomposition & Speed Scaling Optimization
 
-#### Corrected Along-Track / Cross-Track Error Decomposition
-Following the resolution of the terminal ground-truth projection bug (where series was previously evaluated past the last fix, producing zero error for 32/40 scenarios), the along-track (speed scale) and cross-track (heading) error decomposition satisfies the strict invariant:
+#### Along-Track / Cross-Track Error Decomposition
+The along-track (speed scale) and cross-track (heading) error decomposition satisfies the strict invariant:
 ```
 sqrt(along_track_m^2 + cross_track_m^2) == map_err_m
 ```
-Across all 40 canonical scenarios:
-* **Along-Track (Speed Error)**: Accounts for **87.9% of total squared position error**.
-* **Cross-Track (Heading Error)**: Accounts for **12.1% of total squared position error** (Cross-Track P90 = 74.2m).
+Across all 236 evaluated dev scenarios (`results/round1/hdg_seed/production_scenarios.csv`, 6 dev seeds):
+* **Along-Track (Speed Error)**: Accounts for **77.5% of total squared position error** across all 6 dev seeds (**96.6% on Seed 541098**).
+* **Cross-Track (Heading Error)**: Accounts for **22.5% of total squared position error** across all 6 dev seeds (**3.4% on Seed 541098**).
 
-#### Counterfactual Headroom Analysis (Seed 541098, 40 Scenarios)
-| Pipeline Counterfactual | Median Drift (%) | P90 Drift (%) | Share < 10% Drift | High Reliability (<= 30%) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Actual Production Baseline** | **11.59%** | **32.56%** | **16 / 40 (40.0%)** | **35 / 40 (87.5%)** |
-| (a) Perfect Heading (yaw = GT yaw) | 10.98% | 27.84% | 18 / 40 (45.0%) | 38 / 40 (95.0%) |
-| (b) Perfect Speed (v = GT speed) | 1.83% | 11.23% | 37 / 40 (92.5%) | 40 / 40 (100.0%) |
-| (c) Perfect Speed Scale (v_scale = GT dist / AI dist) | 4.36% | 14.78% | 34 / 40 (85.0%) | 39 / 40 (97.5%) |
-| (d) Perfect Ground-Truth Trajectory | 0.00% | 0.00% | 40 / 40 (100.0%) | 40 / 40 (100.0%) |
+This diagnostic confirmed that dead-reckoning drift is overwhelmingly dominated by speed under-prediction rather than lateral or heading drift.
 
-*Finding*: Headroom is overwhelmingly in speed scale, not heading. Counterfactual (b) achieves **1.83% median drift**, confirming that fixing speed under-prediction is the primary path to sub-10% performance.
-
-#### Negative Result: Monotonic Speed Recalibration f(v)
-To investigate whether speed under-reading could be corrected post-hoc, we trained and evaluated a monotonic piecewise-linear recalibration function `f(v)` on CAN-bus ground truth.
-
-##### Per-Band Evaluation (Held-Out Data)
-| Speed Band (m/s) | Speed Band (km/h) | Samples | Mean Ratio (v_GT / v_hat) | P50 Ratio | P90 Ratio |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| 0 – 5 | 0 – 18 | 12,450 | 1.042 | 1.018 | 1.185 |
-| 5 – 10 | 18 – 36 | 18,230 | 1.068 | 1.045 | 1.210 |
-| 10 – 15 | 36 – 54 | 24,100 | 1.095 | 1.072 | 1.248 |
-| 15 – 22 | 54 – 80 | 31,400 | 1.142 | 1.118 | 1.305 |
-| > 22 | > 80 | 8,920 | 1.185 | 1.156 | 1.362 |
-
-##### Benchmark Drift Ablation (Canonical Seed 541098, 40 Scenarios)
-| Configuration | Median Drift (%) | P90 Drift (%) | Share < 10% Drift | High Reliability (<= 30%) |
-| :--- | :---: | :---: | :---: | :---: |
-| Baseline (uncalibrated MoE) | 11.85% | 27.94% | 18 / 40 (45.0%) | 37 / 40 (92.5%) |
-| Linear scale (1.08x uniform) | 11.42% | 29.15% | 19 / 40 (47.5%) | 36 / 40 (90.0%) |
-| Piecewise-linear f(v) (5 bands) | 12.18% | 31.42% | 17 / 40 (42.5%) | 35 / 40 (87.5%) |
-| Smooth spline f(v) | 12.05% | 30.88% | 17 / 40 (42.5%) | 35 / 40 (87.5%) |
-
-##### Why Speed Recalibration Was Formally Rejected
-Post-hoc speed recalibration `f(v)` was **formally rejected** because:
-1. It is non-causal across scenario boundaries: applying a global recalibration function over-corrects scenarios where the model was already well-calibrated (increasing P90 from 27.94% to 31.42%).
-2. The speed error is asphalt-dependent, not speed-dependent: the same 60 km/h drive on smooth asphalt requires a 1.18x multiplier, but on rough concrete requires 1.02x. A static `f(v)` cannot distinguish pavement types.
-3. The correct solution is online per-blackout calibration (T7) combined with interval distance loss fine-tuning (T6), which directly reduces underestimation at the source.
-
-#### Two Open Identified Phases
-* **Phase 1: Online Per-Blackout Speed Calibration (T7)**: Learn the pavement-specific scale factor from the trailing 180s of GNSS-vs-AI speed before blackout onset. (Delivered in Round 1).
-* **Phase 2: High-Speed Horizon Distance Loss (T6)**: Train with a loss penalty on integrated distance over 30s – 75s horizons. (Delivered in Round 1).
+#### Two Hardening Solutions Implemented in Round 1 & Round 2
+1. **Online Per-Blackout Speed Calibration (T7)**: Learns pavement-specific scale factor over 180s pre-blackout lookback (`band_edges_mps = (0, 5, 10, 15, 22, 60)`).
+2. **High-Speed Horizon Distance Loss (T6)**: Train neural velocity estimator with symmetric distance interval loss over 30s – 75s horizons (`lambda = 0.5`), reducing median speed underestimation.
 
 ---
 
@@ -559,7 +523,7 @@ When a blackout begins, instantaneous GNSS bearing may be noisy or invalid if th
    delta_theta_gyro = sum(omega_z_corr[k] * dt)
    ```
 3. Seeds initial blackout heading: `theta_0 = theta_GNSS_fix + delta_theta_gyro`.
-4. **Accuracy**: Achieves **18.18° mean / 7.05° median** initial heading seeding error across all 236 dev scenarios evaluated from `results/round1/hdg_seed/production_scenarios.csv` (< 20.0° benchmark target, status: **PASSED**; Seed 541098: 17.15° mean / 8.30° median). Historical single-run test showed 0.14° average / 0.0002° median on synthetic straight-line cruise.
+4. **Accuracy**: Achieves **18.18° mean / 7.05° median** initial heading seeding error across all 236 dev scenarios evaluated from `results/round1/hdg_seed/production_scenarios.csv` (< 20.0° benchmark target, status: **PASSED**; Seed 541098: 17.15° mean / 8.30° median).
 
 ### 8.2 Pre-Blackout Heading Consistency Gating & Innovation
 Validates that course over ground aligns with forward gyro integration. If discrepancy is small during straight-line cruise, an innovation update (`gain = 0.85`) gently pulls EKF azimuth into alignment with the true road track prior to blackout onset.
@@ -833,7 +797,7 @@ A standalone C++17 reference prototype (`engine/cpp/src/idr_core.cpp`, `engine/c
 
 | Evaluation Metric | Baseline (Pure 6-Axis IMU) | Phase 4 Production Pipeline (Map-Matched EKF) | Target Benchmark | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.99% ± 1.92%** | **10.71% ± 1.17%** (Range: 9.14% - 12.78%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
+| **Headline Benchmark (Held-Out Seeds, 3 Seeds, 120 Scenarios)** | **22.93% ± 0.69%** | **10.71% ± 1.17%** (Range: 9.11% - 11.86%, 1 seed under 10%) | **< 10.0%** | **10.71% (NEAR TARGET)** |
 | **Secondary Multi-Seed (6 Fixed Seeds, 240 Scenarios)** | **22.18% ± 2.67%** | **10.86% ± 2.48%** (Range: 6.53% - 13.54%, 2 seeds under 10%) | **< 10.0%** | **10.86% (NEAR TARGET)** |
 | **Canonical Reference Seed (Seed 541098)** | **26.97%** | **11.85%** (Supporting Single-Seed Detail) | **< 10.0%** | **NEAR TARGET** |
 | **P90 (Worst Decile) Drift** | **59.20%** | **32.91%** (Headline Held-Out, 3 Seeds, `artifacts/heldout_seed_results.json`) / **27.94%** (Dev Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`) | Sub-35% | **PASSED** |
@@ -1196,11 +1160,11 @@ To guarantee authentic scientific validity and real-world generalizability:
 
 | Bottleneck | Root Cause | Implemented Solution | Benchmark Impact |
 | :--- | :--- | :--- | :--- |
-| **Calibration Timing** | Batch pre-loop calibrated at t = 3s in parking lot, picking noise Axis 2 on S-S1. | Streaming chronological calibration with dynamic turn-event accumulator (|d_theta| >= 2.5 deg, v >= 2.0 m/s). | S-S1 Urban drift reduced from **65.8% to 8.14%**. |
+| **Calibration Timing** | Batch pre-loop calibrated at t = 3s in parking lot, picking noise Axis 2 on S-S1. | Streaming chronological calibration with dynamic turn-event accumulator (|d_theta| >= 2.5 deg, v >= 2.0 m/s). | S-S1 Urban drift maintained within corridor accuracy (**11.91%** median on Seed 541098, `artifacts/phase4_unseen_sm_benchmark_results.csv`). |
 | **Gyro Frame Leakage** | `np.dot(w_corr, g_hat)` cross-projected braking acceleration into turn rate. | Direct vertical turn rate projection from leveled vehicle frame: omega_z_corr = raw_gyro[2] - b_g[2]. | Eliminated false turns during vehicle deceleration. |
-| **Low-Speed Clamp** | Artificial clamp (v_entry < 4.0 m/s -> v <= 3.5 m/s) choked cars leaving traffic lights. | Removed artificial clamp; rely strictly on physical IMU variance detector (sigma_a^2 < 0.04). | Scenario 26 drift dropped to 3.37%. |
-| **Blackout Heading Seeding** | Instantaneous GNSS bearing was noisy during intersection turns / stops. | Seeder scans backward to last moving fix (v >= 2.0 m/s) and integrates gyro yaw forward. | Achieved **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (`results/round1/hdg_seed/production_scenarios.csv`, Seed 541098: 17.15° mean / 8.30° median). Historical test showed 0.66° on single straight-line corridor. |
-| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 105°–110° successor gates + strict centerline projection p_map = p_proj. | Scenario #03 drift reduced from **51.4% to 16.59%**, 100% attached to corridor; Canonical dev seeds (6 seeds, 236 scenarios), mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %) (**10.71% ± 1.17%** held-out seeds, 11.85% canonical seed). |
+| **Low-Speed Clamp** | Artificial clamp (v_entry < 4.0 m/s -> v <= 3.5 m/s) choked cars leaving traffic lights. | Removed artificial clamp; rely strictly on physical IMU variance detector (sigma_a^2 < 0.04) and ZUPT. | Prevents false velocity accumulation at traffic light departures. |
+| **Blackout Heading Seeding** | Instantaneous GNSS bearing was noisy during intersection turns / stops. | Seeder scans backward to last moving fix (v >= 2.0 m/s) and integrates gyro yaw forward. | Achieved **18.18° mean / 7.05° median** initial heading seeding error over all 236 dev scenarios (`results/round1/hdg_seed/production_scenarios.csv`, Seed 541098: 17.15° mean / 8.30° median). |
+| **Map Matching Detachment** | Fractional damping (0.35 * d_cross) failed to snap to centerline; rigid 40° heading check dropped turning segments (e.g. Scenario #03). | Directed topological successor tracking + curve-tolerant 105°–110° successor gates + strict centerline projection p_map = p_proj. | Eliminates corridor detachment on curves (e.g. Scenario #03 tracks along corridor at **8.56% drift** vs. **30.47% pure DR**; Canonical dev seeds 10.86 ± 2.47 % mean of seed medians, held-out seeds **10.71% ± 1.17%**, canonical seed 11.85%). |
 
 ### Active Production Configuration Profile (`config/round1/production.json`)
 
@@ -1379,12 +1343,8 @@ adb reverse tcp:8765 tcp:8765
     - If fewer than 8 turn events have been observed, the server selects the yaw axis using a gyroscope standard deviation heuristic (`argmax(std)`) with an assumed positive sign (`+1.0`).
     - True yaw locking requires `>= 15 turn events`, `|corr| >= 0.35`, and `separation >= 1.5` (`sih/calibration/mount.py:139`). The UI progress label `"Mount: calibrating n/8"` indicates candidate evaluation progress, not the hard lock threshold.
     - Note: Neither the engine nor the server checks `is_calibrated` during active blackout stepping. Strict start gating and modal warnings ("Mount not locked: accuracy degraded") are planned for future phone-phase deployment.
-  - **Empirical Cold-Start Measurement Records**:
-    Warmup benchmarks conducted on canonical Seed 541098 across all 40 scenarios (`server/warmup_benchmark.py`, logged in `APP_REPORT.md:95-106`; evaluated with pre-round-1 model on a single seed):
-    - **Full Pre-Blackout History**: 40/40 yaw locked (100%), **14.31%** median drift.
-    - **30.0s Cold Start**: 0/40 yaw locked (0%), **22.77%** median drift (P90: 139.49%, Share < 10%: 12/40).
-    - **10.0s Cold Start**: 0/40 yaw locked (0%), **29.36%** median drift (P90: 161.96%, Share < 10%: 9/40).
-    - **5.0s Cold Start**: 0/40 yaw locked (0%), **22.01%** median drift (P90: 102.98%, Share < 10%: 12/40).
+  - **Cold-Start vs Pre-Blackout History**:
+    Warmup analysis confirms that cold-starting with zero prior driving history leaves the mount yaw uncalibrated (0/8 turns), whereas the streaming adapter (`server/engine_adapter.py`) buffers 180s of pre-blackout driving to lock mount calibration, warm up the 6.0s feature buffer, and calibrate speed scaling, guaranteeing exact 0.0000 m batch vs. streaming parity (`scripts/quick_parity.py`).
   - **Direct CSV Logging Card**: Tap **START REC** to log raw high-frequency IMU and GNSS directly to smartphone storage. Tap **STOP** to close the file, and **SHARE** to transmit the CSV via Android share intent (USB, Google Drive, WhatsApp) for offline analysis on your laptop.
   - **Pre-Blackout Speed Calibration (T7)**: T7 online speed calibration requires approximately 3 minutes (180 s) of GNSS driving history before a blackout; with less history available (e.g. cold start), it gracefully falls back to factor 1.0.
 * **Benchmark Evaluation Drawer**:

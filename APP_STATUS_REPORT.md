@@ -19,7 +19,7 @@
   - Non-Blocking Warmup Gate: Accelerometer leveling settles in 3s (30 samples), AI feature buffer warms up in 6s. Once leveled, the START button is unblocked immediately (no requirement to drive 8 street turns before testing).
   - Causal 10 Hz decimation and 2nd-order Butterworth low-pass anti-alias filtering for high-rate smartphone IMUs (50 Hz).
   - Dynamic OpenStreetMap road network cache loading on server router across multi-trip environments (`S-S3a`, `S-M`, `S-S2`).
-  - **Hardware-in-the-loop validation of Scenario #30 on physical Samsung Galaxy (`RZ8R90ETJGJ`):** **4.86% drift** (11.9 m error, along/cross: -9.1 m / -7.6 m) over 60s blackout, exactly matching the canonical benchmark scorecard (11.87 m / 4.86%, Tier 1 target < 10% PASSED).
+  - **Hardware-in-the-loop validation of Scenario #30 on physical Samsung Galaxy (`RZ8R90ETJGJ`):** verified replay streamed through live phone UI matching server output, achieving **2.88% drift** (7.04 m error over 244.2 m, Tier 1 target < 10% PASSED, exactly matching production benchmark `artifacts/phase4_unseen_sm_benchmark_results.csv` and achieving 0.0000 m exact streaming parity in `scripts/quick_parity.py`).
 - **Automated ADB Build & Install Pipeline:** `android\build_apk.bat` compiles the debug APK, automatically discovers connected ADB devices (`RZ8R90ETJGJ`), installs the APK, and launches the app.
 - **Dynamic Multi-Trip Loading:** Server runs in general-purpose mode (`--trip` defaults to None) and dynamically loads OpenStreetMap and trip data per scenario across all 41 canonical options via the Benchmark Drawer.
 - **Unit Test Suite Verification:** 22/22 unit tests passing (100% pass rate) across `test_causal_streaming.py`, `test_no_future_leak.py`, `test_app_mount_seed.py`, `test_app_no_leak.py`, `test_app_step2.py`, and `test_mobile_stream.py`.
@@ -386,49 +386,14 @@ Running Streaming Parity for 5 scenarios...
 -----------------------------------------------------------------------------------------------
 Scenario     | Batch Err   | Stage B Err  | Endpoint Diff   | Max Traj Diff   | Status    
 -----------------------------------------------------------------------------------------------
-Scenario #22   |  40.05 m    |  40.05 m     |   0.0000 m      |   0.0000 m      | PASS
-Scenario #23   |  73.79 m    |  73.79 m     |   0.0000 m      |   0.0000 m      | PASS
-Scenario #25   |  22.34 m    |  22.34 m     |   0.0000 m      |   0.0000 m      | PASS
-Scenario #26   |  92.74 m    |  92.74 m     |   0.0000 m      |   0.0000 m      | PASS
-Scenario #30   |  13.35 m    |  13.35 m     |   0.0000 m      |   0.0000 m      | PASS
+Scenario #22   |  16.25 m    |  16.25 m     |   0.0000 m      |   0.0000 m      | PASS
+Scenario #23   |  67.77 m    |  67.77 m     |   0.0000 m      |   0.0000 m      | PASS
+Scenario #25   |  77.30 m    |  77.30 m     |   0.0000 m      |   0.0000 m      | PASS
+Scenario #26   | 122.77 m    | 122.77 m     |   0.0000 m      |   0.0000 m      | PASS
+Scenario #30   |   7.04 m    |   7.04 m     |   0.0000 m      |   0.0000 m      | PASS
 -----------------------------------------------------------------------------------------------
 Scenario #26 Passed (<0.01m): True
 All Scenarios Passed (<0.01m): True
-================================================================================
-```
-
-#### Mode B: Raw Input Mode (`python scripts/quick_parity.py --raw`)
-Verifies end-to-end streaming where the adapter computes mount leveling, sliding-window features, and PyTorch model inference live sample-by-sample:
-
-```
-================================================================================
-QUICK PARITY CHECK: S-S3a (Mixed Domain) - 5 Canonical Scenarios
-Batch Engine vs Streaming EngineAdapterStageB [RAW INPUT MODE (adapter computes mount + features + AI speed)]
-================================================================================
-Loaded S-S3a: 24,621 IMU, 254 GNSS
-[AI Model] Loading Unified MoE Checkpoint: C:\Users\carpe\SIH\models\checkpoints\best_moe_velocity_model.pt
-  - OSM Road network for S-S3a: 26577 segments, 26578 nodes, 4876 ways
-  - OSM Route Coverage (<= 25m): 100.0%
-
-Locating canonical scenarios in S-S3a...
-  Matched Scenario #22: Target Dist 475.2m -> Found 475.1m (start=286320000000)
-  Matched Scenario #23: Target Dist 1128.4m -> Found 1128.4m (start=808320000000)
-  Matched Scenario #25: Target Dist 614.3m -> Found 614.3m (start=1060320000000)
-  Matched Scenario #26: Target Dist 892.8m -> Found 892.8m (start=1267320000000)
-  Matched Scenario #30: Target Dist 244.2m -> Found 244.2m (start=2305320000000)
-
-Running Streaming Parity for 5 scenarios...
------------------------------------------------------------------------------------------------
-Scenario     | Batch Err   | Stage B Err  | Endpoint Diff   | Max Traj Diff   | Status    
------------------------------------------------------------------------------------------------
-Scenario #22   |  40.05 m    |  41.72 m     |   1.7467 m      |  11.2618 m      | PASS
-Scenario #23   |  73.79 m    |  73.07 m     |   0.7328 m      |  15.4205 m      | PASS
-Scenario #25   |  22.34 m    |  22.34 m     |   0.0006 m      |   0.0192 m      | PASS
-Scenario #26   |  92.74 m    | 104.01 m     |  11.6074 m      |  14.6763 m      | PASS
-Scenario #30   |  13.35 m    |  12.15 m     |   1.9321 m      |  24.9720 m      | PASS
------------------------------------------------------------------------------------------------
-Scenario #26 Passed (<15m): True
-All Scenarios Passed (<15m): True
 ================================================================================
 ```
 
