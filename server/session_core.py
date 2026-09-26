@@ -531,6 +531,7 @@ class SessionCore:
             decimate_gnss_for_seeding=False,
             lock_saved_alignment=True,
             use_speed_smoother=self.use_speed_smoother,
+            predictor=self.predictor,
         )
         self.evaluator = LiveEvaluator(
             ref_lat=ref_lat,
@@ -563,6 +564,7 @@ class SessionCore:
             decimate_gnss_for_seeding=False,
             lock_saved_alignment=False,
             use_speed_smoother=self.use_speed_smoother,
+            predictor=self.predictor,
         )
         self.evaluator = LiveEvaluator(
             ref_lat=0.0,

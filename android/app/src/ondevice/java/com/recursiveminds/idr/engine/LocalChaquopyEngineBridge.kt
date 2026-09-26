@@ -12,17 +12,24 @@ import com.recursiveminds.idr.data.SensorBatch
 import com.recursiveminds.idr.inference.TFLitePredictorBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
 
 class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     private val gson = Gson()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var benchmarkJob: Job? = null
 
     // Dedicated single-thread worker for local dead reckoning engine execution
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "IDROnDeviceEngine") }
@@ -241,19 +248,114 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
     override fun prepareBenchmark(scenarioId: Int) {
         executor.execute {
             try {
-                // In on-device mode, benchmark data can be preloaded from assets
                 Log.i("PHONE", "Preparing benchmark scenario $scenarioId on-device")
+                val assetName = "scenario_${scenarioId}.json"
+                val hasAsset = try {
+                    context.assets.open(assetName).close()
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+                val filename = if (hasAsset) assetName else "smoke_test_60s.json"
+                val jsonStr = context.assets.open(filename).bufferedReader().use { it.readText() }
+                val root = JSONObject(jsonStr)
+                val refLat = root.optDouble("reference_lat_deg", 52.404877)
+                val refLon = root.optDouble("reference_lon_deg", -1.500284)
+                val refAlt = root.optDouble("reference_alt_m", 166.93)
+                val domain = root.optString("domain", "Mixed")
+                val tripName = root.optString("trip", "Scenario_${scenarioId}")
+
+                sessionCore?.callAttr(
+                    "setup_benchmark_engine",
+                    refLat, refLon, refAlt,
+                    null, // saved_alignment
+                    null, // road_network
+                    domain,
+                    scenarioId,
+                    tripName
+                )
+
+                val hudDict = sessionCore?.callAttr("get_hud")
+                if (hudDict != null && pyJson != null) {
+                    val hudJson = pyJson?.callAttr("dumps", hudDict).toString()
+                    val hud = gson.fromJson(hudJson, HudUpdate::class.java)
+                    scope.launch(Dispatchers.Main) {
+                        onHudUpdateListener?.invoke(hud)
+                    }
+                }
+                Log.i("PHONE", "Benchmark scenario $scenarioId prepared successfully")
             } catch (e: Throwable) {
-                Log.e("PHONE", "Failed to prepare benchmark: ${e.message}")
+                Log.e("PHONE", "Failed to prepare benchmark: ${e.message}", e)
             }
         }
     }
 
     override fun startBenchmark(scenarioId: Int, speed: Double) {
-        Log.i("PHONE", "Starting benchmark scenario $scenarioId on-device")
+        Log.i("PHONE", "Starting benchmark scenario $scenarioId on-device @ ${speed}x")
+        benchmarkJob?.cancel()
+        benchmarkJob = scope.launch(Dispatchers.IO) {
+            try {
+                val assetName = "scenario_${scenarioId}.json"
+                val hasAsset = try {
+                    context.assets.open(assetName).close()
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+                val filename = if (hasAsset) assetName else "smoke_test_60s.json"
+                val jsonStr = context.assets.open(filename).bufferedReader().use { it.readText() }
+                val root = JSONObject(jsonStr)
+                val batchesArray = root.getJSONArray("batches")
+                val nBatches = batchesArray.length()
+                val dtTargetMs = (100.0 / max(speed, 0.2)).toLong()
+
+                Log.i("PHONE", "Replaying $nBatches batches for scenario $scenarioId from $filename @ ${speed}x...")
+
+                for (i in 0 until nBatches) {
+                    if (!isActive) break
+                    val tStart = System.currentTimeMillis()
+                    val batchObj = batchesArray.getJSONObject(i)
+                    batchObj.put("source", "benchmark")
+                    val batchStr = batchObj.toString()
+
+                    val hudJson = executor.submit(Callable<String?> {
+                        val pj = pyJson ?: return@Callable null
+                        val sc = sessionCore ?: return@Callable null
+                        val batchDict = pj.callAttr("loads", batchStr)
+                        val hudDict = sc.callAttr("push_batch", batchDict, "benchmark")
+                        if (hudDict != null) pj.callAttr("dumps", hudDict).toString() else null
+                    }).get()
+
+                    if (hudJson != null) {
+                        try {
+                            val hud = gson.fromJson(hudJson, HudUpdate::class.java)
+                            withContext(Dispatchers.Main) {
+                                onHudUpdateListener?.invoke(hud)
+                            }
+                        } catch (de: Exception) {
+                            Log.e("PHONE", "Error parsing HUD update: ${de.message}")
+                        }
+                    }
+
+                    val elapsed = System.currentTimeMillis() - tStart
+                    val sleepMs = max(0L, dtTargetMs - elapsed)
+                    if (sleepMs > 0) {
+                        delay(sleepMs)
+                    }
+                }
+                Log.i("PHONE", "Scenario $scenarioId replay completed on-device.")
+            } catch (e: Throwable) {
+                Log.e("PHONE", "Benchmark replay failed: ${e.message}", e)
+            }
+        }
     }
 
     override fun stopBenchmark() {
         Log.i("PHONE", "Stopping benchmark on-device")
+        benchmarkJob?.cancel()
+        benchmarkJob = null
+        executor.execute {
+            sessionCore?.callAttr("deload_benchmark")
+        }
     }
 }
