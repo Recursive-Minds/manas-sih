@@ -8,8 +8,9 @@ from the streaming dead reckoning engine adapter and offline evaluation harnesse
 
 from __future__ import annotations
 import os
+import time
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union, Any
+from typing import Optional, Tuple, Union, Any, Dict
 import numpy as np
 
 
@@ -168,25 +169,67 @@ class JavaBridgeVelocityPredictor(VelocityPredictor):
     via Chaquopy's Java reflection.
     """
 
-    def __init__(self, java_bridge: Any) -> None:
+    def __init__(self, java_bridge: Any, use_bytes: bool = True) -> None:
         self.bridge = java_bridge
+        self.use_bytes = use_bytes and hasattr(java_bridge, "predictWindowBytes")
+        self.reset_stats()
+
+    def reset_stats(self) -> None:
+        self.stats = {
+            "calls": 0,
+            "py_prep_ms": 0.0,
+            "bridge_call_ms": 0.0,
+            "py_unpack_ms": 0.0,
+            "total_ms": 0.0,
+        }
+        if hasattr(self.bridge, "resetTiming"):
+            try:
+                self.bridge.resetTiming()
+            except Exception:
+                pass
 
     def predict_window(self, x_short: np.ndarray, x_long: np.ndarray) -> Tuple[float, float]:
+        t0 = time.perf_counter_ns()
         if x_short.ndim == 3:
             x_short = x_short[0]
         if x_long.ndim == 3:
             x_long = x_long[0]
 
-        s_flat = np.ascontiguousarray(x_short, dtype=np.float32).flatten()
-        l_flat = np.ascontiguousarray(x_long, dtype=np.float32).flatten()
+        s_arr = np.ascontiguousarray(x_short, dtype=np.float32)
+        l_arr = np.ascontiguousarray(x_long, dtype=np.float32)
 
-        try:
-            from jarray import array
-            res = self.bridge.predictWindow(array(s_flat.tolist(), "f"), array(l_flat.tolist(), "f"))
-        except Exception:
-            res = self.bridge.predictWindow(s_flat.tolist(), l_flat.tolist())
+        if self.use_bytes and hasattr(self.bridge, "predictWindowBytes"):
+            s_bytes = s_arr.tobytes()
+            l_bytes = l_arr.tobytes()
+            t1 = time.perf_counter_ns()
+            res = self.bridge.predictWindowBytes(s_bytes, l_bytes)
+            t2 = time.perf_counter_ns()
+            v = float(res[0])
+            var_val = float(res[1])
+            t3 = time.perf_counter_ns()
+        else:
+            s_flat = s_arr.flatten()
+            l_flat = l_arr.flatten()
+            s_list = s_flat.tolist()
+            l_list = l_flat.tolist()
+            t1 = time.perf_counter_ns()
+            try:
+                from jarray import array
+                res = self.bridge.predictWindow(array(s_list, "f"), array(l_list, "f"))
+            except Exception:
+                res = self.bridge.predictWindow(s_list, l_list)
+            t2 = time.perf_counter_ns()
+            v = float(res[0])
+            var_val = float(res[1])
+            t3 = time.perf_counter_ns()
 
-        return float(res[0]), float(res[1])
+        self.stats["calls"] += 1
+        self.stats["py_prep_ms"] += (t1 - t0) / 1e6
+        self.stats["bridge_call_ms"] += (t2 - t1) / 1e6
+        self.stats["py_unpack_ms"] += (t3 - t2) / 1e6
+        self.stats["total_ms"] += (t3 - t0) / 1e6
+
+        return v, var_val
 
     def predict_batch(self, x_short: np.ndarray, x_long: np.ndarray) -> np.ndarray:
         N = len(x_short)
@@ -238,3 +281,25 @@ def create_predictor(
 
     else:
         raise ValueError(f"Unknown predictor kind: {kind}. Expected 'torch', 'onnx', 'tflite', or 'java'.")
+
+
+def benchmark_bridge(predictor: VelocityPredictor, n: int = 600) -> Dict[str, float]:
+    """Runs n forward passes to benchmark bridge overhead and interpreter latency."""
+    np.random.seed(42)
+    x_s = np.random.randn(n, 12, 20).astype(np.float32)
+    x_l = np.random.randn(n, 12, 60).astype(np.float32)
+    if hasattr(predictor, "reset_stats"):
+        predictor.reset_stats()
+    for i in range(n):
+        predictor.predict_window(x_s[i], x_l[i])
+    if hasattr(predictor, "stats"):
+        s = predictor.stats.copy()
+        n_calls = max(1, s["calls"])
+        return {
+            "calls": float(n_calls),
+            "py_prep_ms": float(s["py_prep_ms"] / n_calls),
+            "bridge_call_ms": float(s["bridge_call_ms"] / n_calls),
+            "py_unpack_ms": float(s["py_unpack_ms"] / n_calls),
+            "total_ms": float(s["total_ms"] / n_calls),
+        }
+    return {}
