@@ -62,7 +62,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 
 | Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT (both paths); causal speed smoothing (live path only) |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT (both paths); causal speed smoothing (CausalSpeedSmoother, both batch and live) |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | 26 | **12.00%** | 22.48% | 11 / 26 | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | 7 | **8.62%** | 28.58% | 4 / 7 | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 

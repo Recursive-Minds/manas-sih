@@ -335,7 +335,7 @@ The table below catalogs all 20 real-world physical failure modes identified dur
 
 | # | Physical Failure Mode | Root Cause | Hardening Solution Implemented | Verification Evidence |
 | :-: | :--- | :--- | :--- | :--- |
-| 1 | **Stationary Crawl Drift** | Engine idle vibrations simulate forward motion during red lights. (Note: Low-Speed Crawl Clamping was a design proposal not in code). | Physical Rest ZUPT (both paths) clamps velocity to 0.0 m/s when accel variance < 0.04 and gyro norm < 0.04 rad/s; causal speed smoothing (live path only) dampens noise. | Scenario #26 drift dropped to 3.37%. |
+| 1 | **Stationary Crawl Drift** | Engine idle vibrations simulate forward motion during red lights. (Note: Low-Speed Crawl Clamping was a design proposal not in code). | Physical Rest ZUPT (both paths) clamps velocity to 0.0 m/s when accel variance < 0.04 and gyro norm < 0.04 rad/s; causal speed smoothing (CausalSpeedSmoother, both batch and live) dampens noise. | Scenario #26 drift dropped to 3.37%. |
 | 2 | **Cabin Magnetic Corruption** | Vehicle steel frames and electronics distort compass heading by +28° to +76°. | Speed-regime GNSS displacement vector seeder bypasses magnetometer entirely. | Initial heading error cut to **18.18° mean / 7.05° median** over all 236 dev scenarios (`results/round1/hdg_seed/production_scenarios.csv`). |
 | 3 | **9-Second GPS Stair-Step** | Smartphone GPS internal filters introduce 9s delay during speed changes. | Ground-truth supervision shifted to 10 Hz vehicle CAN-bus wheel speeds with validated offsets. | MoE validation RMSE 1.46 m/s; sum(v_hat)/sum(v_GT) = 1.00. |
 | 4 | **1.3s Causal Filter Lag** | Rolling window buffers (2.0s – 6.0s) delay braking detection. | Kinematic Delta-v Speed Observer integrates 10 Hz longitudinal accel with neural bounding. | Zero phase lag on braking transients (|a_x| >= 0.35 m/s^2). |
@@ -843,7 +843,7 @@ To isolate how velocity estimation errors translate to endpoint position drift a
 
 | Velocity Regime | Mean Speed Range | Scenario Count | Map-Matched Median Drift | Pure DR Median Drift | Passes < 10% Drift | Position Error Dynamics |
 | :--- | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT (both paths); causal speed smoothing (live path only) |
+| **Low Speed / Traffic Crawl** | < 20 km/h (< 5.56 m/s) | 7 | **10.68%** | 36.54% | 3 / 7 | ZUPT (both paths); causal speed smoothing (CausalSpeedSmoother, both batch and live) |
 | **Arterial / Urban Cruising** | 20 – 50 km/h (5.56 – 13.89 m/s) | 26 | **12.00%** | 22.48% | 11 / 26 | Kinematic NHC constraints and map matching hold lane alignment |
 | **Highway High-Speed Cruise** | > 50 km/h (> 13.89 m/s) | 7 | **8.62%** | 28.58% | 4 / 7 | Pre-blackout dynamic scale anchoring compensates for open-loop scale loss |
 

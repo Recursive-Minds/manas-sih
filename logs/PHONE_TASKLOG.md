@@ -118,4 +118,35 @@ This log records every command and process executed during the On-Device Phone P
   6. Repo-wide `pytest`:
      - Result: 133 passed, 1 skipped.
 
+---
+
+### Step 1: Docs Fix, Decoupled SessionCore, and Clean Scenarios
+- **Timestamp**: 2026-09-26 12:00:00 +05:30
+- **Branch**: `phone/s1-core` (branched from `phone-s0`)
+- **Key Changes**:
+  1. **Step 1.0 Docs Fix**:
+     - Clarified that `CausalSpeedSmoother` runs in BOTH batch (`predict_velocities apply_smoothing=True`) and live paths (`EngineAdapterStageB use_speed_smoother=True`).
+     - Replaced "causal speed smoothing (live path only)" with "causal speed smoothing (CausalSpeedSmoother, both batch and live)" across `FINAL_JUDGE_EVALUATION_REPORT.md`, `FINAL_JUDGE_EVALUATION_REPORT.html`, `benchmarks/run_final_benchmark.py`, `README.md`, `SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md`, and added correction note in `CODE_REALITY_REPORT.md`.
+     - Doc audits (`check_number_registry.py`, `check_links.py`, `check_latex.py`) all passed 100%.
+  2. **Step 1.1 Decoupled SessionCore (`server/session_core.py`)**:
+     - Extracted pure session orchestrator handling state machine (`WARMING_UP` <-> `BLACKOUT`), GNSS firewall, benchmark firewall, IMU/GNSS batch ingestion, and evaluator tracking.
+     - Implemented lazy module loaders in `sih/__init__.py`, `sih/data/__init__.py`, and `sih/models/__init__.py` to prevent eagerly loading `pandas`, `pyarrow`, `tqdm`, or `dill`.
+     - `SessionCore` has ZERO imports of `aiohttp`, `server.replay`, `pandas`, `tqdm`, or `dill`.
+     - Refactored `server/router.py` to delegate all session management to `SessionCore`.
+  3. **Step 1.2 SessionCore Verification Suite (`tests/test_app_session_core.py`)**:
+     - Verified import isolation: importing `server.session_core` loads zero forbidden modules (`aiohttp`, `pandas`, `tqdm`, `dill`, `server.replay`).
+     - Verified batch replay bit-identity across 60 batches against `NavigationRouter`.
+     - Verified control commands (`start_blackout`, `stop_blackout`, `reset`).
+  4. **Step 1.3 Removed Hardcoded Drift Numbers**:
+     - Removed hardcoded fallback #30 with result literal from `server/router.py`.
+     - Bundled `server/scenarios_canonical.json` into `android/app/src/main/assets/scenarios_canonical.json`.
+     - Updated Android Kotlin `MainActivity.kt` to load scenarios dynamically from assets and `/api/scenarios`, stripping all hardcoded drift literals.
+  5. **Step 1.4 Verification**:
+     - Repo-wide `pytest`: 135 passed, 1 skipped.
+     - `python scripts/quick_parity.py`: 5/5 passed (exact 0.0000 m).
+     - `python scripts/quick_parity.py --raw --cpu`: 5/5 passed (exact 0.0000 m, max speed diff <= 5e-6 m/s).
+     - `python scripts/round1_eval.py --assert-parity`: PARITY PASS (5.68e-14 m <= 1e-9 m).
+     - Android `compileDebugSources`: 0 errors.
+
+
 

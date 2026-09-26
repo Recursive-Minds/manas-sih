@@ -29,10 +29,9 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from sih.core.contracts import IMUSample, GNSSSample
+from sih.core.contracts import GNSSSample
 from sih.calibration.mount import MountAlignment
-from server.engine_adapter import EngineAdapterStageA, EngineAdapterStageB
-from server.evaluator import LiveEvaluator
+from server.session_core import SessionCore
 
 
 def load_scenarios_meta() -> List[Dict[str, Any]]:
@@ -46,7 +45,6 @@ def load_scenarios_meta() -> List[Dict[str, Any]]:
             "duration_s": 0.0,
             "distance_m": 0.0,
             "target_drift_pct": 10.0,
-            "benchmark_drift_pct": 0.0,
             "split": "Held-Out Verification",
         }
     ]
@@ -60,33 +58,18 @@ def load_scenarios_meta() -> List[Dict[str, Any]]:
                 dom = str(sc["domain"])
                 dur = int(sc["duration_s"])
                 dist = float(sc["gt_dist_m"])
-                drift = float(sc.get("drift_osm", 0.0))
-                status = "PASS" if drift < 10.0 else "FAIL"
                 metas.append({
                     "id": sid,
                     "trip": trip,
-                    "name": f"Scenario #{sid:02d}: {dom} ({trip}, {dur}s, {dist:.0f}m) - {drift:.1f}% Drift [{status}]",
+                    "name": f"Scenario #{sid:02d}: {dom} ({trip}, {dur}s, {dist:.0f}m)",
                     "env": dom,
                     "duration_s": float(dur),
                     "distance_m": float(dist),
                     "target_drift_pct": 10.0,
-                    "benchmark_drift_pct": float(drift),
                     "split": "Held-Out 20% / Unseen Trip",
                 })
         except Exception as e:
             print(f"[Router] Failed loading scenarios_canonical.json: {e}")
-    else:
-        metas.append({
-            "id": 30,
-            "trip": "S-S3a",
-            "name": "Scenario #30: Urban Mixed (S-S3a, 60s) - 5.5% Drift [PASS]",
-            "env": "Mixed",
-            "duration_s": 60.0,
-            "distance_m": 244.2,
-            "target_drift_pct": 10.0,
-            "benchmark_drift_pct": 5.44,
-            "split": "Held-Out Unseen Test Drive",
-        })
     return metas
 
 
@@ -104,135 +87,65 @@ class NavigationRouter:
         domain: str = "Mixed",
         engine_type: str = "stage_b",
     ) -> None:
-        self.ref_lat = ref_lat
-        self.ref_lon = ref_lon
-        self.ref_alt = ref_alt
-        self.saved_alignment = saved_alignment
-        self.road_network = road_network
-        self.domain = domain
-        self.engine_type = engine_type
-
-        # Load unified MoE AI velocity model
-        try:
-            import torch
-            from sih.models.inference import load_ai_model
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.ai_model, self.norm_mean, self.norm_std, _ = load_ai_model(self.device)
-            print(f"[Router] AI Model successfully loaded onto {self.device}")
-        except Exception as e:
-            print(f"[Router Warning] Failed to load AI model: {e}")
-            self.ai_model, self.norm_mean, self.norm_std, self.device = None, None, None, None
-
-        if engine_type == "stage_a":
-            self.engine = EngineAdapterStageA(
-                reference_lat_deg=ref_lat,
-                reference_lon_deg=ref_lon,
-                reference_alt_m=ref_alt,
-                saved_alignment=saved_alignment,
-            )
-        else:
-            self.engine = EngineAdapterStageB(
-                reference_lat_deg=ref_lat,
-                reference_lon_deg=ref_lon,
-                reference_alt_m=ref_alt,
-                road_network=road_network,
-                saved_alignment=saved_alignment,
-                domain=domain,
-                model=self.ai_model,
-                norm_mean=self.norm_mean,
-                norm_std=self.norm_std,
-                device=self.device,
-                decimate_gnss_for_seeding=False,
-                lock_saved_alignment=(saved_alignment is not None),
-            )
-        self.evaluator = LiveEvaluator(
+        self.core = SessionCore(
             ref_lat=ref_lat,
             ref_lon=ref_lon,
             ref_alt=ref_alt,
+            saved_alignment=saved_alignment,
+            road_network=road_network,
+            domain=domain,
+            engine_type=engine_type,
+            use_speed_smoother=True,
         )
-        self.state: str = "WARMING_UP"
+
         self.client_websockets: Set[web.WebSocketResponse] = set()
         self.stream_websockets: Set[web.WebSocketResponse] = set()
-        self.last_replay_time: float = 0.0
-        self.is_preloaded_trip: bool = (saved_alignment is not None or road_network is not None)
-
-        # Dedicated Benchmark Evaluation State
-        self.benchmark_active: bool = False
         self.benchmark_task: Optional[asyncio.Task] = None
-        self.current_benchmark_scenario: Optional[int] = None
         self.loaded_trip: Any = None
-        self.current_trip_name: str = ""
+
+    @property
+    def engine(self):
+        return self.core.engine
+
+    @property
+    def evaluator(self):
+        return self.core.evaluator
+
+    @property
+    def state(self) -> str:
+        return self.core.state
+
+    @property
+    def benchmark_active(self) -> bool:
+        return self.core.benchmark_active
+
+    @property
+    def current_benchmark_scenario(self) -> Optional[int]:
+        return self.core.current_benchmark_scenario
+
+    @property
+    def current_trip_name(self) -> str:
+        return self.core.current_trip_name
 
     def set_blackout(self, active: bool = True, entry_gnss: Optional[GNSSSample] = None) -> None:
-        self.state = "BLACKOUT" if active else "WARMING_UP"
-        print(f"[Router] State transition -> {self.state}")
-        self.engine.set_blackout(active, entry_gnss=entry_gnss)
-        if active:
-            self.evaluator.start_blackout(timestamp_ns=entry_gnss.timestamp_ns if entry_gnss else None)
-        else:
-            self.evaluator.stop_blackout()
+        self.core.set_blackout(active, entry_gnss=entry_gnss)
 
     def reset(self, clear_trip: bool = False) -> None:
-        self.state = "WARMING_UP"
-        self.benchmark_active = False
-        self.is_preloaded_trip = False
-        self.current_benchmark_scenario = None
+        self.core.reset(clear_trip=clear_trip)
         if clear_trip:
             self.loaded_trip = None
-            self.current_trip_name = ""
-            self.ref_lat = 0.0
-            self.ref_lon = 0.0
-            self.ref_alt = 0.0
-            self.evaluator.reset(keep_ref=False)
-        else:
-            self.evaluator.reset(keep_ref=(self.ref_lat != 0.0 or self.ref_lon != 0.0))
-        self.engine.reset()
 
     async def broadcast_hud(self) -> None:
         recipients = list(self.client_websockets | self.stream_websockets)
         if not recipients:
             return
 
-        latest_dr = self.engine.latest_fused_position
-        latest_gnss = self.evaluator.gnss_fixes[-1] if self.evaluator.gnss_fixes else None
-
-        dr_dict = None
-        if latest_dr is not None:
-            dr_dict = {
-                "lat": float(latest_dr.latitude_deg),
-                "lon": float(latest_dr.longitude_deg),
-                "speed_mps": round(float(self.evaluator.latest_metrics.dr_speed_mps), 2),
-                "heading_deg": round(float(self.evaluator.latest_metrics.dr_heading_deg), 1),
-            }
-
-        gnss_dict = None
-        if latest_gnss is not None:
-            gnss_dict = {
-                "lat": float(latest_gnss.latitude_deg),
-                "lon": float(latest_gnss.longitude_deg),
-                "speed_mps": round(float(latest_gnss.speed_mps or 0.0), 2),
-                "bearing_deg": round(float(latest_gnss.bearing_deg or 0.0), 1),
-            }
-
-        msg = {
-            "type": "hud_update",
-            "state": self.state,
-            "benchmark_active": self.benchmark_active,
-            "benchmark_scenario": self.current_benchmark_scenario,
-            "mount_status": self.engine.get_mount_status(),
-            "warmup": self.engine.get_warmup_status(),
-            "dr_pos": dr_dict,
-            "gnss_pos": gnss_dict,
-            "metrics": self.evaluator.get_summary_dict(),
-        }
-        payload = json.dumps(msg)
-
+        payload = json.dumps(self.core.get_hud())
         to_remove = set()
         for ws in recipients:
             try:
                 await ws.send_str(payload)
-            except Exception as e:
-                print(f"[WebSocket Error]: {e}")
+            except Exception:
                 to_remove.add(ws)
         self.client_websockets.difference_update(to_remove)
         self.stream_websockets.difference_update(to_remove)
@@ -241,71 +154,12 @@ class NavigationRouter:
         """
         Processes a single sensor batch JSON received from phone or replay.
         """
-        source = batch_data.get("source", "device")
-
-        # CRITICAL FIREWALL: While benchmark is active, strictly drop non-benchmark batches
-        if self.benchmark_active and source != "benchmark":
-            return
-
-        # When evaluating preloaded benchmark trip outside benchmark mode, drop local desk phone
-        if self.is_preloaded_trip and not self.benchmark_active and source not in ("benchmark", "replay"):
-            return
-
-        now = time.time()
-        if source == "replay":
-            if (now - self.last_replay_time) > 8.0:
-                print("[Router] New replay session detected. Auto-resetting for clean run.")
-                self.reset()
-            self.last_replay_time = now
-
-        # 1. Ingest GNSS samples if present
-        gnss_list = batch_data.get("gnss", [])
-        latest_g_in_batch = None
-        for g_dict in gnss_list:
-            gnss = GNSSSample(
-                timestamp_ns=int(g_dict["timestamp_ns"]),
-                latitude_deg=float(g_dict["latitude_deg"]),
-                longitude_deg=float(g_dict["longitude_deg"]),
-                altitude_m=float(g_dict.get("altitude_m", 0.0)),
-                speed_mps=float(g_dict["speed_mps"]) if g_dict.get("speed_mps") is not None else None,
-                bearing_deg=float(g_dict["bearing_deg"]) if g_dict.get("bearing_deg") is not None else None,
-                accuracy_h_m=float(g_dict.get("accuracy_h_m", 5.0)),
-                is_valid=bool(g_dict.get("is_valid", True)),
-            )
-            self.evaluator.on_gnss(gnss)
-
-            if self.state == "WARMING_UP":
-                self.engine.on_gnss(gnss)
-            latest_g_in_batch = gnss
-
-        # 2. State transition evaluation
-        if "state" in batch_data:
-            req_state = batch_data["state"]
-            if req_state in ("WARMING_UP", "BLACKOUT") and req_state != self.state:
-                entry_g = latest_g_in_batch or (self.evaluator.gnss_fixes[-1] if self.evaluator.gnss_fixes else None)
-                self.set_blackout(req_state == "BLACKOUT", entry_gnss=entry_g)
-
-        # 3. Ingest IMU samples
-        imu_list = batch_data.get("imu", [])
-        for im_dict in imu_list:
-            acc = im_dict["accel"]
-            gyr = im_dict["gyro"]
-            imu = IMUSample(
-                timestamp_ns=int(im_dict["timestamp_ns"]),
-                accel=np.array([float(acc[0]), float(acc[1]), float(acc[2])], dtype=np.float64),
-                gyro=np.array([float(gyr[0]), float(gyr[1]), float(gyr[2])], dtype=np.float64),
-            )
-            fused = self.engine.on_imu(imu)
-            if fused is not None:
-                self.evaluator.on_dr(fused)
-
-        # 4. Broadcast updated HUD state to phone and web dashboard
+        self.core.push_batch(batch_data)
         await self.broadcast_hud()
 
     async def prepare_benchmark(self, scenario_id: int = 30) -> Dict[str, Any]:
         """
         Preloads scenario trip, road network, and alignment when benchmark suite is opened.
-        Immediately activates benchmark warmup ticks ('✓ Bench-Calib', '✓ Gravity', etc.).
         """
         if scenario_id <= 0:
             import random
@@ -325,14 +179,10 @@ class NavigationRouter:
         from sih.map.network import load_trip_road_network
         from sih.calibration.mount import MountCalibrator
 
-        if self.current_trip_name != trip_name or self.loaded_trip is None:
+        if self.core.current_trip_name != trip_name or self.loaded_trip is None:
             print(f"[Benchmark] Preloading trip {trip_name} and OSM road network for Scenario #{scenario_id}...")
             t = load_any_trip(trip_path)
             self.loaded_trip = t
-            self.current_trip_name = trip_name
-            self.ref_lat = t.reference_lat_deg
-            self.ref_lon = t.reference_lon_deg
-            self.ref_alt = 0.0
 
             calib_m = MountCalibrator(min_samples=30)
             idx_g = 0
@@ -342,33 +192,24 @@ class NavigationRouter:
                     calib_m.observe_gnss(t.gnss_samples[idx_g])
                     idx_g += 1
                 calib_m.update(im)
-            self.saved_alignment = calib_m.alignment
-            self.road_network, _ = load_trip_road_network(t, map_source="osm", cache_dir="data/maps/cache")
+            saved_alignment = calib_m.alignment
+            road_network, _ = load_trip_road_network(t, map_source="osm", cache_dir="data/maps/cache")
+            trip_domain = "Mixed" if "S-S3" in trip_name else ("Highway" if "S-M" in trip_name else "Arterial")
 
-        trip_domain = "Mixed" if "S-S3" in trip_name else ("Highway" if "S-M" in trip_name else "Arterial")
-        self.engine = EngineAdapterStageB(
-            reference_lat_deg=self.ref_lat,
-            reference_lon_deg=self.ref_lon,
-            reference_alt_m=self.ref_alt,
-            road_network=self.road_network,
-            saved_alignment=self.saved_alignment,
-            domain=trip_domain,
-            model=self.ai_model,
-            norm_mean=self.norm_mean,
-            norm_std=self.norm_std,
-            device=self.device,
-            decimate_gnss_for_seeding=False,
-            lock_saved_alignment=True,
-        )
-        self.evaluator = LiveEvaluator(
-            ref_lat=self.ref_lat,
-            ref_lon=self.ref_lon,
-            ref_alt=self.ref_alt,
-        )
+            self.core.setup_benchmark_engine(
+                ref_lat=t.reference_lat_deg,
+                ref_lon=t.reference_lon_deg,
+                ref_alt=0.0,
+                saved_alignment=saved_alignment,
+                road_network=road_network,
+                domain=trip_domain,
+                scenario_id=scenario_id,
+                trip_name=trip_name,
+            )
+        else:
+            self.core.current_benchmark_scenario = scenario_id
+            self.core.benchmark_active = True
 
-        self.benchmark_active = True
-        self.is_preloaded_trip = True
-        self.current_benchmark_scenario = scenario_id
         await self.broadcast_hud()
         return {"status": "ok", "scenario_id": scenario_id, "trip": trip_name}
 
@@ -403,24 +244,22 @@ class NavigationRouter:
                 calib_sc.observe_gnss(self.loaded_trip.gnss_samples[idx_g])
                 idx_g += 1
             calib_sc.update(im)
-        align_to_use = calib_sc.alignment if (calib_sc.alignment and calib_sc.alignment.is_calibrated) else self.saved_alignment
+        align_to_use = calib_sc.alignment if (calib_sc.alignment and calib_sc.alignment.is_calibrated) else self.core.saved_alignment
 
-        # Clean reset of engine and evaluator for replay, PRESERVING identical reference coords
-        self.engine.saved_alignment = align_to_use
-        self.engine.reset()
+        self.core.engine.saved_alignment = align_to_use
+        self.core.engine.reset()
         if align_to_use is not None and align_to_use.is_calibrated:
-            self.engine.calibrator._alignment = align_to_use
-            self.engine.calibrator._yaw_locked = True
-            self.engine.mount_reused = True
+            self.core.engine.calibrator._alignment = align_to_use
+            self.core.engine.calibrator._yaw_locked = True
+            self.core.engine.mount_reused = True
 
-        self.evaluator.reset(keep_ref=True)
-        self.evaluator.set_reference(self.ref_lat, self.ref_lon, self.ref_alt)
-        self.state = "WARMING_UP"
+        self.core.evaluator.reset(keep_ref=True)
+        self.core.evaluator.set_reference(self.core.ref_lat, self.core.ref_lon, self.core.ref_alt)
+        self.core.state = "WARMING_UP"
 
-        # Seed initial EKF fix from the first valid sample in the warm-up window
         valid_gnss = [g for g in sliced_trip.gnss_samples if g.is_valid]
-        if valid_gnss and hasattr(self.engine, "session"):
-            self.engine.session.init_from_gnss(valid_gnss[0])
+        if valid_gnss and hasattr(self.core.engine, "session"):
+            self.core.engine.session.init_from_gnss(valid_gnss[0])
 
         batches = build_sensor_batches(
             trip=sliced_trip,
@@ -433,8 +272,8 @@ class NavigationRouter:
         for b in batches:
             b["source"] = "benchmark"
 
-        self.benchmark_active = True
-        self.current_benchmark_scenario = scenario_id
+        self.core.benchmark_active = True
+        self.core.current_benchmark_scenario = scenario_id
         self.benchmark_task = asyncio.create_task(self._run_benchmark_loop(batches, speed))
         return {
             "status": "ok",
@@ -446,7 +285,7 @@ class NavigationRouter:
 
     async def _run_benchmark_loop(self, batches: List[Dict[str, Any]], speed: float) -> None:
         try:
-            print(f"[Benchmark] Replaying Scenario #{self.current_benchmark_scenario} ({len(batches)} batches @ {speed}x)...")
+            print(f"[Benchmark] Replaying Scenario #{self.core.current_benchmark_scenario} ({len(batches)} batches @ {speed}x)...")
             t_prev = time.time()
             for b_idx, batch in enumerate(batches):
                 await self.process_batch(batch)
@@ -459,52 +298,27 @@ class NavigationRouter:
                     t_prev = time.time()
                 if b_idx % 50 == 0 or b_idx == len(batches) - 1:
                     print(f"  [Benchmark] Progress: {b_idx + 1}/{len(batches)} ({batch['state']})")
-            print(f"[Benchmark] Scenario #{self.current_benchmark_scenario} replay finished successfully.")
+            print(f"[Benchmark] Scenario #{self.core.current_benchmark_scenario} replay finished successfully.")
         except asyncio.CancelledError:
             print(f"[Benchmark] Scenario replay cancelled.")
         except Exception as e:
             print(f"[Benchmark Error]: {e}")
         finally:
-            if self.state == "BLACKOUT":
-                self.set_blackout(False)
-            self.benchmark_active = False
-            self.is_preloaded_trip = False
-            self.current_benchmark_scenario = None
+            if self.core.state == "BLACKOUT":
+                self.core.set_blackout(False)
+            self.core.benchmark_active = False
+            self.core.is_preloaded_trip = False
+            self.core.current_benchmark_scenario = None
             await self.broadcast_hud()
 
     async def stop_benchmark(self) -> Dict[str, Any]:
         if self.benchmark_task and not self.benchmark_task.done():
             self.benchmark_task.cancel()
-        self.benchmark_active = False
-        self.is_preloaded_trip = False
-        self.current_benchmark_scenario = None
-        self.current_trip_name = ""
-        self.ref_lat = 0.0
-        self.ref_lon = 0.0
-        self.ref_alt = 0.0
-        # Deload benchmark: restore engine back to live mode with unlocked saved alignment
-        self.engine = EngineAdapterStageB(
-            reference_lat_deg=0.0,
-            reference_lon_deg=0.0,
-            reference_alt_m=0.0,
-            road_network=None,
-            saved_alignment=None,
-            domain="Mixed",
-            model=self.ai_model,
-            norm_mean=self.norm_mean,
-            norm_std=self.norm_std,
-            device=self.device,
-            decimate_gnss_for_seeding=False,
-            lock_saved_alignment=False,
-        )
-        self.evaluator = LiveEvaluator(
-            ref_lat=0.0,
-            ref_lon=0.0,
-            ref_alt=0.0,
-        )
-        self.state = "WARMING_UP"
+        self.core.deload_benchmark()
+        self.loaded_trip = None
         await self.broadcast_hud()
         return {"status": "ok", "message": "Benchmark stopped and deloaded"}
+
 
 
 def json_response_cors(data: Any, status: int = 200) -> web.Response:
