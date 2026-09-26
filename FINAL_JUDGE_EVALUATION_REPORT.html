@@ -81,7 +81,7 @@ Evaluated on held-out Part 3 (20%) partitions and completely unseen test drives 
 To isolate how velocity estimation errors translate to endpoint position drift across vehicle operational regimes, scenarios are partitioned by mean vehicle velocity:
 
 <div class="table-container"><table><thead><tr><th>Velocity Regime</th><th>Mean Speed Range</th><th>Scenario Count</th><th>Map-Matched Median Drift</th><th>Pure DR Median Drift</th><th>Passes < 10% Drift</th><th>Position Error Dynamics</th></tr></thead><tbody>
-<tr><td><strong>Low Speed / Traffic Crawl</strong></td><td>< 20 km/h (< 5.56 m/s)</td><td>7</td><td><strong>10.68%</strong></td><td>36.54%</td><td>3 / 7</td><td>ZUPT (both paths); causal speed smoothing (live path only)</td></tr>
+<tr><td><strong>Low Speed / Traffic Crawl</strong></td><td>< 20 km/h (< 5.56 m/s)</td><td>7</td><td><strong>10.68%</strong></td><td>36.54%</td><td>3 / 7</td><td>ZUPT (both paths); causal speed smoothing (CausalSpeedSmoother, both batch and live)</td></tr>
 <tr><td><strong>Arterial / Urban Cruising</strong></td><td>20 – 50 km/h (5.56 – 13.89 m/s)</td><td>26</td><td><strong>12.00%</strong></td><td>22.48%</td><td>11 / 26</td><td>Kinematic NHC constraints and map matching hold lane alignment</td></tr>
 <tr><td><strong>Highway High-Speed Cruise</strong></td><td>> 50 km/h (> 13.89 m/s)</td><td>7</td><td><strong>8.62%</strong></td><td>28.58%</td><td>4 / 7</td><td>Pre-blackout dynamic scale anchoring compensates for open-loop scale loss</td></tr>
 </tbody></table></div>
