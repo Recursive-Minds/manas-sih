@@ -22,12 +22,12 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
 import com.recursiveminds.idr.data.*
+import com.recursiveminds.idr.engine.EngineBridgeProvider
+import com.recursiveminds.idr.engine.IEngineBridge
 import kotlinx.coroutines.*
-import okhttp3.*
 import java.io.File
 import java.io.FileWriter
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SensorStreamService : Service(), SensorEventListener, LocationListener {
@@ -53,9 +53,8 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
     private val imuQueue = ConcurrentLinkedQueue<ImuPoint>()
     private val gnssQueue = ConcurrentLinkedQueue<GnssPoint>()
 
-    // Networking
-    private var okHttpClient: OkHttpClient? = null
-    private var webSocket: WebSocket? = null
+    // Modular Engine Bridge (RemoteWebSocket in server flavor, LocalChaquopy in ondevice flavor)
+    lateinit var engineBridge: IEngineBridge
     val isConnected = AtomicBoolean(false)
     val isBlackout = AtomicBoolean(false)
 
@@ -91,6 +90,19 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
 
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+
+        engineBridge = EngineBridgeProvider.create(this)
+        engineBridge.onHudUpdateListener = { update ->
+            scope.launch(Dispatchers.Main) {
+                onHudUpdateListener?.invoke(update)
+            }
+        }
+        engineBridge.onConnectionStateChanged = { connected ->
+            isConnected.set(connected)
+            scope.launch(Dispatchers.Main) {
+                onConnectionStateChanged?.invoke(connected)
+            }
+        }
 
         // Do NOT auto-start CSV — user controls it explicitly via REC button
         registerSensors()
@@ -220,75 +232,34 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
     override fun onProviderDisabled(provider: String) {}
 
     fun connectServer(serverIp: String, port: Int) {
-        disconnectServer()
-
-        val wsUrl = "ws://$serverIp:$port/ws/stream"
-        Log.i("IDRService", "Attempting WebSocket connection to: $wsUrl")
-        val request = Request.Builder().url(wsUrl).build()
-
-        okHttpClient = OkHttpClient.Builder()
-            .proxy(java.net.Proxy.NO_PROXY)
-            .readTimeout(0, TimeUnit.MILLISECONDS)
-            .build()
-
-        webSocket = okHttpClient?.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) {
-                Log.i("IDRService", "WebSocket connection opened successfully!")
-                isConnected.set(true)
-                scope.launch(Dispatchers.Main) {
-                    onConnectionStateChanged?.invoke(true)
-                }
-            }
-
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                try {
-                    val update = gson.fromJson(text, HudUpdate::class.java)
-                    scope.launch(Dispatchers.Main) {
-                        onHudUpdateListener?.invoke(update)
-                    }
-                } catch (e: Exception) {
-                    Log.e("IDRService", "Failed to parse HUD update: ${e.message}")
-                }
-            }
-
-            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.i("IDRService", "WebSocket closed: code=$code reason=$reason")
-                isConnected.set(false)
-                scope.launch(Dispatchers.Main) {
-                    onConnectionStateChanged?.invoke(false)
-                }
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e("IDRService", "WebSocket onFailure: ${t.message}", t)
-                isConnected.set(false)
-                scope.launch(Dispatchers.Main) {
-                    onConnectionStateChanged?.invoke(false)
-                }
-            }
-        })
+        engineBridge.connect(serverIp, port)
     }
 
     fun disconnectServer() {
-        webSocket?.close(1000, "User disconnected")
-        webSocket = null
-        isConnected.set(false)
-        onConnectionStateChanged?.invoke(false)
+        engineBridge.disconnect()
     }
 
     fun startBlackout() {
         isBlackout.set(true)
-        sendControl("start_blackout")
+        engineBridge.startBlackout()
     }
 
     fun stopBlackout() {
         isBlackout.set(false)
-        sendControl("stop_blackout")
+        engineBridge.stopBlackout()
     }
 
     fun resetSession() {
         isBlackout.set(false)
-        sendControl("reset")
+        engineBridge.resetSession()
+    }
+
+    fun setMapMatching(enabled: Boolean) {
+        engineBridge.setMapMatching(enabled)
+    }
+
+    fun prefetchArea(lat: Double, lon: Double, radiusM: Double, callback: (Boolean, String) -> Unit) {
+        engineBridge.prefetchArea(lat, lon, radiusM, callback)
     }
 
     val isMuted = AtomicBoolean(false)
@@ -299,32 +270,17 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
     }
 
     fun prepareBenchmark(scenarioId: Int) {
-        val msg = ControlMessage(
-            command = "prepare_benchmark",
-            scenarioId = scenarioId
-        )
-        webSocket?.send(gson.toJson(msg))
+        engineBridge.prepareBenchmark(scenarioId)
     }
 
     fun startBenchmark(scenarioId: Int, speed: Double) {
         setSensorStreamingMuted(true)
-        val msg = ControlMessage(
-            command = "start_benchmark",
-            scenarioId = scenarioId,
-            speed = speed
-        )
-        webSocket?.send(gson.toJson(msg))
+        engineBridge.startBenchmark(scenarioId, speed)
     }
 
     fun stopBenchmark() {
-        val msg = ControlMessage(command = "stop_benchmark")
-        webSocket?.send(gson.toJson(msg))
+        engineBridge.stopBenchmark()
         setSensorStreamingMuted(false)
-    }
-
-    private fun sendControl(command: String) {
-        val msg = ControlMessage(command = command)
-        webSocket?.send(gson.toJson(msg))
     }
 
     private fun startBatchDispatcher() {
@@ -352,8 +308,7 @@ class SensorStreamService : Service(), SensorEventListener, LocationListener {
                         imu = imuList,
                         gnss = gnssList
                     )
-                    val json = gson.toJson(batch)
-                    webSocket?.send(json)
+                    engineBridge.pushBatch(batch)
                 }
 
                 // Update rate telemetry once per second

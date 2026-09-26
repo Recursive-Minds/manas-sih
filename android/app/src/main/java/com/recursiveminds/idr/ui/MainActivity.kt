@@ -18,6 +18,7 @@ import android.preference.PreferenceManager
 import android.util.Log
 import android.view.View
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -72,11 +73,18 @@ class MainActivity : AppCompatActivity() {
     private var currentMode = AppMode.LIVE_DRIVE
 
     // Header & Connection
+    private lateinit var cardConnection: LinearLayout
     private lateinit var tvConnStatus: TextView
     private lateinit var etServerIp: EditText
     private lateinit var etServerPort: EditText
     private lateinit var btnConnect: Button
     private lateinit var btnBenchmarkSuite: Button
+
+    // Map & Feature Controls
+    private lateinit var cardMapControls: LinearLayout
+    private lateinit var btnPrefetchArea: Button
+    private lateinit var btnToggleMapMatching: Button
+    private lateinit var tvHandoffState: TextView
 
     // Dedicated Benchmark Suite Panel
     private lateinit var cardBenchmark: LinearLayout
@@ -117,8 +125,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gnssPolyline: Polyline
     private lateinit var drPolyline: Polyline
     private var vehicleMarker: Marker? = null
+    private var drMarker: Marker? = null
+    private var reconciledMarker: Marker? = null
     private var hasCenteredMap = false
     private var tilePrefetcher: SpeedAdaptiveTilePrefetcher? = null
+
+    private var isMapMatchingEnabled = true
+    private var latestWarmup: WarmupStatus? = null
 
     // Session Summary Overlay
     private lateinit var cardSummaryModal: LinearLayout
@@ -209,11 +222,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun initViews() {
         // Header & Connection
+        cardConnection = findViewById(R.id.cardConnection)
         tvConnStatus = findViewById(R.id.tvConnStatus)
         etServerIp = findViewById(R.id.etServerIp)
         etServerPort = findViewById(R.id.etServerPort)
         btnConnect = findViewById(R.id.btnConnect)
         btnBenchmarkSuite = findViewById(R.id.btnBenchmarkSuite)
+
+        // Map & Feature Controls
+        cardMapControls = findViewById(R.id.cardMapControls)
+        btnPrefetchArea = findViewById(R.id.btnPrefetchArea)
+        btnToggleMapMatching = findViewById(R.id.btnToggleMapMatching)
+        tvHandoffState = findViewById(R.id.tvHandoffState)
+
+        // Autonomous On-Device Mode UI adjustments
+        if (packageName.endsWith(".ondevice")) {
+            cardConnection.visibility = View.GONE
+            tvConnStatus.text = "Autonomous On-Device Engine"
+            tvConnStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
+        }
 
         // Dedicated Benchmark Suite Panel
         cardBenchmark = findViewById(R.id.cardBenchmark)
@@ -378,18 +405,57 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Map Controls Listeners
+        btnPrefetchArea.setOnClickListener {
+            val s = streamService
+            if (s == null) {
+                Toast.makeText(this, "Service not bound", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val center = mapView.mapCenter
+            Toast.makeText(this, "Prefetching road network (3km radius)...", Toast.LENGTH_SHORT).show()
+            s.prefetchArea(center.latitude, center.longitude, 3000.0) { success, msg ->
+                Toast.makeText(this, msg, if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG).show()
+            }
+        }
+
+        btnToggleMapMatching.setOnClickListener {
+            val s = streamService ?: return@setOnClickListener
+            isMapMatchingEnabled = !isMapMatchingEnabled
+            s.setMapMatching(isMapMatchingEnabled)
+            if (isMapMatchingEnabled) {
+                btnToggleMapMatching.text = "MAP MATCH: ON"
+                btnToggleMapMatching.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
+                Toast.makeText(this, "Map Matching: ENABLED", Toast.LENGTH_SHORT).show()
+            } else {
+                btnToggleMapMatching.text = "MAP MATCH: OFF"
+                btnToggleMapMatching.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
+                Toast.makeText(this, "Map Matching: DISABLED", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         btnStart.setOnClickListener {
             val s = streamService ?: return@setOnClickListener
-            if (!isEngineReady) {
-                Toast.makeText(this, "Starting Dead Reckoning blackout (Warmup still completing...)", Toast.LENGTH_SHORT).show()
+            val w = latestWarmup
+            val mountState = w?.mountState ?: "UNLEVELLED"
+            val isLocked = mountState == "YAW_LOCKED" || mountState == "REUSED" || w?.mountLocked == true
+
+            if (!isLocked) {
+                val turns = w?.turnsDisplay ?: "turns: 0/15"
+                AlertDialog.Builder(this)
+                    .setTitle("Warning: Mount Not Locked")
+                    .setMessage("Mount calibration has not achieved yaw lock yet ($turns, state: $mountState).\n\nDead reckoning heading accuracy may be reduced without full yaw lock. Do you want to proceed anyway?")
+                    .setPositiveButton("Start Anyway") { _, _ ->
+                        Log.i("PHONE", "User chose START before lock (state=$mountState, turns=$turns)")
+                        executeStartBlackout(s)
+                    }
+                    .setNegativeButton("Wait for Lock") { _, _ ->
+                        Log.i("PHONE", "User chose to wait for yaw lock (state=$mountState)")
+                    }
+                    .show()
+            } else {
+                executeStartBlackout(s)
             }
-            s.startBlackout()
-            isInBlackout = true
-            isSummaryDismissed = false
-            updateControlButtons()
-            cardSummaryModal.visibility = View.GONE
-            tvStateBadge.text = "BLACKOUT"
-            tvStateBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
         }
 
         btnStop.setOnClickListener {
@@ -415,9 +481,11 @@ class MainActivity : AppCompatActivity() {
             tvStateBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
             cardSummaryModal.visibility = View.GONE
 
-            // Clear map tracks
+            // Clear map tracks and markers
             gnssPolyline.actualPoints.clear()
             drPolyline.actualPoints.clear()
+            drMarker?.isEnabled = false
+            reconciledMarker?.isEnabled = false
             hasCenteredMap = false
             mapView.invalidate()
 
@@ -443,6 +511,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateControlButtons()
+    }
+
+    private fun executeStartBlackout(s: SensorStreamService) {
+        if (!isEngineReady) {
+            Toast.makeText(this, "Starting Dead Reckoning blackout (Warmup still completing...)", Toast.LENGTH_SHORT).show()
+        }
+        s.startBlackout()
+        isInBlackout = true
+        isSummaryDismissed = false
+        updateControlButtons()
+        cardSummaryModal.visibility = View.GONE
+        tvStateBadge.text = "BLACKOUT"
+        tvStateBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
     }
 
     private fun initBenchmarkSpinners() {
@@ -505,17 +586,38 @@ class MainActivity : AppCompatActivity() {
         gnssPolyline.outlinePaint.strokeCap = Paint.Cap.ROUND
         mapView.overlays.add(gnssPolyline)
 
-        // Dead Reckoning track (electric cyan)
+        // Dead Reckoning track (amber / gold for clear visual contrast with GNSS track)
         drPolyline = Polyline(mapView)
-        drPolyline.outlinePaint.color = Color.parseColor("#00F2FE")
+        drPolyline.outlinePaint.color = Color.parseColor("#F59E0B")
         drPolyline.outlinePaint.strokeWidth = 10f
         drPolyline.outlinePaint.strokeCap = Paint.Cap.ROUND
         mapView.overlays.add(drPolyline)
 
-        // Vehicle position marker
+        // Vehicle GNSS position marker (emerald pointer)
         vehicleMarker = Marker(mapView)
         vehicleMarker?.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        try {
+            vehicleMarker?.icon = ContextCompat.getDrawable(this, R.drawable.ic_gnss_marker)
+        } catch (_: Exception) {}
         mapView.overlays.add(vehicleMarker)
+
+        // Dead Reckoning vehicle marker (amber pointer)
+        drMarker = Marker(mapView)
+        drMarker?.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        try {
+            drMarker?.icon = ContextCompat.getDrawable(this, R.drawable.ic_dr_marker)
+        } catch (_: Exception) {}
+        drMarker?.isEnabled = false
+        mapView.overlays.add(drMarker)
+
+        // Reconciled / Blended handoff marker (cyan diamond)
+        reconciledMarker = Marker(mapView)
+        reconciledMarker?.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+        try {
+            reconciledMarker?.icon = ContextCompat.getDrawable(this, R.drawable.ic_reconciled_marker)
+        } catch (_: Exception) {}
+        reconciledMarker?.isEnabled = false
+        mapView.overlays.add(reconciledMarker)
 
         // Initialize speed-adaptive tile prefetcher for offline resilience
         tilePrefetcher = SpeedAdaptiveTilePrefetcher(this, mapView)
@@ -789,11 +891,51 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Map updates — ONLY apply server-side positions during BENCHMARK_EVALUATION.
-        // In LIVE_DRIVE mode the map is driven exclusively by the phone's own GPS
-        // via onLocalGnssUpdate. Letting server benchmark coordinates through in
-        // LIVE_DRIVE mode is the root cause of the map-mixing bug.
-        if (currentMode == AppMode.BENCHMARK_EVALUATION) {
+        // Map updates:
+        if (currentMode == AppMode.LIVE_DRIVE) {
+            if (isInBlackout) {
+                hud.drPos?.let { d ->
+                    if (d.lat != 0.0 && d.lon != 0.0) {
+                        val pt = GeoPoint(d.lat, d.lon)
+                        val lastPt = drPolyline.actualPoints.lastOrNull()
+                        val distToLast = if (lastPt != null) pt.distanceToAsDouble(lastPt) else 1000.0
+                        if (distToLast > 500.0) {
+                            drPolyline.actualPoints.clear()
+                            drPolyline.addPoint(pt)
+                        } else if (distToLast >= 0.5) {
+                            drPolyline.addPoint(pt)
+                        }
+                        drMarker?.position = pt
+                        drMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)
+                        drMarker?.isEnabled = true
+
+                        tilePrefetcher?.onMotionUpdate(
+                            d.lat,
+                            d.lon,
+                            hud.metrics?.drSpeedMps ?: 0.0,
+                            d.headingDeg ?: 0.0
+                        )
+                        mapView.controller.animateTo(pt)
+                    }
+                }
+
+                hud.reconciledPos?.let { r ->
+                    val hState = hud.warmup?.handoffState ?: ""
+                    if (r.lat != 0.0 && r.lon != 0.0 && (hState == "REACQUISITION_VERIFY" || hState == "REACQUISITION_BLENDING")) {
+                        val rPt = GeoPoint(r.lat, r.lon)
+                        reconciledMarker?.position = rPt
+                        reconciledMarker?.isEnabled = true
+                    } else {
+                        reconciledMarker?.isEnabled = false
+                    }
+                } ?: run {
+                    reconciledMarker?.isEnabled = false
+                }
+            } else {
+                drMarker?.isEnabled = false
+                reconciledMarker?.isEnabled = false
+            }
+        } else if (currentMode == AppMode.BENCHMARK_EVALUATION) {
             hud.gnssPos?.let { g ->
                 if (g.lat != 0.0 && g.lon != 0.0) {
                     val pt = GeoPoint(g.lat, g.lon)
@@ -818,10 +960,9 @@ class MainActivity : AppCompatActivity() {
                         mapView.controller.animateTo(pt)
                         hasCenteredMap = true
                     }
-                    if (hud.drPos == null) {
-                        vehicleMarker?.position = pt
-                        vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(g.bearingDeg)  // [ROUND1] T1
-                    }
+                    vehicleMarker?.position = pt
+                    vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(g.bearingDeg)
+                    vehicleMarker?.isEnabled = true
                 }
             }
 
@@ -842,17 +983,35 @@ class MainActivity : AppCompatActivity() {
                     } else if (distToLast >= 0.5) {
                         drPolyline.addPoint(pt)
                     }
-                    vehicleMarker?.position = pt
-                    vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)  // [ROUND1] T1
+                    drMarker?.position = pt
+                    drMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)
+                    drMarker?.isEnabled = true
                 }
+            }
+
+            hud.reconciledPos?.let { r ->
+                val hState = hud.warmup?.handoffState ?: ""
+                if (r.lat != 0.0 && r.lon != 0.0 && (hState == "REACQUISITION_VERIFY" || hState == "REACQUISITION_BLENDING")) {
+                    val rPt = GeoPoint(r.lat, r.lon)
+                    reconciledMarker?.position = rPt
+                    reconciledMarker?.isEnabled = true
+                } else {
+                    reconciledMarker?.isEnabled = false
+                }
+            } ?: run {
+                reconciledMarker?.isEnabled = false
             }
         }
         mapView.invalidate()
     }
 
     private fun updateWarmupPanel(w: WarmupStatus) {
+        latestWarmup = w
         val emerald = ContextCompat.getColor(this, R.color.accent_emerald)
         val muted = ContextCompat.getColor(this, R.color.text_muted)
+        val amber = ContextCompat.getColor(this, R.color.accent_amber)
+        val rose = ContextCompat.getColor(this, R.color.accent_rose)
+        val cyan = ContextCompat.getColor(this, R.color.accent_cyan)
         val isBenchmark = (currentMode == AppMode.BENCHMARK_EVALUATION)
 
         // 1. Gravity Leveling — phone held still for 3s so accelerometer baseline settles
@@ -864,18 +1023,18 @@ class MainActivity : AppCompatActivity() {
             tvCondGravity.setTextColor(muted)
         }
 
-        // 2. Mount Calibration — "Reused" in benchmark means the UK-trip calibration is loaded,
-        //    not your phone's live cradle angle. In LIVE_DRIVE this shows real turn progress.
-        if (w.mountLocked) {
+        // 2. Mount Calibration: 15-turn target
+        val isMountLocked = w.mountLocked || w.mountState == "YAW_LOCKED" || w.mountState == "REUSED"
+        if (isMountLocked) {
             val label = when {
                 isBenchmark && w.mountStatus.contains("reused", ignoreCase = true) -> "✓ Bench-Calib"
-                w.mountStatus.contains("reused", ignoreCase = true) -> "✓ Mount Reused"
+                w.mountState == "REUSED" || w.mountStatus.contains("reused", ignoreCase = true) -> "✓ Mount Reused"
                 else -> "✓ ${w.turnsDisplay}"
             }
             tvCondMount.text = label
             tvCondMount.setTextColor(emerald)
         } else {
-            tvCondMount.text = "✗ Mount (${w.turnsDisplay})"
+            tvCondMount.text = "✗ ${w.turnsDisplay}"
             tvCondMount.setTextColor(muted)
         }
 
@@ -888,14 +1047,40 @@ class MainActivity : AppCompatActivity() {
             tvCondBuffer.setTextColor(muted)
         }
 
-        // 4. Alpha Adaptive Scaling — speed-scale factor learned from ≥3 moving GNSS fixes
-        if (w.alphaLearned) {
-            tvCondAlpha.text = "✓ Alpha"
+        // 4. Speed Calibration: Speed calibration n/180 s
+        val calibDone = w.alphaLearned || w.speedCalibS >= 180
+        if (calibDone) {
+            tvCondAlpha.text = "✓ Speed calib ${w.speedCalibS}/180s"
             tvCondAlpha.setTextColor(emerald)
         } else {
-            tvCondAlpha.text = if (isBenchmark) "✗ Alpha (need motion)" else "✗ Alpha (drive slowly)"
+            tvCondAlpha.text = "✗ Speed calib ${w.speedCalibS}/180s"
             tvCondAlpha.setTextColor(muted)
         }
+
+        // Detail status line: Mount state + Handoff state
+        tvMountStatusDetail.text = "Mount: ${w.mountState} (${w.turnsDisplay}) | Handoff: ${w.handoffState}"
+        if (isMountLocked) {
+            tvMountStatusDetail.setTextColor(emerald)
+        } else {
+            tvMountStatusDetail.setTextColor(cyan)
+        }
+
+        // Handoff state indicator
+        tvHandoffState.text = "FSM: ${w.handoffState}"
+        val handoffColor = when (w.handoffState) {
+            "GNSS_HEALTHY" -> emerald
+            "INS_DEAD_RECKONING" -> rose
+            "REACQUISITION_VERIFY" -> cyan
+            "REACQUISITION_BLENDING" -> ContextCompat.getColor(this, R.color.accent_blue)
+            "GNSS_DEGRADED" -> amber
+            else -> muted
+        }
+        tvHandoffState.setTextColor(handoffColor)
+
+        // Synchronize map matching toggle button
+        isMapMatchingEnabled = w.mapMatchingEnabled
+        btnToggleMapMatching.text = if (w.mapMatchingEnabled) "MAP MATCH: ON" else "MAP MATCH: OFF"
+        btnToggleMapMatching.setTextColor(if (w.mapMatchingEnabled) emerald else rose)
 
         // Headline
         if (w.isReady) {
@@ -903,7 +1088,7 @@ class MainActivity : AppCompatActivity() {
             tvReadyHeadline.setTextColor(emerald)
         } else {
             tvReadyHeadline.text = if (isBenchmark) "BENCHMARK: WARMING ENGINE..." else "WARM-UP STATUS: WAITING FOR READY"
-            tvReadyHeadline.setTextColor(ContextCompat.getColor(this, R.color.accent_amber))
+            tvReadyHeadline.setTextColor(amber)
         }
     }
 

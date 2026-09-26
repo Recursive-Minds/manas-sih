@@ -94,11 +94,16 @@ data class WarmupStatus(
     @SerializedName("gravity_converged") val gravityConverged: Boolean = false,
     @SerializedName("mount_locked") val mountLocked: Boolean = false,
     @SerializedName("mount_status") val mountStatus: String = "Mount: Initializing",
+    @SerializedName("mount_state") val mountState: String = "UNLEVELLED",
     @SerializedName("turn_events") val turnEvents: Int = 0,
-    @SerializedName("turn_events_target") val turnEventsTarget: Int = 8,
-    @SerializedName("turns_display") val turnsDisplay: String = "turns: 0/8",
+    @SerializedName("turn_events_target") val turnEventsTarget: Int = 15,
+    @SerializedName("turns_display") val turnsDisplay: String = "turns: 0/15",
     @SerializedName("buffer_warm") val bufferWarm: Boolean = false,
-    @SerializedName("alpha_learned") val alphaLearned: Boolean = false
+    @SerializedName("alpha_learned") val alphaLearned: Boolean = false,
+    @SerializedName("speed_calib_s") val speedCalibS: Int = 0,
+    @SerializedName("speed_calib_display") val speedCalibDisplay: String = "Speed calibration 0/180 s",
+    @SerializedName("handoff_state") val handoffState: String = "INITIALIZING",
+    @SerializedName("map_matching_enabled") val mapMatchingEnabled: Boolean = true
 )
 
 data class HudUpdate(
@@ -110,5 +115,6 @@ data class HudUpdate(
     @SerializedName("warmup") val warmup: WarmupStatus?,
     @SerializedName("dr_pos") val drPos: PositionPoint?,
     @SerializedName("gnss_pos") val gnssPos: PositionPoint?,
+    @SerializedName("reconciled_pos") val reconciledPos: PositionPoint? = null,
     @SerializedName("metrics") val metrics: LiveMetrics?
 )

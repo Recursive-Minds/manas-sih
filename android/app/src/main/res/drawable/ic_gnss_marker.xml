@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- GNSS Ground Truth vehicle marker (Emerald green chevron with white border) -->
+    <path
+        android:fillColor="#10B981"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineJoin="round"
+        android:pathData="M12,2 L21,20 L12,16 L3,20 Z" />
+    <path
+        android:fillColor="#059669"
+        android:pathData="M12,4 L19,18 L12,15 Z" />
+</vector>
