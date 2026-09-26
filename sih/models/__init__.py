@@ -1,6 +1,10 @@
 """Models module for AI velocity estimation, spectral features, and Bayesian MoE fusion."""
 
-from sih.models.dataset import IMUVelocityDataset, MultiScaleMoEDataset
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sih.models.dataset import IMUVelocityDataset, MultiScaleMoEDataset
+
 from sih.models.tcn_attention import TCNAttentionVelocityModel, gaussian_nll_loss
 from sih.models.resnet1d import ResNet1DSpeedEstimator
 from sih.models.moe_fusion import BayesianMoEFusion, numpy_bayesian_fusion
@@ -34,3 +38,11 @@ __all__ = [
     "load_ai_model",
     "predict_velocities",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in ("IMUVelocityDataset", "MultiScaleMoEDataset"):
+        from sih.models.dataset import IMUVelocityDataset, MultiScaleMoEDataset
+        return IMUVelocityDataset if name == "IMUVelocityDataset" else MultiScaleMoEDataset
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+

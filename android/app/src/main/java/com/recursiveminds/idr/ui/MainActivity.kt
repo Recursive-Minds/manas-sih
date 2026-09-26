@@ -45,19 +45,16 @@ data class BenchmarkScenarioItem(
     val domain: String,
     val durationS: Int,
     val distanceM: Int,
-    val driftPct: Double,
-    val isPass: Boolean,
     val isRandom: Boolean = false
 ) {
     override fun toString(): String {
         if (isRandom) {
             return "🎲 Random Held-Out Scenario (All Trips)"
         }
-        val status = if (isPass) "PASS" else "FAIL"
         return String.format(
             Locale.US,
-            "Scenario #%02d: %s (%s, %ds, %dm) - %.1f%% Drift [%s]",
-            id, domain, trip, durationS, distanceM, driftPct, status
+            "Scenario #%02d: %s (%s, %ds, %dm)",
+            id, domain, trip, durationS, distanceM
         )
     }
 }
@@ -149,39 +146,32 @@ class MainActivity : AppCompatActivity() {
     private var isInBlackout = false
     private var isSummaryDismissed = false
 
-    private val benchmarkScenarioList = mutableListOf(
-        BenchmarkScenarioItem(-1, "All", "Diverse", 0, 0, 0.0, true, isRandom = true),
-        // S-S3a
-        BenchmarkScenarioItem(30, "S-S3a", "Mixed", 60, 244, 5.4, true),
-        BenchmarkScenarioItem(26, "S-S3a", "Mixed", 75, 892, 0.5, true),
-        BenchmarkScenarioItem(25, "S-S3a", "Mixed", 45, 614, 3.6, true),
-        BenchmarkScenarioItem(21, "S-S3a", "Mixed", 30, 325, 8.0, true),
-        BenchmarkScenarioItem(22, "S-S3a", "Mixed", 45, 475, 19.6, false),
-        BenchmarkScenarioItem(23, "S-S3a", "Mixed", 75, 1128, 20.5, false),
-        // S-M
-        BenchmarkScenarioItem(8, "S-M", "Highway", 60, 314, 4.6, true),
-        BenchmarkScenarioItem(2, "S-M", "Highway", 45, 600, 17.9, false),
-        BenchmarkScenarioItem(3, "S-M", "Highway", 75, 1174, 10.6, false),
-        BenchmarkScenarioItem(1, "S-M", "Highway", 30, 301, 33.5, false),
-        // S-S2
-        BenchmarkScenarioItem(11, "S-S2", "Arterial", 60, 435, 0.8, true),
-        BenchmarkScenarioItem(10, "S-S2", "Arterial", 30, 245, 7.1, true),
-        BenchmarkScenarioItem(12, "S-S2", "Arterial", 45, 261, 6.2, true),
-        BenchmarkScenarioItem(13, "S-S2", "Arterial", 45, 331, 11.4, false),
-        BenchmarkScenarioItem(9, "S-S2", "Arterial", 75, 872, 90.4, false),
-        // S-S1
-        BenchmarkScenarioItem(18, "S-S1", "Urban", 45, 98, 12.3, false),
-        BenchmarkScenarioItem(15, "S-S1", "Urban", 45, 399, 12.8, false),
-        BenchmarkScenarioItem(16, "S-S1", "Urban", 30, 200, 25.6, false),
-        BenchmarkScenarioItem(20, "S-S1", "Urban", 60, 135, 32.5, false),
-        // S-S4
-        BenchmarkScenarioItem(32, "S-S4", "Arterial", 75, 610, 4.8, true),
-        BenchmarkScenarioItem(36, "S-S4", "Arterial", 45, 739, 7.5, true),
-        BenchmarkScenarioItem(38, "S-S4", "Arterial", 60, 931, 7.7, true),
-        BenchmarkScenarioItem(31, "S-S4", "Arterial", 45, 490, 9.4, true),
-        BenchmarkScenarioItem(33, "S-S4", "Arterial", 60, 443, 11.3, false),
-        BenchmarkScenarioItem(34, "S-S4", "Arterial", 45, 328, 28.2, false)
-    )
+    private val benchmarkScenarioList = mutableListOf<BenchmarkScenarioItem>()
+
+    private fun loadCanonicalScenariosFromAssets(): List<BenchmarkScenarioItem> {
+        val list = mutableListOf<BenchmarkScenarioItem>()
+        list.add(BenchmarkScenarioItem(-1, "All", "Diverse", 0, 0, isRandom = true))
+        try {
+            val jsonString = assets.open("scenarios_canonical.json").bufferedReader().use { it.readText() }
+            val array = org.json.JSONArray(jsonString)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    BenchmarkScenarioItem(
+                        id = obj.getInt("scenario_id"),
+                        trip = obj.getString("trip"),
+                        domain = obj.getString("domain"),
+                        durationS = obj.getInt("duration_s"),
+                        distanceM = obj.getDouble("gt_dist_m").toInt(),
+                        isRandom = false
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Failed to load scenarios from assets: ${e.message}")
+        }
+        return list
+    }
     private lateinit var scenarioAdapter: ArrayAdapter<BenchmarkScenarioItem>
 
     private val connection = object : ServiceConnection {
@@ -456,6 +446,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initBenchmarkSpinners() {
+        if (benchmarkScenarioList.isEmpty()) {
+            benchmarkScenarioList.addAll(loadCanonicalScenariosFromAssets())
+        }
         scenarioAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, benchmarkScenarioList)
         scenarioAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerScenarios.adapter = scenarioAdapter
@@ -1007,8 +1000,6 @@ class MainActivity : AppCompatActivity() {
                         val domain = obj.optString("env", "")
                         val dur = obj.optDouble("duration_s", 0.0).toInt()
                         val dist = obj.optDouble("distance_m", 0.0).toInt()
-                        val drift = obj.optDouble("benchmark_drift_pct", 0.0)
-                        val isPass = drift < 10.0
                         items.add(
                             BenchmarkScenarioItem(
                                 id = id,
@@ -1016,8 +1007,6 @@ class MainActivity : AppCompatActivity() {
                                 domain = domain,
                                 durationS = dur,
                                 distanceM = dist,
-                                driftPct = drift,
-                                isPass = isPass,
                                 isRandom = isRandom
                             )
                         )
