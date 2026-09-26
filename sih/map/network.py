@@ -525,8 +525,10 @@ def build_road_network_from_osm(
     lat_max = float(max(bbox_ll[0], bbox_ll[2]))
     lon_min = float(min(bbox_ll[1], bbox_ll[3]))
     lon_max = float(max(bbox_ll[1], bbox_ll[3]))
-
-    os.makedirs(cache_dir, exist_ok=True)
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+    except OSError:
+        pass
     cache_file = os.path.join(
         cache_dir,
         f"osm_bbox_{lat_min:.5f}_{lon_min:.5f}_{lat_max:.5f}_{lon_max:.5f}.geojson",

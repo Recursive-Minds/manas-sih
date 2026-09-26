@@ -1,0 +1,67 @@
+{
+  "timestamp": 1790422820.572219,
+  "scenarios": [
+    {
+      "scenario_id": 22,
+      "duration_s": 45.0,
+      "laptop_batch_err_m": 16.275391564513175,
+      "ondevice_err_m": 16.27540886054454,
+      "endpoint_diff_m": 2.210495974483604e-05,
+      "max_traj_diff_m": 2.210495974483604e-05,
+      "fork_flips": 4,
+      "passed": true,
+      "replay_time_s": 12.811462029989343
+    },
+    {
+      "scenario_id": 23,
+      "duration_s": 75.0,
+      "laptop_batch_err_m": 67.76048544974026,
+      "ondevice_err_m": 67.76049537460945,
+      "endpoint_diff_m": 1.0019379438554619e-05,
+      "max_traj_diff_m": 2.144519508759325e-05,
+      "fork_flips": 36,
+      "passed": true,
+      "replay_time_s": 16.437597412033938
+    },
+    {
+      "scenario_id": 25,
+      "duration_s": 45.0,
+      "laptop_batch_err_m": 77.30366357103112,
+      "ondevice_err_m": 77.30366677329954,
+      "endpoint_diff_m": 3.2998756432565415e-06,
+      "max_traj_diff_m": 1.7347067190340573e-05,
+      "fork_flips": 12,
+      "passed": true,
+      "replay_time_s": 11.109260606986936
+    },
+    {
+      "scenario_id": 26,
+      "duration_s": 75.0,
+      "laptop_batch_err_m": 122.79689402905998,
+      "ondevice_err_m": 122.79692671541365,
+      "endpoint_diff_m": 3.2734358419545286e-05,
+      "max_traj_diff_m": 3.737480685557838e-05,
+      "fork_flips": 18,
+      "passed": true,
+      "replay_time_s": 17.852450448961463
+    },
+    {
+      "scenario_id": 30,
+      "duration_s": 60.0,
+      "laptop_batch_err_m": 7.0417667119854235,
+      "ondevice_err_m": 7.0417670903310325,
+      "endpoint_diff_m": 4.530738223476443e-07,
+      "max_traj_diff_m": 4.77269824564623e-06,
+      "fork_flips": 19,
+      "passed": true,
+      "replay_time_s": 15.867807027010713
+    }
+  ],
+  "all_scenarios_passed": true,
+  "leak_test": {
+    "max_abs_diff_m": 0.0,
+    "passed": true,
+    "status": "PASS (Bit-Identical)"
+  },
+  "overall_status": "PASS"
+}

@@ -27,6 +27,8 @@ class OSMOverpassClient(IRoadNetworkProvider):
         "https://lz4.overpass-api.de/api/interpreter",
         "https://overpass-api.de/api/interpreter",
         "https://z.overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://overpass.private.coffee/api/interpreter",
     ]
 
     HIGHWAY_SPEED_LIMITS_MPS = {
@@ -81,6 +83,17 @@ out body geom;"""
         encoded_data = urllib.parse.urlencode({"data": query}).encode("utf-8")
         endpoints_to_try = [self.endpoint] + [ep for ep in self.OVERPASS_ENDPOINTS if ep != self.endpoint]
 
+        import ssl
+        try:
+            ssl_ctx = ssl._create_unverified_context()
+        except Exception:
+            ssl_ctx = None
+
+        handlers: list[Any] = [urllib.request.ProxyHandler()]
+        if ssl_ctx is not None:
+            handlers.append(urllib.request.HTTPSHandler(context=ssl_ctx))
+        opener = urllib.request.build_opener(*handlers)
+
         for attempt in range(self.max_retries + 1):
             for ep in endpoints_to_try:
                 req = urllib.request.Request(
@@ -89,7 +102,7 @@ out body geom;"""
                     headers={"User-Agent": "SIH-Smart-Dead-Reckoning/1.0 (India-Transit-Research)"},
                 )
                 try:
-                    with urllib.request.urlopen(req, timeout=self.timeout_s) as response:
+                    with opener.open(req, timeout=self.timeout_s) as response:
                         if response.status == 200:
                             raw_text = response.read().decode("utf-8")
                             return json.loads(raw_text)
@@ -99,8 +112,8 @@ out body geom;"""
                         print(f"[OSM Overpass] HTTP {e.code} on {ep}, backing off {backoff_s:.1f}s...")
                         time.sleep(backoff_s)
                     continue
-                except Exception:
-                    # Fallback to next mirror endpoint
+                except Exception as ex:
+                    print(f"[OSM Overpass] Query failed on {ep}: {ex}")
                     continue
 
         return None

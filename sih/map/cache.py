@@ -32,7 +32,10 @@ class SpatialDiskCache:
         self.max_lru_tiles = max_lru_memory_tiles
         self._memory_cache: OrderedDict[str, RoadNetwork] = OrderedDict()
 
-        os.makedirs(self.cache_dir, exist_ok=True)
+        try:
+            os.makedirs(self.cache_dir, exist_ok=True)
+        except OSError:
+            pass
 
     def compute_tile_key(self, lat: float, lon: float) -> str:
         """Computes the deterministic string key for a geographic point."""
@@ -201,3 +204,15 @@ class SpatialDiskCache:
     def clear_memory(self) -> None:
         """Clears in-memory LRU cache."""
         self._memory_cache.clear()
+
+    def get_cache_size_bytes(self) -> int:
+        """Returns total bytes stored in the disk cache directory."""
+        total = 0
+        if os.path.exists(self.cache_dir):
+            for root, _, files in os.walk(self.cache_dir):
+                for f in files:
+                    try:
+                        total += os.path.getsize(os.path.join(root, f))
+                    except OSError:
+                        pass
+        return total

@@ -196,7 +196,7 @@ class LiveEvaluator:
 
         if len(bo_gnss) >= 2 and self.has_ref:
             gt_pts = np.array([
-                geodetic_to_enu(g.latitude_deg, g.longitude_deg, g.altitude_m or 0.0, self.ref_lat, self.ref_lon, self.ref_alt)[:2]
+                geodetic_to_enu(g.latitude_deg, g.longitude_deg, 0.0, self.ref_lat, self.ref_lon, 0.0)[:2]
                 for g in bo_gnss
             ])
             gt_dist = float(np.sum(np.linalg.norm(np.diff(gt_pts, axis=0), axis=1)))
@@ -255,13 +255,16 @@ class LiveEvaluator:
 
         self.last_completed_summary = {
             "final_error_m": round(final_err, 2),
+            "final_error_m_raw": float(final_err),
             "drift_pct": round(final_drift_pct, 2),
+            "drift_pct_raw": float(final_drift_pct),
             "drift_label": f"Drift: {final_drift_pct:.2f}% (target <10%)",
             "target_met": bool(final_drift_pct < 10.0),
             "max_error_m": round(self.max_horizontal_error_m, 2),
             "duration_s": round(self.latest_metrics.elapsed_s, 1),
             "dr_dist_m": round(self.cum_dr_dist_m, 1),
             "gnss_dist_m": round(gt_dist, 1),
+            "gnss_dist_m_raw": float(gt_dist),
             "along_track_m": round(along_track, 1),
             "cross_track_m": round(cross_track, 1),
             "speed_regime": self.latest_metrics.speed_regime,

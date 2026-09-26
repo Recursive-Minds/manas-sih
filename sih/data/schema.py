@@ -6,7 +6,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 import re
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 
 @dataclass

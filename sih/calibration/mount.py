@@ -134,8 +134,15 @@ class MountCalibrator(ICalibration):
 
             # Directional slope: in EKF, heading_rad = heading_rad - w_z * dt
             # If d_bearing > 0 (right turn) and d_theta < 0, w_z must be positive to increase heading -> yaw_sign = +1.0
-            # If d_bearing > 0 and d_theta > 0, yaw_sign = -1.0
-            slope = np.polyfit(evs[:, best_a + 1], evs[:, 0], 1)[0]
+            try:
+                var_x = float(np.var(evs[:, best_a + 1]))
+                if var_x > 1e-6:
+                    cov_xy = float(np.cov(evs[:, best_a + 1], evs[:, 0])[0, 1])
+                    slope = cov_xy / var_x
+                else:
+                    slope = 0.0
+            except Exception:
+                slope = 0.0
             computed_sign = -1.0 if slope > 0 else 1.0
 
             if abs(valid_c[best_a]) >= 0.12:

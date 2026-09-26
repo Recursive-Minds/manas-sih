@@ -118,6 +118,7 @@ class EngineAdapterStageA:
         self.decimate_gnss_for_seeding = decimate_gnss_for_seeding
         self.decimate_gnss_for_mount = decimate_gnss_for_mount
         self.gnss_decimate_interval_s = gnss_decimate_interval_s
+        self.lock_saved_alignment = False
         self.last_mount_gnss_ns: Optional[int] = None
         self.last_seeding_gnss_ns: Optional[int] = None
         self.moving_gnss_fixes_count: int = 0
@@ -202,7 +203,6 @@ class EngineAdapterStageA:
         turns_str = "reused" if self.mount_reused else f"{n_turns}/8"
 
         # Mount is ready once initial SO(3) leveling settles (30 accel samples).
-        # Dynamic turns (0/8) continuously refine the horizontal yaw axis, but do not hard-block dead-reckoning start.
         mount_ready = bool(mount_locked or self.stream.calibrator.is_calibrated or gravity_converged)
         is_ready = bool(gravity_converged and buffer_warm and mount_ready)
 
@@ -595,50 +595,78 @@ class EngineAdapterStageB:
             enable_speed_scale=self.enable_speed_scale,
         )
 
-    def get_mount_status(self) -> str:
-        if self.lock_saved_alignment and self.saved_alignment is not None:
-            return "Mount: reused"
-        if self.mount_reused:
-            return "Mount: reused"
-        if self.mount_changed:
-            return "mount changed - drive turns"
+    def get_mount_state_string(self) -> str:
+        if (self.lock_saved_alignment and self.saved_alignment is not None) or self.mount_reused:
+            return "REUSED"
+        if len(self.calibrator._accel_buf) < 30:
+            return "UNLEVELLED"
         if self.calibrator._yaw_locked:
-            return "Mount: locked"
-        n_turns = min(len(self.calibrator._turn_events), 8)
-        return f"Mount: calibrating {n_turns}/8"
+            return "YAW_LOCKED"
+        return "LEVELLED"
+
+    def get_mount_status(self) -> str:
+        state = self.get_mount_state_string()
+        n_turns = len(self.calibrator._turn_events)
+        if state == "REUSED":
+            return "Mount: REUSED"
+        if state == "UNLEVELLED":
+            return "Mount: UNLEVELLED"
+        if state == "YAW_LOCKED":
+            return f"Mount: YAW_LOCKED (turns {n_turns}/15)"
+        return f"Mount: LEVELLED (turns {n_turns}/15)"
 
     def get_warmup_status(self) -> Dict[str, Any]:
-        if self.lock_saved_alignment and self.saved_alignment is not None:
-            return {
-                "is_ready": True,
-                "gravity_converged": True,
-                "mount_locked": True,
-                "mount_status": "Mount: reused",
-                "turn_events": 8,
-                "turn_events_target": 8,
-                "turns_display": "turns: reused",
-                "buffer_warm": True,
-                "alpha_learned": True,
-            }
+        mount_state = self.get_mount_state_string()
+        n_turns = len(self.calibrator._turn_events)
+        turns_str = "reused" if mount_state == "REUSED" else f"{n_turns}/15"
         gravity_converged = len(self.calibrator._accel_buf) >= 30
-        mount_locked = bool(self.mount_reused or self.calibrator._yaw_locked)
+        mount_locked = bool(mount_state in ("YAW_LOCKED", "REUSED"))
         buffer_warm = bool(self.feature_extractor.is_warm)
         alpha_learned = bool(self.moving_gnss_fixes_count >= 3)
-        n_turns = min(len(self.calibrator._turn_events), 8)
-        turns_str = "reused" if self.mount_reused else f"{n_turns}/8"
         mount_ready = bool(mount_locked or self.calibrator.is_calibrated or gravity_converged)
         is_ready = bool(gravity_converged and buffer_warm and mount_ready)
+
+        speed_calib_s = min(180, int(self.moving_gnss_fixes_count))
+        speed_calib_display = f"Speed calibration {speed_calib_s}/180 s"
+
+        has_network = bool(self.road_network is not None and len(self.road_network.segments) > 0)
         return {
             "is_ready": is_ready,
             "gravity_converged": gravity_converged,
-            "mount_locked": mount_ready,
+            "mount_locked": mount_locked,
+            "mount_state": mount_state,
             "mount_status": self.get_mount_status(),
             "turn_events": n_turns,
-            "turn_events_target": 8,
+            "turn_events_target": 15,
             "turns_display": f"turns: {turns_str}",
             "buffer_warm": buffer_warm,
             "alpha_learned": alpha_learned,
+            "speed_calib_s": speed_calib_s,
+            "speed_calib_display": speed_calib_display,
+            "map_matching_enabled": bool(self.enable_map_matching and has_network),
         }
+
+    @property
+    def matcher(self):
+        return getattr(self.session, "matcher", None)
+
+    @matcher.setter
+    def matcher(self, value):
+        if hasattr(self, "session"):
+            self.session.matcher = value
+
+    def update_road_network(self, road_network: Any, ref_lat: float = 0.0, ref_lon: float = 0.0) -> None:
+        self.road_network = road_network
+        if hasattr(self, "session"):
+            self.session.road_network = road_network
+            from sih.map.matcher import HMMMapMatcher
+            self.session.matcher = HMMMapMatcher(
+                road_network=road_network,
+                reference_lat_deg=ref_lat or self.ref_lat,
+                reference_lon_deg=ref_lon or self.ref_lon,
+                smoothing_factor=self.smoothing_factor,
+            )
+        self.enable_map_matching = True
 
     def _evaluate_mount_guard(self) -> None:
         if self.lock_saved_alignment:
@@ -864,7 +892,7 @@ class EngineAdapterStageB:
             self.recent_imu_calib.append(c)
             self.recent_ai_ts.append(imu.timestamp_ns)
 
-        if self.model is None:
+        if self.model is None and self.predictor is None:
             for c in c_list:
                 f = self.feature_extractor.push(c)
                 self.feature_buf.append(f)

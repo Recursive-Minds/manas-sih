@@ -38,6 +38,7 @@ class SpeedAdaptiveTilePrefetcher(
     private var lastPrefetchPoint: GeoPoint? = null
     private var lastPrefetchTimeMs: Long = 0L
     private var isTaskRunning = false
+    private var hasPrefetchedInitialRegion = false
 
     init {
         try {
@@ -52,7 +53,8 @@ class SpeedAdaptiveTilePrefetcher(
      * Prefetch an immediate initial bubble around starting location (e.g. at warmup or initial GPS fix).
      */
     fun prefetchInitialRegion(lat: Double, lon: Double, radiusM: Double = 800.0) {
-        if (cacheManager == null || lat == 0.0 || lon == 0.0) return
+        if (hasPrefetchedInitialRegion || cacheManager == null || lat == 0.0 || lon == 0.0) return
+        hasPrefetchedInitialRegion = true
         try {
             val dLat = radiusM / METERS_PER_DEG_LAT
             val dLon = radiusM / (METERS_PER_DEG_LAT * cos(Math.toRadians(lat)))

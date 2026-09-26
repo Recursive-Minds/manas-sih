@@ -53,6 +53,8 @@ class SessionCore:
         device: Optional[Any] = None,
         use_speed_smoother: bool = True,
         predictor: Optional[Any] = None,
+        enable_handoff: bool = True,
+        cache_dir: Optional[str] = None,
     ) -> None:
         self.ref_lat = float(ref_lat)
         self.ref_lon = float(ref_lon)
@@ -63,6 +65,7 @@ class SessionCore:
         self.engine_type = engine_type
         self.use_speed_smoother = use_speed_smoother
         self.predictor = predictor
+        self.cache_dir = cache_dir or "data/maps/cache"
 
         if ai_model is not None:
             self.ai_model = ai_model
@@ -123,6 +126,14 @@ class SessionCore:
             "ekf_map_ms": 0.0,
             "total_ms": 0.0,
         }
+        self.enable_handoff = enable_handoff
+        self.handoff_manager = None
+        if enable_handoff:
+            try:
+                from sih.handoff.manager import SeamlessGNSSHandoffManager, HandoffConfig
+                self.handoff_manager = SeamlessGNSSHandoffManager(HandoffConfig())
+            except Exception:
+                self.handoff_manager = None
 
     def get_last_batch_timing(self) -> Dict[str, float]:
         """Returns the timing breakdown of the most recently processed batch."""
@@ -152,6 +163,43 @@ class SessionCore:
             kr = keep_ref if keep_ref is not None else (self.ref_lat != 0.0 or self.ref_lon != 0.0)
             self.evaluator.reset(keep_ref=kr)
         self.engine.reset()
+        if self.handoff_manager is not None:
+            self.handoff_manager.reset()
+
+    def set_map_matching(self, enabled: bool) -> None:
+        """Enables or disables map matching in the underlying engine."""
+        if hasattr(self.engine, "enable_map_matching"):
+            self.engine.enable_map_matching = bool(enabled)
+        if hasattr(self.engine, "session") and hasattr(self.engine.session, "enable_map_matching"):
+            self.engine.session.enable_map_matching = bool(enabled)
+
+    def prefetch_road_network(self, lat: float, lon: float, radius_m: float = 3000.0) -> Dict[str, Any]:
+        """
+        Prefetches road network geometry around (lat, lon) using Overpass client
+        and assigns it to the engine.
+        """
+        try:
+            from sih.map.osm_client import OSMOverpassClient
+            client = OSMOverpassClient()
+            net = client.fetch_road_network(lat, lon, radius_m=radius_m)
+            if net is not None:
+                self.engine.road_network = net
+                if hasattr(self.engine, "session") and hasattr(self.engine.session, "road_network"):
+                    self.engine.session.road_network = net
+                return {
+                    "success": True,
+                    "segments": len(net.segments),
+                    "message": f"Prefetched {len(net.segments)} segments ({radius_m:.0f}m radius)",
+                }
+            return {"success": False, "segments": 0, "message": "No roads returned"}
+        except Exception as e:
+            return {"success": False, "segments": 0, "message": str(e)}
+
+    def get_mount_state(self) -> str:
+        """Returns mount state string (UNLEVELLED / LEVELLED / YAW_LOCKED / REUSED)."""
+        if hasattr(self.engine, "get_mount_state_string"):
+            return self.engine.get_mount_state_string()
+        return "UNKNOWN"
 
     def prime_features(
         self,
@@ -185,15 +233,37 @@ class SessionCore:
                 "bearing_deg": round(float(latest_gnss.bearing_deg or 0.0), 1),
             }
 
+        warmup = self.engine.get_warmup_status()
+        if self.handoff_manager is not None:
+            warmup["handoff_state"] = self.handoff_manager.state.value
+        else:
+            warmup["handoff_state"] = "INITIALIZING"
+        warmup["map_matching_enabled"] = getattr(self.engine, "enable_map_matching", True)
+
+        reconciled_dict = None
+        if self.handoff_manager is not None and getattr(self.handoff_manager.reconciler, "is_active", False):
+            try:
+                from sih.data.geo import enu_to_geodetic
+                p_disp = self.handoff_manager.reconciler.get_reconciled_position(time.time_ns())
+                if p_disp is not None and self.ref_lat != 0.0:
+                    r_lat, r_lon, _ = enu_to_geodetic(
+                        p_disp[0], p_disp[1], p_disp[2],
+                        self.ref_lat, self.ref_lon, self.ref_alt
+                    )
+                    reconciled_dict = {"lat": float(r_lat), "lon": float(r_lon)}
+            except Exception:
+                pass
+
         return {
             "type": "hud_update",
             "state": self.state,
             "benchmark_active": self.benchmark_active,
             "benchmark_scenario": self.current_benchmark_scenario,
             "mount_status": self.engine.get_mount_status(),
-            "warmup": self.engine.get_warmup_status(),
+            "warmup": warmup,
             "dr_pos": dr_dict,
             "gnss_pos": gnss_dict,
+            "reconciled_pos": reconciled_dict,
             "metrics": self.evaluator.get_summary_dict(),
         }
 
@@ -242,6 +312,32 @@ class SessionCore:
             if self.state == "WARMING_UP":
                 self.engine.on_gnss(gnss)
             latest_g_in_batch = gnss
+            if self.handoff_manager is not None:
+                try:
+                    self.handoff_manager.on_gnss(gnss)
+                except Exception:
+                    pass
+
+            if gnss.is_valid and (self.road_network is None or len(self.road_network.segments) == 0):
+                try:
+                    from sih.map.cache import SpatialDiskCache
+                    c_dir = getattr(self, "cache_dir", "data/maps/cache")
+                    cache = SpatialDiskCache(cache_dir=c_dir)
+                    if cache.is_area_cached(gnss.latitude_deg, gnss.longitude_deg, 1500.0):
+                        cached_rnet = cache.get_combined_network_for_radius(
+                            gnss.latitude_deg, gnss.longitude_deg, 1500.0,
+                            ref_lat=self.ref_lat if self.ref_lat != 0.0 else gnss.latitude_deg,
+                            ref_lon=self.ref_lon if self.ref_lon != 0.0 else gnss.longitude_deg,
+                        )
+                        if len(cached_rnet.segments) > 0:
+                            self.road_network = cached_rnet
+                            if hasattr(self.engine, "update_road_network"):
+                                self.engine.update_road_network(cached_rnet, self.ref_lat or gnss.latitude_deg, self.ref_lon or gnss.longitude_deg)
+                            elif hasattr(self.engine, "road_network"):
+                                self.engine.road_network = cached_rnet
+                                self.engine.enable_map_matching = True
+                except Exception:
+                    pass
 
         # 2. State transition evaluation
         if "state" in batch_data:
@@ -263,6 +359,11 @@ class SessionCore:
             fused = self.engine.on_imu(imu)
             if fused is not None:
                 self.evaluator.on_dr(fused)
+                if self.handoff_manager is not None:
+                    try:
+                        self.handoff_manager.on_fused_position(fused)
+                    except Exception:
+                        pass
 
         t_batch_end = time.perf_counter()
         total_ms = (t_batch_end - t_batch_start) * 1000.0
@@ -311,10 +412,89 @@ class SessionCore:
             calib_samples = args.get("calib_samples")
             self.prime_features(imu_samples, calib_samples=calib_samples)
             return {"status": "ok"}
+        elif cmd == "set_map_matching":
+            enabled = bool(args.get("enabled", True))
+            self.set_map_matching(enabled)
+            return {"status": "ok", "enabled": enabled}
+        elif cmd == "prefetch_road_network":
+            lat = float(args.get("lat", self.ref_lat))
+            lon = float(args.get("lon", self.ref_lon))
+            radius_m = float(args.get("radius_m", 3000.0))
+            cache_dir = args.get("cache_dir")
+            return self.prefetch_road_network(lat, lon, radius_m, cache_dir)
         elif cmd == "get_hud":
             return self.get_hud()
         else:
             return {"status": "error", "message": f"Unknown control command: {cmd}"}
+
+    def set_map_matching(self, enabled: bool) -> None:
+        """Enables or disables map matching in the engine."""
+        if hasattr(self.engine, "enable_map_matching"):
+            self.engine.enable_map_matching = bool(enabled)
+
+    def prefetch_road_network(
+        self,
+        lat: float,
+        lon: float,
+        radius_m: float = 3000.0,
+        cache_dir: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Prefetches road network around (lat, lon) within radius_m.
+        Stores into cache_dir (or self.cache_dir).
+        Updates self.road_network and self.engine.
+        """
+        t0 = time.perf_counter()
+        c_dir = cache_dir or getattr(self, "cache_dir", "data/maps/cache")
+        try:
+            from sih.map.cache import SpatialDiskCache
+            from sih.map.hybrid_provider import HybridIndiaMapProvider
+            cache = SpatialDiskCache(cache_dir=c_dir)
+            gis_dir = os.path.join(c_dir, "indian_gis")
+            provider = HybridIndiaMapProvider(
+                disk_cache=cache,
+                enable_live_osm=True,
+                cache_dir=c_dir,
+                gis_data_dir=gis_dir,
+            )
+            rnet = provider.get_corridor_network(lat=lat, lon=lon, radius_m=radius_m)
+            fetch_time_s = time.perf_counter() - t0
+            seg_count = len(rnet.segments)
+            cache_size_bytes = cache.get_cache_size_bytes()
+
+            if seg_count > 0:
+                self.road_network = rnet
+                if hasattr(self.engine, "update_road_network"):
+                    self.engine.update_road_network(rnet, self.ref_lat or lat, self.ref_lon or lon)
+                elif hasattr(self.engine, "road_network"):
+                    self.engine.road_network = rnet
+                    self.engine.enable_map_matching = True
+                return {
+                    "success": True,
+                    "message": f"Prefetched {seg_count} segments ({fetch_time_s:.2f}s, cache: {cache_size_bytes / 1024:.1f} KB)",
+                    "segment_count": seg_count,
+                    "fetch_time_s": fetch_time_s,
+                    "cache_size_bytes": cache_size_bytes,
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"No segments found ({fetch_time_s:.2f}s)",
+                    "segment_count": 0,
+                    "fetch_time_s": fetch_time_s,
+                    "cache_size_bytes": cache_size_bytes,
+                }
+        except Exception as e:
+            import traceback
+            print(f"[Prefetch] Exception during prefetch: {e}")
+            traceback.print_exc()
+            return {
+                "success": False,
+                "message": f"Prefetch error: {e}",
+                "segment_count": 0,
+                "fetch_time_s": time.perf_counter() - t0,
+                "cache_size_bytes": 0,
+            }
 
     def setup_benchmark_engine(
         self,
