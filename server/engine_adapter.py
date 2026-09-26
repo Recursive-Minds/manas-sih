@@ -24,9 +24,16 @@ from __future__ import annotations
 import os
 import sys
 import math
+import time
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
-from scipy.signal import butter, sosfilt
+if os.environ.get("SIH_FORCE_SCIPY_SHIM", "0") == "1":
+    from sih.core.scipy_shim import butter, sosfilt, sosfilt_zi
+else:
+    try:
+        from scipy.signal import butter, sosfilt, sosfilt_zi
+    except ImportError:
+        from sih.core.scipy_shim import butter, sosfilt, sosfilt_zi
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -69,7 +76,6 @@ class CausalAntiAliasFilter:
         if not self.initialized:
             # Initialize filter steady-state with first sample to prevent step artifact
             for ch in range(3):
-                from scipy.signal import sosfilt_zi
                 zi_ch = sosfilt_zi(self.sos) * val_3d[ch]
                 self.zi[:, ch, :] = zi_ch
             self.initialized = True
@@ -381,6 +387,7 @@ class EngineAdapterStageB:
         decimate_gnss: Optional[bool] = None,
         lock_saved_alignment: bool = False,
         use_speed_smoother: bool = True,
+        predictor: Optional[Any] = None,
     ) -> None:
         if decimate_gnss is not None:
             decimate_gnss_for_seeding = decimate_gnss
@@ -411,20 +418,46 @@ class EngineAdapterStageB:
         self.last_moving_gnss: Optional[GNSSSample] = None
         self.last_imu_ts_ns: Optional[int] = None
 
-        # AI model setup
+        # AI model & predictor setup
         self.device = device
         self.model = model
         self.norm_mean = norm_mean
         self.norm_std = norm_std
-        if self.model is None:
+        self.predictor = None
+
+        if predictor is not None:
+            if isinstance(predictor, str):
+                from sih.models.predictor import create_predictor
+                self.predictor = create_predictor(predictor, model=model, device=device)
+            else:
+                self.predictor = predictor
+        elif self.model is not None:
+            from sih.models.predictor import TorchVelocityPredictor
+            self.predictor = TorchVelocityPredictor(self.model, device=self.device)
+        else:
             from sih.models.inference import load_ai_model
+            from sih.models.predictor import TorchVelocityPredictor
             try:
                 import torch
                 dev = self.device or torch.device("cpu")
                 self.model, self.norm_mean, self.norm_std, _ = load_ai_model(dev)
                 self.device = dev
+                self.predictor = TorchVelocityPredictor(self.model, device=self.device)
             except Exception as e:
                 print(f"[EngineAdapterStageB] Could not load AI model: {e}")
+
+        # If normalization params still not loaded, attempt to load from exported sidecar
+        if (self.norm_mean is None or self.norm_std is None):
+            norm_sidecar = os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz")
+            if os.path.exists(norm_sidecar):
+                try:
+                    npz = np.load(norm_sidecar)
+                    if self.norm_mean is None:
+                        self.norm_mean = npz["mean"].reshape(-1, 1)
+                    if self.norm_std is None:
+                        self.norm_std = npz["std"].reshape(-1, 1)
+                except Exception:
+                    pass
 
         # Decimation & anti-alias filter
         self.accel_filter = CausalAntiAliasFilter(cutoff_hz=4.0, default_fs=50.0)
@@ -475,6 +508,23 @@ class EngineAdapterStageB:
             smoothing_factor=self.smoothing_factor,
             enable_speed_scale=self.enable_speed_scale,
         )
+
+        # Per-batch timing split tracking (ms)
+        self.batch_features_ms: float = 0.0
+        self.batch_model_ms: float = 0.0
+        self.batch_ekf_map_ms: float = 0.0
+
+    def reset_batch_timing(self) -> None:
+        self.batch_features_ms = 0.0
+        self.batch_model_ms = 0.0
+        self.batch_ekf_map_ms = 0.0
+
+    def get_batch_timing(self) -> Dict[str, float]:
+        return {
+            "features_ms": float(self.batch_features_ms),
+            "model_ms": float(self.batch_model_ms),
+            "ekf_map_ms": float(self.batch_ekf_map_ms),
+        }
 
     @property
     def ekf(self) -> ErrorStateEKF:
@@ -742,12 +792,14 @@ class EngineAdapterStageB:
             return float(override_speed)
 
         # Causal feature extraction
+        t_feat0 = time.perf_counter()
         f = self.feature_extractor.push(cal)
         self.feature_buf.append(f)
         if len(self.feature_buf) > 60:
             self.feature_buf.pop(0)
 
-        if self.model is None or len(self.feature_buf) < 1:
+        if self.model is None and self.predictor is None or len(self.feature_buf) < 1:
+            self.batch_features_ms += (time.perf_counter() - t_feat0) * 1000.0
             return max(0.0, float(np.linalg.norm(self.session.ekf_map._v)))
 
         # Build short (20) and long (60) feature windows with pad repetition
@@ -758,19 +810,30 @@ class EngineAdapterStageB:
             w_l = np.array(self.feature_buf[-60:], dtype=np.float32).T
 
         if self.norm_mean is not None and self.norm_std is not None:
-            norm_w_l = (w_l - self.norm_mean) / (self.norm_std + 1e-6)
+            norm_w_l = (w_l - self.norm_mean.reshape(-1, 1)) / (self.norm_std.reshape(-1, 1) + 1e-6)
         else:
             norm_w_l = w_l
 
         norm_w_s = norm_w_l[:, -20:].copy()
+        self.batch_features_ms += (time.perf_counter() - t_feat0) * 1000.0
 
-        import torch
-        dev = self.device or torch.device("cpu")
-        ts_s = torch.from_numpy(norm_w_s[None, ...]).to(dev)
-        ts_l = torch.from_numpy(norm_w_l[None, ...]).to(dev)
-        with torch.no_grad():
-            vf, _, _ = self.model(ts_s, ts_l)
-        v_raw = float(vf.item())
+        t_mod0 = time.perf_counter()
+        if self.predictor is not None:
+            v_raw, _ = self.predictor.predict_window(norm_w_s, norm_w_l)
+        elif self.model is not None:
+            import torch
+            dev = self.device or torch.device("cpu")
+            ts_s = torch.from_numpy(norm_w_s[None, ...]).to(dev)
+            ts_l = torch.from_numpy(norm_w_l[None, ...]).to(dev)
+            with torch.no_grad():
+                vf, _, _ = self.model(ts_s, ts_l)
+            v_raw = float(vf.item())
+        else:
+            self.batch_model_ms += (time.perf_counter() - t_mod0) * 1000.0
+            return max(0.0, float(np.linalg.norm(self.session.ekf_map._v)))
+
+        self.batch_model_ms += (time.perf_counter() - t_mod0) * 1000.0
+
         if self.use_speed_smoother and self.speed_smoother is not None:
             return self.speed_smoother.update(v_raw, dt_s=0.1)
         return v_raw
@@ -831,16 +894,19 @@ class EngineAdapterStageB:
         windows_l = np.ascontiguousarray(windows_l.transpose(1, 0, 2)).astype(np.float32)
         windows_s = np.ascontiguousarray(windows_l[:, :, -short_len:]).astype(np.float32)
 
-        import torch
-        dev = self.device or torch.device("cpu")
-        batch_size = 2048
-        preds = []
-        with torch.no_grad():
-            for b in range(0, N, batch_size):
-                b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(dev)
-                b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(dev)
-                vf, _, _ = self.model(b_s, b_l)
-                preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
+        if self.predictor is not None:
+            preds = self.predictor.predict_batch(windows_s, windows_l)
+        else:
+            import torch
+            dev = self.device or torch.device("cpu")
+            batch_size = 2048
+            preds = []
+            with torch.no_grad():
+                for b in range(0, N, batch_size):
+                    b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(dev)
+                    b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(dev)
+                    vf, _, _ = self.model(b_s, b_l)
+                    preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
 
         for v_raw in preds:
             v_val = float(v_raw)
@@ -898,13 +964,16 @@ class EngineAdapterStageB:
         self.recent_ai_ts.append(imu.timestamp_ns)
 
         # Predict warmup
+        t_ekf0 = time.perf_counter()
         if self.state == "WARMING_UP":
             if self.has_ref_coords and self.session.ekf_pure._initialised and (self.session.ekf_pure._ref[0] != 0.0 or self.session.ekf_pure._ref[1] != 0.0):
                 self.session.predict_warmup(cal, v_raw, imu.timestamp_ns)
+            self.batch_ekf_map_ms += (time.perf_counter() - t_ekf0) * 1000.0
             return None
 
         # BLACKOUT propagation
         step_res = self.session.step(cal, v_raw, imu.timestamp_ns)
+        self.batch_ekf_map_ms += (time.perf_counter() - t_ekf0) * 1000.0
 
         pos_enu = self.session.ekf_map._p
         if step_res.matched_pos is not None and step_res.matched_pos.is_matched:

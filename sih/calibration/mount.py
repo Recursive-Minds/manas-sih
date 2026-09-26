@@ -8,8 +8,15 @@ windshield mount, dashboard cradle) from the vehicle body frame (X=Forward, Y=Le
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Dict
+import os
 import numpy as np
-from scipy.spatial.transform import Rotation as R
+if os.environ.get("SIH_FORCE_SCIPY_SHIM", "0") == "1":
+    from sih.core.scipy_shim import Rotation as R
+else:
+    try:
+        from scipy.spatial.transform import Rotation as R
+    except ImportError:
+        from sih.core.scipy_shim import Rotation as R
 
 from sih.core.contracts import IMUSample, GNSSSample, CalibratedSample
 from sih.core.interfaces import ICalibration

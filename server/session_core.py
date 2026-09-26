@@ -52,6 +52,7 @@ class SessionCore:
         norm_std: Optional[np.ndarray] = None,
         device: Optional[Any] = None,
         use_speed_smoother: bool = True,
+        predictor: Optional[Any] = None,
     ) -> None:
         self.ref_lat = float(ref_lat)
         self.ref_lon = float(ref_lon)
@@ -61,12 +62,15 @@ class SessionCore:
         self.domain = domain
         self.engine_type = engine_type
         self.use_speed_smoother = use_speed_smoother
+        self.predictor = predictor
 
         if ai_model is not None:
             self.ai_model = ai_model
             self.norm_mean = norm_mean
             self.norm_std = norm_std
             self.device = device
+        elif predictor is not None and not isinstance(predictor, str):
+            self.ai_model, self.norm_mean, self.norm_std, self.device = None, None, None, None
         else:
             try:
                 import torch
@@ -98,6 +102,7 @@ class SessionCore:
                 decimate_gnss_for_seeding=False,
                 lock_saved_alignment=(saved_alignment is not None),
                 use_speed_smoother=self.use_speed_smoother,
+                predictor=self.predictor,
             )
 
         self.evaluator = LiveEvaluator(
@@ -112,6 +117,16 @@ class SessionCore:
         self.benchmark_active: bool = False
         self.current_benchmark_scenario: Optional[int] = None
         self.current_trip_name: str = ""
+        self.last_batch_timing: Dict[str, float] = {
+            "features_ms": 0.0,
+            "model_ms": 0.0,
+            "ekf_map_ms": 0.0,
+            "total_ms": 0.0,
+        }
+
+    def get_last_batch_timing(self) -> Dict[str, float]:
+        """Returns the timing breakdown of the most recently processed batch."""
+        return dict(self.last_batch_timing)
 
     def set_blackout(self, active: bool = True, entry_gnss: Optional[GNSSSample] = None) -> None:
         self.state = "BLACKOUT" if active else "WARMING_UP"
@@ -182,7 +197,7 @@ class SessionCore:
             "metrics": self.evaluator.get_summary_dict(),
         }
 
-    def push_batch(self, batch_data: Dict[str, Any]) -> Dict[str, Any]:
+    def push_batch(self, batch_data: Dict[str, Any], source: str = "phone") -> Dict[str, Any]:
         """
         Processes a single sensor batch dictionary (IMU and/or GNSS).
         Enforces zero-future-leak firewall and state transitions.
@@ -203,6 +218,10 @@ class SessionCore:
             if (now - self.last_replay_time) > 8.0:
                 self.reset()
             self.last_replay_time = now
+
+        t_batch_start = time.perf_counter()
+        if hasattr(self.engine, "reset_batch_timing"):
+            self.engine.reset_batch_timing()
 
         # 1. Ingest GNSS samples if present
         gnss_list = batch_data.get("gnss", [])
@@ -245,7 +264,24 @@ class SessionCore:
             if fused is not None:
                 self.evaluator.on_dr(fused)
 
-        return self.get_hud()
+        t_batch_end = time.perf_counter()
+        total_ms = (t_batch_end - t_batch_start) * 1000.0
+
+        timing = {
+            "features_ms": 0.0,
+            "model_ms": 0.0,
+            "ekf_map_ms": 0.0,
+            "total_ms": float(total_ms),
+        }
+        if hasattr(self.engine, "get_batch_timing"):
+            split = self.engine.get_batch_timing()
+            timing.update(split)
+            timing["total_ms"] = float(total_ms)
+
+        self.last_batch_timing = timing
+        hud = self.get_hud()
+        hud["timing"] = self.last_batch_timing
+        return hud
 
     def control(self, cmd: str, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
