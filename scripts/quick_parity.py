@@ -30,8 +30,10 @@ from server.engine_adapter import EngineAdapterStageB
 from sih.round1.config import get_active_config
 
 
-def run_quick_parity(raw_mode: bool = False):
+def run_quick_parity(raw_mode: bool = False, no_smoother: bool = False, use_cpu: bool = False):
     mode_str = "RAW INPUT MODE (adapter computes mount + features + AI speed)" if raw_mode else "ENGINE PARITY MODE (exact component comparison)"
+    if no_smoother:
+        mode_str += " [NO SMOOTHER]"
     print("=" * 80)
     print("QUICK PARITY CHECK: S-S3a (Mixed Domain) - 5 Canonical Scenarios")
     print(f"Batch Engine vs Streaming EngineAdapterStageB [{mode_str}]")
@@ -45,9 +47,12 @@ def run_quick_parity(raw_mode: bool = False):
 
     # 2. Calibrations, Road Network, AI Velocities
     calibs = calibrate_stream(trip, min_samples=30)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if use_cpu:
+        device = torch.device("cpu")
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, norm_mean, norm_std, model_type = load_ai_model(device)
-    v_preds = predict_velocities(model, calibs, norm_mean, norm_std, device, model_type=model_type)
+    v_preds = predict_velocities(model, calibs, norm_mean, norm_std, device, model_type=model_type, apply_smoothing=not no_smoother)
     rnet, rpts = load_trip_road_network(trip, map_source="osm", cache_dir="data/maps/cache")
 
     # 3. Canonical target scenarios on S-S3a from Seed 541098:
@@ -156,6 +161,7 @@ def run_quick_parity(raw_mode: bool = False):
             device=device if raw_mode else None,
             decimate_gnss_for_seeding=False,
             lock_saved_alignment=True,
+            use_speed_smoother=not no_smoother,
         )
 
         valid_gnss = [g for g in trip.gnss_samples if g.is_valid and g.timestamp_ns <= bo_start_ns]
@@ -167,9 +173,14 @@ def run_quick_parity(raw_mode: bool = False):
         j_warm = next((i for i, im in enumerate(trip.imu_samples) if im.timestamp_ns >= warmup_start_ns), 0)
         j_hist = min(j_hist, j_warm)
 
-        adapter.recent_imu_calib = list(calibs[j_hist:j_warm])
-        adapter.recent_ai_speeds = list(v_preds[j_hist:j_warm])
-        adapter.recent_ai_ts = [imu.timestamp_ns for imu in trip.imu_samples[j_hist:j_warm]]
+        if raw_mode:
+            # Step 0c: pre-roll with prime_features from TRIP START up to warmup start
+            adapter.prime_features(trip.imu_samples[:j_warm], calib_samples=calibs[:j_warm])
+        else:
+            adapter.recent_imu_calib = list(calibs[j_hist:j_warm])
+            adapter.recent_ai_speeds = list(v_preds[j_hist:j_warm])
+            adapter.recent_ai_ts = [imu.timestamp_ns for imu in trip.imu_samples[j_hist:j_warm]]
+
         adapter.recent_gnss_window = [g for g in valid_gnss if t_hist_ns <= g.timestamp_ns < warmup_start_ns]
 
         # 3. Stream through warmup then blackout
@@ -179,6 +190,7 @@ def run_quick_parity(raw_mode: bool = False):
 
         stream_pts = []
         stream_ts_list = []
+        stream_speeds = []
 
         for j, imu in enumerate(trip.imu_samples):
             t_curr = imu.timestamp_ns
@@ -207,6 +219,8 @@ def run_quick_parity(raw_mode: bool = False):
             if adapter.blackout_started and fused is not None:
                 stream_pts.append(adapter.ekf._p[:2].copy())
                 stream_ts_list.append(t_curr)
+                if adapter.recent_ai_speeds:
+                    stream_speeds.append(adapter.recent_ai_speeds[-1])
 
         stream_pts = np.array(stream_pts)
         stream_ts_arr = np.array(stream_ts_list, dtype=np.float64)
@@ -244,7 +258,15 @@ def run_quick_parity(raw_mode: bool = False):
         traj_diffs = np.hypot(s_interp_e - b_interp_e, s_interp_n - b_interp_n)
         max_traj_diff = float(np.max(traj_diffs))
 
-        thresh = 5.0 if raw_mode else 0.01
+        # Speed difference during blackout
+        bo_imu_idxs = [i for i, im in enumerate(trip.imu_samples) if bo_start_ns <= im.timestamp_ns <= bo_end_ns]
+        batch_v_bo = v_preds[bo_imu_idxs[:len(stream_speeds)]]
+        if len(stream_speeds) > 0 and len(batch_v_bo) > 0:
+            max_speed_diff = float(np.max(np.abs(np.array(stream_speeds) - np.array(batch_v_bo))))
+        else:
+            max_speed_diff = 0.0
+
+        thresh = 0.05 if raw_mode else 0.01
         passed = endpoint_diff < thresh
         status = "PASS" if passed else "FAIL"
         if tgt["id"] == 26:
@@ -252,10 +274,10 @@ def run_quick_parity(raw_mode: bool = False):
         if not passed:
             all_passed = False
 
-        print(f"Scenario #{tgt['id']:<4} | {batch_err:6.2f} m    | {stage_b_err:6.2f} m     | {endpoint_diff:8.4f} m      | {max_traj_diff:8.4f} m      | {status}")
+        print(f"Scenario #{tgt['id']:<4} | {batch_err:6.2f} m    | {stage_b_err:6.2f} m     | {endpoint_diff:8.4f} m      | {max_traj_diff:8.4f} m      | {max_speed_diff:8.6f} m/s | {status}")
 
-    thresh_str = "<5m" if raw_mode else "<0.01m"
-    print("-" * 95)
+    thresh_str = "<0.05m" if raw_mode else "<0.01m"
+    print("-" * 110)
     print(f"Scenario #26 Passed ({thresh_str}): {sc26_passed}")
     print(f"All Scenarios Passed ({thresh_str}): {all_passed}")
     print("=" * 80)
@@ -266,7 +288,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Quick Parity Check: Batch vs Streaming EngineAdapterStageB")
     parser.add_argument("--raw", action="store_true", help="Run in raw-input mode (adapter computes mount + features + AI speeds)")
+    parser.add_argument("--no-smoother", action="store_true", help="Disable speed smoother in both batch and streaming")
+    parser.add_argument("--cpu", action="store_true", help="Force CPU inference for exact bit-parity (< 1e-5 m/s)")
     args = parser.parse_args()
 
-    success = run_quick_parity(raw_mode=args.raw)
+    success = run_quick_parity(raw_mode=args.raw, no_smoother=args.no_smoother, use_cpu=args.cpu)
     sys.exit(0 if success else 1)
