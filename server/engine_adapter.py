@@ -775,6 +775,79 @@ class EngineAdapterStageB:
             return self.speed_smoother.update(v_raw, dt_s=0.1)
         return v_raw
 
+    def prime_features(
+        self,
+        imu_samples: List[IMUSample],
+        calib_samples: Optional[List[CalibratedSample]] = None,
+    ) -> None:
+        """
+        Pre-rolls the feature extractor and AI speed model over historical IMU samples
+        from trip / app start up to the streaming connection point.
+        Runs ONLY feature extraction + model forward (+ smoother if enabled).
+        Appends to recent_ai_speeds / recent_imu_calib exactly as on_imu does,
+        without touching the EKF session, GNSS buffers, or filter state machines.
+        """
+        if not imu_samples:
+            return
+
+        N = len(imu_samples)
+        c_list: List[CalibratedSample] = []
+        for i, imu in enumerate(imu_samples):
+            if calib_samples is not None and i < len(calib_samples):
+                c = calib_samples[i]
+            else:
+                c = self.calibrator.update(imu)
+            c_list.append(c)
+            self.recent_imu_calib.append(c)
+            self.recent_ai_ts.append(imu.timestamp_ns)
+
+        if self.model is None:
+            for c in c_list:
+                f = self.feature_extractor.push(c)
+                self.feature_buf.append(f)
+                if len(self.feature_buf) > 60:
+                    self.feature_buf.pop(0)
+                self.recent_ai_speeds.append(0.0)
+            return
+
+        feats = []
+        for c in c_list:
+            f = self.feature_extractor.push(c)
+            self.feature_buf.append(f)
+            if len(self.feature_buf) > 60:
+                self.feature_buf.pop(0)
+            feats.append(f)
+
+        feats_arr = np.array(feats, dtype=np.float32)
+        norm_mean = self.norm_mean if self.norm_mean is not None else np.zeros(12, dtype=np.float32)
+        norm_std = self.norm_std if self.norm_std is not None else np.ones(12, dtype=np.float32)
+        norm_feats = (feats_arr.T - norm_mean) / (norm_std + 1e-6)
+        short_len, long_len = 20, 60
+        pad_l = np.repeat(norm_feats[:, 0:1], long_len - 1, axis=1)
+        padded_feats = np.hstack([pad_l, norm_feats]).astype(np.float32)
+
+        from numpy.lib.stride_tricks import sliding_window_view
+        windows_l = sliding_window_view(padded_feats, window_shape=long_len, axis=1)
+        windows_l = np.ascontiguousarray(windows_l.transpose(1, 0, 2)).astype(np.float32)
+        windows_s = np.ascontiguousarray(windows_l[:, :, -short_len:]).astype(np.float32)
+
+        import torch
+        dev = self.device or torch.device("cpu")
+        batch_size = 2048
+        preds = []
+        with torch.no_grad():
+            for b in range(0, N, batch_size):
+                b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(dev)
+                b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(dev)
+                vf, _, _ = self.model(b_s, b_l)
+                preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
+
+        for v_raw in preds:
+            v_val = float(v_raw)
+            if self.use_speed_smoother and self.speed_smoother is not None:
+                v_val = self.speed_smoother.update(v_val, dt_s=0.1)
+            self.recent_ai_speeds.append(v_val)
+
     def on_imu(
         self,
         imu: IMUSample,
