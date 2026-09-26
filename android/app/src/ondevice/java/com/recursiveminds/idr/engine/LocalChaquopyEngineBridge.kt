@@ -26,6 +26,8 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     // Dedicated single-thread worker for local dead reckoning engine execution
     private val executor = Executors.newSingleThreadExecutor { Thread(it, "IDROnDeviceEngine") }
+    // Dedicated asynchronous worker for network map prefetching and disk I/O
+    private val ioExecutor = Executors.newSingleThreadExecutor { Thread(it, "IDRIOWorker") }
     private val batchQueue = ConcurrentLinkedQueue<SensorBatch>()
     private val isDraining = AtomicBoolean(false)
 
@@ -58,12 +60,29 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                 py = Python.getInstance()
                 pyJson = py?.getModule("json")
 
+                // Propagate system proxy to Python's os.environ if configured (e.g. campus Wi-Fi)
+                try {
+                    val cm = context.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+                    val proxy = cm?.defaultProxy
+                    if (proxy != null && !proxy.host.isNullOrBlank()) {
+                        val proxyUrl = "http://${proxy.host}:${proxy.port}"
+                        Log.i("LocalEngineBridge", "Propagating system proxy to Python: $proxyUrl")
+                        val osMod = py?.getModule("os")
+                        val environ = osMod?.get("environ")
+                        environ?.callAttr("__setitem__", "http_proxy", proxyUrl)
+                        environ?.callAttr("__setitem__", "https_proxy", proxyUrl)
+                    }
+                } catch (pe: Throwable) {
+                    Log.w("LocalEngineBridge", "Could not propagate system proxy: ${pe.message}")
+                }
+
                 // 1. TFLite Predictor Bridge (XNNPACK, 4 threads, warm-up)
                 bridge = TFLitePredictorBridge.create(context.applicationContext, "moe_velocity_model.tflite")
                 val predictorModule = py?.getModule("sih.models.predictor")
                 val pyPredictor = predictorModule?.callAttr("JavaBridgeVelocityPredictor", bridge, true)
 
                 // 2. Instantiate SessionCore (runs features & model from start)
+                val mapsCacheDir = context.applicationContext.filesDir.resolve("maps_cache").absolutePath
                 val sessionModule = py?.getModule("server.session_core")
                 sessionCore = sessionModule?.callAttr(
                     "SessionCore",
@@ -75,7 +94,8 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                     null, null, null, null,
                     true, // use_speed_smoother
                     pyPredictor,
-                    true // enable_handoff (display only)
+                    true, // enable_handoff (display only)
+                    mapsCacheDir // cache_dir
                 )
 
                 _isConnected.set(true)
@@ -199,10 +219,11 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
     }
 
     override fun prefetchArea(lat: Double, lon: Double, radiusM: Double, callback: (Boolean, String) -> Unit) {
-        executor.execute {
+        ioExecutor.execute {
             try {
                 Log.i("PHONE", "Prefetching road network area at lat=$lat, lon=$lon, radius=$radiusM")
-                val res = sessionCore?.callAttr("prefetch_road_network", lat, lon, radiusM)
+                val mapsCacheDir = context.applicationContext.filesDir.resolve("maps_cache").absolutePath
+                val res = sessionCore?.callAttr("prefetch_road_network", lat, lon, radiusM, mapsCacheDir)
                 val success = res?.callAttr("get", "success")?.toBoolean() ?: false
                 val msg = res?.callAttr("get", "message")?.toString() ?: "Unknown result"
                 scope.launch(Dispatchers.Main) {

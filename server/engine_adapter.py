@@ -629,6 +629,7 @@ class EngineAdapterStageB:
         speed_calib_s = min(180, int(self.moving_gnss_fixes_count))
         speed_calib_display = f"Speed calibration {speed_calib_s}/180 s"
 
+        has_network = bool(self.road_network is not None and len(self.road_network.segments) > 0)
         return {
             "is_ready": is_ready,
             "gravity_converged": gravity_converged,
@@ -642,8 +643,30 @@ class EngineAdapterStageB:
             "alpha_learned": alpha_learned,
             "speed_calib_s": speed_calib_s,
             "speed_calib_display": speed_calib_display,
-            "map_matching_enabled": bool(self.enable_map_matching),
+            "map_matching_enabled": bool(self.enable_map_matching and has_network),
         }
+
+    @property
+    def matcher(self):
+        return getattr(self.session, "matcher", None)
+
+    @matcher.setter
+    def matcher(self, value):
+        if hasattr(self, "session"):
+            self.session.matcher = value
+
+    def update_road_network(self, road_network: Any, ref_lat: float = 0.0, ref_lon: float = 0.0) -> None:
+        self.road_network = road_network
+        if hasattr(self, "session"):
+            self.session.road_network = road_network
+            from sih.map.matcher import HMMMapMatcher
+            self.session.matcher = HMMMapMatcher(
+                road_network=road_network,
+                reference_lat_deg=ref_lat or self.ref_lat,
+                reference_lon_deg=ref_lon or self.ref_lon,
+                smoothing_factor=self.smoothing_factor,
+            )
+        self.enable_map_matching = True
 
     def _evaluate_mount_guard(self) -> None:
         if self.lock_saved_alignment:

@@ -54,6 +54,7 @@ class SessionCore:
         use_speed_smoother: bool = True,
         predictor: Optional[Any] = None,
         enable_handoff: bool = True,
+        cache_dir: Optional[str] = None,
     ) -> None:
         self.ref_lat = float(ref_lat)
         self.ref_lon = float(ref_lon)
@@ -64,6 +65,7 @@ class SessionCore:
         self.engine_type = engine_type
         self.use_speed_smoother = use_speed_smoother
         self.predictor = predictor
+        self.cache_dir = cache_dir or "data/maps/cache"
 
         if ai_model is not None:
             self.ai_model = ai_model
@@ -316,6 +318,27 @@ class SessionCore:
                 except Exception:
                     pass
 
+            if gnss.is_valid and (self.road_network is None or len(self.road_network.segments) == 0):
+                try:
+                    from sih.map.cache import SpatialDiskCache
+                    c_dir = getattr(self, "cache_dir", "data/maps/cache")
+                    cache = SpatialDiskCache(cache_dir=c_dir)
+                    if cache.is_area_cached(gnss.latitude_deg, gnss.longitude_deg, 1500.0):
+                        cached_rnet = cache.get_combined_network_for_radius(
+                            gnss.latitude_deg, gnss.longitude_deg, 1500.0,
+                            ref_lat=self.ref_lat if self.ref_lat != 0.0 else gnss.latitude_deg,
+                            ref_lon=self.ref_lon if self.ref_lon != 0.0 else gnss.longitude_deg,
+                        )
+                        if len(cached_rnet.segments) > 0:
+                            self.road_network = cached_rnet
+                            if hasattr(self.engine, "update_road_network"):
+                                self.engine.update_road_network(cached_rnet, self.ref_lat or gnss.latitude_deg, self.ref_lon or gnss.longitude_deg)
+                            elif hasattr(self.engine, "road_network"):
+                                self.engine.road_network = cached_rnet
+                                self.engine.enable_map_matching = True
+                except Exception:
+                    pass
+
         # 2. State transition evaluation
         if "state" in batch_data:
             req_state = batch_data["state"]
@@ -389,10 +412,89 @@ class SessionCore:
             calib_samples = args.get("calib_samples")
             self.prime_features(imu_samples, calib_samples=calib_samples)
             return {"status": "ok"}
+        elif cmd == "set_map_matching":
+            enabled = bool(args.get("enabled", True))
+            self.set_map_matching(enabled)
+            return {"status": "ok", "enabled": enabled}
+        elif cmd == "prefetch_road_network":
+            lat = float(args.get("lat", self.ref_lat))
+            lon = float(args.get("lon", self.ref_lon))
+            radius_m = float(args.get("radius_m", 3000.0))
+            cache_dir = args.get("cache_dir")
+            return self.prefetch_road_network(lat, lon, radius_m, cache_dir)
         elif cmd == "get_hud":
             return self.get_hud()
         else:
             return {"status": "error", "message": f"Unknown control command: {cmd}"}
+
+    def set_map_matching(self, enabled: bool) -> None:
+        """Enables or disables map matching in the engine."""
+        if hasattr(self.engine, "enable_map_matching"):
+            self.engine.enable_map_matching = bool(enabled)
+
+    def prefetch_road_network(
+        self,
+        lat: float,
+        lon: float,
+        radius_m: float = 3000.0,
+        cache_dir: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Prefetches road network around (lat, lon) within radius_m.
+        Stores into cache_dir (or self.cache_dir).
+        Updates self.road_network and self.engine.
+        """
+        t0 = time.perf_counter()
+        c_dir = cache_dir or getattr(self, "cache_dir", "data/maps/cache")
+        try:
+            from sih.map.cache import SpatialDiskCache
+            from sih.map.hybrid_provider import HybridIndiaMapProvider
+            cache = SpatialDiskCache(cache_dir=c_dir)
+            gis_dir = os.path.join(c_dir, "indian_gis")
+            provider = HybridIndiaMapProvider(
+                disk_cache=cache,
+                enable_live_osm=True,
+                cache_dir=c_dir,
+                gis_data_dir=gis_dir,
+            )
+            rnet = provider.get_corridor_network(lat=lat, lon=lon, radius_m=radius_m)
+            fetch_time_s = time.perf_counter() - t0
+            seg_count = len(rnet.segments)
+            cache_size_bytes = cache.get_cache_size_bytes()
+
+            if seg_count > 0:
+                self.road_network = rnet
+                if hasattr(self.engine, "update_road_network"):
+                    self.engine.update_road_network(rnet, self.ref_lat or lat, self.ref_lon or lon)
+                elif hasattr(self.engine, "road_network"):
+                    self.engine.road_network = rnet
+                    self.engine.enable_map_matching = True
+                return {
+                    "success": True,
+                    "message": f"Prefetched {seg_count} segments ({fetch_time_s:.2f}s, cache: {cache_size_bytes / 1024:.1f} KB)",
+                    "segment_count": seg_count,
+                    "fetch_time_s": fetch_time_s,
+                    "cache_size_bytes": cache_size_bytes,
+                }
+            else:
+                return {
+                    "success": False,
+                    "message": f"No segments found ({fetch_time_s:.2f}s)",
+                    "segment_count": 0,
+                    "fetch_time_s": fetch_time_s,
+                    "cache_size_bytes": cache_size_bytes,
+                }
+        except Exception as e:
+            import traceback
+            print(f"[Prefetch] Exception during prefetch: {e}")
+            traceback.print_exc()
+            return {
+                "success": False,
+                "message": f"Prefetch error: {e}",
+                "segment_count": 0,
+                "fetch_time_s": time.perf_counter() - t0,
+                "cache_size_bytes": 0,
+            }
 
     def setup_benchmark_engine(
         self,

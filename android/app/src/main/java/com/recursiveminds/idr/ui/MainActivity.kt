@@ -718,7 +718,11 @@ class MainActivity : AppCompatActivity() {
                         // GPS multipath jitter (2-5m) at stationary causes pointer "drift"
                         // when the phone is sitting on a desk — this prevents that.
                         val speedMps = gnss.speedMps?.toDouble() ?: 0.0
-                        val isMoving = speedMps > 0.5
+                        val accuracyM = gnss.accuracyHM ?: 100.0f
+                        // Real vehicle motion requires speed > 1.2 m/s (~4.3 km/h) and acceptable accuracy (<= 35m).
+                        // Stationary phone on a desk experiences indoor multipath hops where Android calculates
+                        // false speeds of 0.5 - 1.0 m/s — this strict gate locks the marker in place.
+                        val isMoving = speedMps > 1.2 && accuracyM <= 35.0f
 
                         if (isMoving) {
                             tilePrefetcher?.onMotionUpdate(

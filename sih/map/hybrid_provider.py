@@ -71,6 +71,7 @@ class HybridIndiaMapProvider(IRoadNetworkProvider):
                 lon=lon,
                 radius_m=radius_m,
                 bearing_deg=bearing_deg,
+                cache_dir=self.cache.cache_dir,
             )
             if len(osm_net.segments) > 0:
                 # Cache fetched network partitioned by spatial tiles for future offline use
