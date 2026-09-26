@@ -1,0 +1,782 @@
+{
+  "seeds": [
+    541098,
+    75496,
+    45736,
+    12345,
+    987654,
+    314159
+  ],
+  "model_path": "models/checkpoints/round1_interval_lam0.5_s42.pt",
+  "map_source": "osm",
+  "configs": {
+    "t7_t8": {
+      "name": "t7_t8",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": false,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "entry",
+        "w_history": 0.5,
+        "window_s": 0.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_doppler": {
+      "name": "r2_doppler",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": true,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": false,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "entry",
+        "w_history": 0.5,
+        "window_s": 0.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_level45": {
+      "name": "r2_level45",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": true,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "history",
+        "w_history": 0.5,
+        "window_s": 45.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_level60": {
+      "name": "r2_level60",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": true,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "history",
+        "w_history": 0.5,
+        "window_s": 60.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_level90": {
+      "name": "r2_level90",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": true,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "history",
+        "w_history": 0.5,
+        "window_s": 90.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_blend60": {
+      "name": "r2_blend60",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": true,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "blend",
+        "w_history": 0.5,
+        "window_s": 60.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    },
+    "r2_blend180": {
+      "name": "r2_blend180",
+      "velocity_checkpoint": "",
+      "diagnostics": false,
+      "entry_doppler_bearing": false,
+      "history_s": 180.0,
+      "scale_fix": {
+        "source": "both"
+      },
+      "scale_level": {
+        "enabled": true,
+        "lo": 0.85,
+        "hi": 1.25,
+        "hi_highway": 1.35,
+        "source": "blend",
+        "w_history": 0.5,
+        "window_s": 0.0
+      },
+      "stop": {
+        "enabled": false,
+        "v_enter_mps": 1.2,
+        "v_exit_mps": 2.5,
+        "t_enter_s": 1.0,
+        "t_exit_s": 0.5,
+        "gyro_quiet_rad_s": 0.03,
+        "accel_std_default": 0.35,
+        "accel_std_mult": 1.6,
+        "launch_accel_mps2": 0.35
+      },
+      "gyro_scale": {
+        "enabled": false,
+        "window_s": 5.0,
+        "min_turn_deg": 20.0,
+        "min_speed_mps": 4.0,
+        "min_windows": 3,
+        "prior_windows": 6.0,
+        "clip_lo": 0.92,
+        "clip_hi": 1.08
+      },
+      "speed_mode": {
+        "mode": "ai",
+        "decay_tau_s": 20.0,
+        "entry_ai_window": 20
+      },
+      "online_calib": {
+        "enabled": true,
+        "window_s": 10.0,
+        "min_window_dist_m": 20.0,
+        "band_edges_mps": [
+          0.0,
+          5.0,
+          10.0,
+          15.0,
+          22.0,
+          60.0
+        ],
+        "prior_s": 30.0,
+        "clip_lo": 0.85,
+        "clip_hi": 1.15
+      },
+      "junction": {
+        "enabled": true,
+        "turn_on_rad_s": 0.12,
+        "turn_off_rad_s": 0.05,
+        "t_quiet_s": 1.0,
+        "min_turn_deg": 50.0,
+        "max_turn_deg": 140.0,
+        "max_turn_duration_s": 15.0,
+        "max_speed_mps": 16.0,
+        "line_tol_deg": 25.0,
+        "base_radius_m": 25.0,
+        "radius_frac": 0.15,
+        "max_radius_m": 80.0,
+        "ambiguity_ratio": 1.8,
+        "gain": 0.7,
+        "max_correction_m": 40.0
+      }
+    }
+  },
+  "summary": {
+    "t7_t8": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.307353612139728,
+      "mean_seed_median": 10.832473022572591,
+      "std_seed_median": 2.4271205143487364,
+      "per_seed_median": {
+        "12345": 13.541,
+        "45736": 6.101,
+        "75496": 11.798,
+        "314159": 9.935,
+        "541098": 12.804,
+        "987654": 10.817
+      },
+      "p90": 43.11387422531041,
+      "t1_lt10_share": 0.461864406779661,
+      "beats_pure_share": 0.8135593220338984,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 32.509678632958924,
+      "median_abs_ct_m": 6.078337910602797,
+      "by_domain": {
+        "Arterial": 12.765,
+        "Highway": 10.743,
+        "Mixed": 6.515,
+        "Urban": 17.072
+      }
+    },
+    "r2_doppler": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.308290880160005,
+      "mean_seed_median": 10.687804726409139,
+      "std_seed_median": 2.5793771282014437,
+      "per_seed_median": {
+        "12345": 13.542,
+        "45736": 5.744,
+        "75496": 11.799,
+        "314159": 9.421,
+        "541098": 12.804,
+        "987654": 10.818
+      },
+      "p90": 40.99189828136221,
+      "t1_lt10_share": 0.4745762711864407,
+      "beats_pure_share": 0.7923728813559322,
+      "worst": 178.32388935996082,
+      "median_abs_at_m": 32.335766764952,
+      "median_abs_ct_m": 5.923144239921184,
+      "by_domain": {
+        "Arterial": 12.693,
+        "Highway": 9.182,
+        "Mixed": 8.972,
+        "Urban": 17.072
+      },
+      "vs_first": {
+        "better": 16,
+        "worse": 23,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 119.23040012728912
+      }
+    },
+    "r2_level45": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.307353612139728,
+      "mean_seed_median": 10.832473022572591,
+      "std_seed_median": 2.4271205143487364,
+      "per_seed_median": {
+        "12345": 13.541,
+        "45736": 6.101,
+        "75496": 11.798,
+        "314159": 9.935,
+        "541098": 12.804,
+        "987654": 10.817
+      },
+      "p90": 43.11387422531041,
+      "t1_lt10_share": 0.461864406779661,
+      "beats_pure_share": 0.8135593220338984,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 32.509678632958924,
+      "median_abs_ct_m": 6.078337910602797,
+      "by_domain": {
+        "Arterial": 12.765,
+        "Highway": 10.743,
+        "Mixed": 6.515,
+        "Urban": 17.072
+      },
+      "vs_first": {
+        "better": 0,
+        "worse": 0,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 0.0
+      }
+    },
+    "r2_level60": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.307353612139728,
+      "mean_seed_median": 10.832473022572591,
+      "std_seed_median": 2.4271205143487364,
+      "per_seed_median": {
+        "12345": 13.541,
+        "45736": 6.101,
+        "75496": 11.798,
+        "314159": 9.935,
+        "541098": 12.804,
+        "987654": 10.817
+      },
+      "p90": 43.11387422531041,
+      "t1_lt10_share": 0.461864406779661,
+      "beats_pure_share": 0.8135593220338984,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 32.509678632958924,
+      "median_abs_ct_m": 6.078337910602797,
+      "by_domain": {
+        "Arterial": 12.765,
+        "Highway": 10.743,
+        "Mixed": 6.515,
+        "Urban": 17.072
+      },
+      "vs_first": {
+        "better": 0,
+        "worse": 0,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 0.0
+      }
+    },
+    "r2_level90": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 10.86615222538212,
+      "mean_seed_median": 11.337327722091674,
+      "std_seed_median": 1.0246392755900666,
+      "per_seed_median": {
+        "12345": 12.154,
+        "45736": 10.901,
+        "75496": 10.831,
+        "314159": 13.236,
+        "541098": 10.376,
+        "987654": 10.526
+      },
+      "p90": 38.00931863916531,
+      "t1_lt10_share": 0.4491525423728814,
+      "beats_pure_share": 0.7966101694915254,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 35.18353266381072,
+      "median_abs_ct_m": 6.013115447305435,
+      "by_domain": {
+        "Arterial": 14.402,
+        "Highway": 10.743,
+        "Mixed": 9.795,
+        "Urban": 11.372
+      },
+      "vs_first": {
+        "better": 74,
+        "worse": 75,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 32.040497423171544
+      }
+    },
+    "r2_blend60": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.307353612139728,
+      "mean_seed_median": 10.832473022572591,
+      "std_seed_median": 2.4271205143487364,
+      "per_seed_median": {
+        "12345": 13.541,
+        "45736": 6.101,
+        "75496": 11.798,
+        "314159": 9.935,
+        "541098": 12.804,
+        "987654": 10.817
+      },
+      "p90": 43.11387422531041,
+      "t1_lt10_share": 0.461864406779661,
+      "beats_pure_share": 0.8135593220338984,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 32.509678632958924,
+      "median_abs_ct_m": 6.078337910602797,
+      "by_domain": {
+        "Arterial": 12.765,
+        "Highway": 10.743,
+        "Mixed": 6.515,
+        "Urban": 17.072
+      },
+      "vs_first": {
+        "better": 0,
+        "worse": 0,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 0.0
+      }
+    },
+    "r2_blend180": {
+      "n_scenarios": 236,
+      "median_of_seed_medians": 11.760899615127745,
+      "mean_seed_median": 10.85720889149897,
+      "std_seed_median": 2.4749647725356883,
+      "per_seed_median": {
+        "12345": 13.541,
+        "45736": 6.53,
+        "75496": 11.674,
+        "314159": 8.635,
+        "541098": 11.848,
+        "987654": 12.916
+      },
+      "p90": 34.037695796189546,
+      "t1_lt10_share": 0.4872881355932203,
+      "beats_pure_share": 0.8305084745762712,
+      "worst": 178.28418262404028,
+      "median_abs_at_m": 30.70101041476279,
+      "median_abs_ct_m": 5.5203748708733364,
+      "by_domain": {
+        "Arterial": 12.403,
+        "Highway": 10.743,
+        "Mixed": 6.775,
+        "Urban": 11.294
+      },
+      "vs_first": {
+        "better": 78,
+        "worse": 53,
+        "median_delta_pp": 0.0,
+        "worst_regression_pp": 25.984163918253536
+      }
+    }
+  },
+  "parity": null,
+  "elapsed_s": 13849.98588347435
+}

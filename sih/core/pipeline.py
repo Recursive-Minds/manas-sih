@@ -142,12 +142,15 @@ VELOCITY_FACTORIES: Dict[str, Callable[..., IVelocityEstimator]] = {
 
 FUSION_FACTORIES: Dict[str, Callable[..., IFusionFilter]] = {}
 
-from sih.map.matcher import HMMMapMatcher
+def _make_hmm_matcher(**params) -> IMapMatcher:
+    from sih.map.matcher import HMMMapMatcher
+    return HMMMapMatcher(**params)
+
 from sih.handoff.manager import SeamlessGNSSHandoffManager
 
 MAP_MATCHER_FACTORIES: Dict[str, Callable[..., IMapMatcher]] = {
     "pass_through": lambda **params: PassThroughMapMatcher(**params),
-    "hmm_matcher": lambda **params: HMMMapMatcher(**params),
+    "hmm_matcher": lambda **params: _make_hmm_matcher(**params),
 }
 
 HANDOFF_FACTORIES: Dict[str, Callable[..., IGNSSHandoffPolicy]] = {

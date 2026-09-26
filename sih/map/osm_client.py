@@ -6,6 +6,7 @@ Fetches road centerlines, surface classifications, speed limits, and one-way con
 """
 
 from __future__ import annotations
+import os
 import urllib.request
 import urllib.parse
 import json
@@ -84,14 +85,18 @@ out body geom;"""
         endpoints_to_try = [self.endpoint] + [ep for ep in self.OVERPASS_ENDPOINTS if ep != self.endpoint]
 
         import ssl
-        try:
+        insecure_debug = os.environ.get("IDR_INSECURE_SSL", "0").lower() in ("1", "true")
+        if insecure_debug:
             ssl_ctx = ssl._create_unverified_context()
-        except Exception:
-            ssl_ctx = None
+        else:
+            try:
+                import certifi
+                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            except Exception:
+                ssl_ctx = ssl.create_default_context()
 
         handlers: list[Any] = [urllib.request.ProxyHandler()]
-        if ssl_ctx is not None:
-            handlers.append(urllib.request.HTTPSHandler(context=ssl_ctx))
+        handlers.append(urllib.request.HTTPSHandler(context=ssl_ctx))
         opener = urllib.request.build_opener(*handlers)
 
         for attempt in range(self.max_retries + 1):

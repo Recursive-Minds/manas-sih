@@ -83,6 +83,21 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                     Log.w("LocalEngineBridge", "Could not propagate system proxy: ${pe.message}")
                 }
 
+                // Extract normalization params to filesDir if present in assets
+                try {
+                    val normFile = context.applicationContext.filesDir.resolve("normalization_params.npz")
+                    if (!normFile.exists()) {
+                        context.assets.open("normalization_params.npz").use { input ->
+                            normFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        Log.i("LocalEngineBridge", "Extracted normalization_params.npz to ${normFile.absolutePath}")
+                    }
+                } catch (ne: Throwable) {
+                    Log.w("LocalEngineBridge", "Could not extract normalization_params.npz: ${ne.message}")
+                }
+
                 // 1. TFLite Predictor Bridge (XNNPACK, 4 threads, warm-up)
                 bridge = TFLitePredictorBridge.create(context.applicationContext, "moe_velocity_model.tflite")
                 val predictorModule = py?.getModule("sih.models.predictor")
@@ -104,6 +119,8 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                     true, // enable_handoff (display only)
                     mapsCacheDir // cache_dir
                 )
+
+                sessionCore?.callAttr("set_trace_dir", context.applicationContext.filesDir.absolutePath)
 
                 _isConnected.set(true)
                 Log.i("LocalEngineBridge", "Local SessionCore initialized successfully")
@@ -305,6 +322,25 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                 val filename = if (hasAsset) assetName else "smoke_test_60s.json"
                 val jsonStr = context.assets.open(filename).bufferedReader().use { it.readText() }
                 val root = JSONObject(jsonStr)
+                val refLat = root.optDouble("reference_lat_deg", 52.404877)
+                val refLon = root.optDouble("reference_lon_deg", -1.500284)
+                val refAlt = root.optDouble("reference_alt_m", 166.93)
+                val domain = root.optString("domain", "Mixed")
+                val tripName = root.optString("trip", "Scenario_${scenarioId}")
+
+                // Always ensure benchmark engine is cleanly initialized for this scenario before replay starts
+                executor.submit {
+                    sessionCore?.callAttr(
+                        "setup_benchmark_engine",
+                        refLat, refLon, refAlt,
+                        null, // saved_alignment
+                        null, // road_network
+                        domain,
+                        scenarioId,
+                        tripName
+                    )
+                }.get()
+
                 val batchesArray = root.getJSONArray("batches")
                 val nBatches = batchesArray.length()
                 val dtTargetMs = (100.0 / max(speed, 0.2)).toLong()

@@ -1,0 +1,440 @@
+[
+  {
+    "scenario_id": 1,
+    "name": "Scenario #1 (Highway S-M)",
+    "video": "artifacts/phone_videos/sc_1.mp4",
+    "engine_count": 642,
+    "ui_marker_count": 1599,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "100.0% (295/295)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | distinct=295"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 399.2m, Eng: 399.2m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | L_ui=399.2m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 613)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | gnss_updates=613"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: N/A (no 90\u00b0 in sc))",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "28.86%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | drift=28.86%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.087 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_1_ui.csv | max_dt=0.087s"
+      }
+    ]
+  },
+  {
+    "scenario_id": 22,
+    "name": "Scenario #22 (Arterial S-S3a)",
+    "video": "artifacts/phone_videos/sc_22.mp4",
+    "engine_count": 801,
+    "ui_marker_count": 2044,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "97.3% (439/451)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | distinct=439"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 518.5m, Eng: 518.5m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | L_ui=518.5m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 741)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | gnss_updates=741"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: True)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "81.17%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | drift=81.17%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.077 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_22_ui.csv | max_dt=0.077s"
+      }
+    ]
+  },
+  {
+    "scenario_id": 23,
+    "name": "Scenario #23 (Mixed S-S3a)",
+    "video": "artifacts/phone_videos/sc_23.mp4",
+    "engine_count": 1024,
+    "ui_marker_count": 2828,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "100.0% (751/751)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | distinct=751"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 1140.6m, Eng: 1140.6m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | L_ui=1140.6m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 1003)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | gnss_updates=1003"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: N/A (no 90\u00b0 in sc))",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "107.27%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | drift=107.27%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.096 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_23_ui.csv | max_dt=0.096s"
+      }
+    ]
+  },
+  {
+    "scenario_id": 25,
+    "name": "Scenario #25 (Urban S-S3a)",
+    "video": "artifacts/phone_videos/sc_25.mp4",
+    "engine_count": 800,
+    "ui_marker_count": 2071,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "100.0% (451/451)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | distinct=451"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 828.0m, Eng: 828.0m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | L_ui=828.0m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 770)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | gnss_updates=770"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: False)",
+        "status": "FAIL",
+        "evidence": "logs/phone/sc_25_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "25.08%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | drift=25.08%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.074 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_25_ui.csv | max_dt=0.074s"
+      }
+    ]
+  },
+  {
+    "scenario_id": 26,
+    "name": "Scenario #26 (Highway S-S3a)",
+    "video": "artifacts/phone_videos/sc_26.mp4",
+    "engine_count": 1035,
+    "ui_marker_count": 2851,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "100.0% (751/751)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | distinct=751"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 1022.4m, Eng: 1022.4m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | L_ui=1022.4m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 1014)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | gnss_updates=1014"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: True)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "26.64%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | drift=26.64%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.077 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_26_ui.csv | max_dt=0.077s"
+      }
+    ]
+  },
+  {
+    "scenario_id": 30,
+    "name": "Scenario #30 (Urban Turn S-S3a)",
+    "video": "artifacts/phone_videos/sc_30.mp4",
+    "engine_count": 950,
+    "ui_marker_count": 2521,
+    "metrics": [
+      {
+        "id": "1",
+        "metric": "DR marker distinct positions during blackout",
+        "threshold": ">= 90% of engine steps",
+        "measured": "100.0% (601/601)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | distinct=601"
+      },
+      {
+        "id": "2",
+        "metric": "DR marker follows engine: max |ui_dr - engine_dr|",
+        "threshold": "<= 0.5 m",
+        "measured": "0.000 m",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | max_err=0.000m"
+      },
+      {
+        "id": "3",
+        "metric": "DR marker path length vs engine DR path length",
+        "threshold": "<= 2.0%",
+        "measured": "0.00% (UI: 422.8m, Eng: 422.8m)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | L_ui=422.8m"
+      },
+      {
+        "id": "4",
+        "metric": "GNSS marker tracking vs GNSS truth",
+        "threshold": "<= 0.5 m error",
+        "measured": "0.000 m (updates: 920)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | gnss_updates=920"
+      },
+      {
+        "id": "5",
+        "metric": "DR marker rotation vs engine heading",
+        "threshold": "<= 2.0\u00b0 error & 90\u00b0 East verified",
+        "measured": "0.00\u00b0 (East verified: N/A (no 90\u00b0 in sc))",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | rot_err=0.00"
+      },
+      {
+        "id": "6",
+        "metric": "Blackout end reconciliation: max jump <= 5m",
+        "threshold": "<= 5.0 m jump",
+        "measured": "Max jump: 0.00m (rec updates: 0)",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | rec_count=0"
+      },
+      {
+        "id": "7",
+        "metric": "Summary card drift % fidelity",
+        "threshold": "<= 0.01 pp diff",
+        "measured": "168.11%",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | drift=168.11%"
+      },
+      {
+        "id": "8",
+        "metric": "HUD update interval",
+        "threshold": "<= 1.0 s",
+        "measured": "0.080 s max interval",
+        "status": "PASS",
+        "evidence": "logs/phone/sc_30_ui.csv | max_dt=0.080s"
+      }
+    ]
+  }
+]

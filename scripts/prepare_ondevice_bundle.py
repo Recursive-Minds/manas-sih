@@ -59,6 +59,22 @@ def sync_python_sources():
     if os.path.exists(parity_src):
         shutil.copy2(parity_src, os.path.join(PYTHON_TARGET_DIR, "run_ondevice_parity.py"))
 
+    # 5. Bundle normalization parameters into Python bundle for offline edge inference
+    norm_src = os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz")
+    if os.path.exists(norm_src):
+        # Package into sih/models/
+        shutil.copy2(norm_src, os.path.join(sih_dst, "models", "normalization_params.npz"))
+        # Package into server/
+        shutil.copy2(norm_src, os.path.join(server_dst, "normalization_params.npz"))
+        # Package into models/exported/
+        models_exp_dst = os.path.join(PYTHON_TARGET_DIR, "models", "exported")
+        os.makedirs(models_exp_dst, exist_ok=True)
+        shutil.copy2(norm_src, os.path.join(models_exp_dst, "normalization_params.npz"))
+        with open(os.path.join(PYTHON_TARGET_DIR, "models", "__init__.py"), "w") as f:
+            f.write("# models package\n")
+        with open(os.path.join(models_exp_dst, "__init__.py"), "w") as f:
+            f.write("# exported models package\n")
+
     print("Python sources synced successfully.")
 
 

@@ -158,6 +158,7 @@ class MainActivity : AppCompatActivity() {
     private var isEngineReady = false
     private var isInBlackout = false
     private var isSummaryDismissed = false
+    private var currentPreparedScenarioId: Int? = null
 
     private val benchmarkScenarioList = mutableListOf<BenchmarkScenarioItem>()
 
@@ -202,6 +203,58 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val action = intent?.getStringExtra("action")
+        if (action != null) {
+            runOnUiThread {
+                when (action.lowercase()) {
+                    "stop" -> {
+                        streamService?.stopBenchmark()
+                        streamService?.stopBlackout()
+                    }
+                    "reset" -> {
+                        streamService?.resetSession()
+                    }
+                    "live" -> {
+                        cardBenchmark.visibility = View.GONE
+                        streamService?.stopBenchmark()
+                        currentMode = AppMode.LIVE_DRIVE
+                        tvBenchmarkBadge.text = "LIVE SENSORS"
+                        tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
+                    }
+                }
+            }
+        }
+
+        val scId = intent?.getIntExtra("scenario", -1) ?: -1
+        if (scId > 0) {
+            val autoStart = intent?.getBooleanExtra("autostart", false) ?: false
+            val speed = intent?.getDoubleExtra("speed", 2.0) ?: 2.0
+            runOnUiThread {
+                cardBenchmark.visibility = View.VISIBLE
+                val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
+                if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
+                    currentPreparedScenarioId = scId
+                    spinnerScenarios.setSelection(targetPos)
+                }
+                streamService?.prepareBenchmark(scId)
+                if (autoStart) {
+                    UiTraceLogger.reset()
+                    gnssPolyline.actualPoints.clear()
+                    drPolyline.actualPoints.clear()
+                    hasCenteredMap = false
+                    streamService?.startBenchmark(scId, speed)
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -214,10 +267,12 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(R.layout.activity_main)
 
+        UiTraceLogger.init(this)
         initViews()
         initMap()
         checkAndRequestPermissions()
         startAndBindService()
+        handleIntent(intent)
     }
 
     private fun initViews() {
@@ -334,6 +389,7 @@ class MainActivity : AppCompatActivity() {
             cardSummaryModal.visibility = View.GONE
 
             // Clear previous tracks for clean benchmark run
+            UiTraceLogger.reset()
             gnssPolyline.actualPoints.clear()
             drPolyline.actualPoints.clear()
             hasCenteredMap = false
@@ -550,6 +606,10 @@ class MainActivity : AppCompatActivity() {
                     val scItem = benchmarkScenarioList.getOrNull(position)
                     if (scItem != null) {
                         val scId = if (scItem.id > 0) scItem.id else 30
+                        if (currentPreparedScenarioId == scId) {
+                            return
+                        }
+                        currentPreparedScenarioId = scId
                         tvBenchmarkBadge.text = "PRELOADING #${scId}..."
                         tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_amber))
                         streamService?.prepareBenchmark(scId)
@@ -652,6 +712,7 @@ class MainActivity : AppCompatActivity() {
                     val ip = etServerIp.text.toString().trim().ifEmpty { "127.0.0.1" }
                     val port = etServerPort.text.toString().trim().toIntOrNull() ?: 8765
                     fetchCanonicalScenariosAsync(ip, port)
+                    handleIntent(intent)
                 } else {
                     tvConnStatus.text = "Disconnected"
                     tvConnStatus.setTextColor(ContextCompat.getColor(this, R.color.accent_amber))
@@ -735,6 +796,7 @@ class MainActivity : AppCompatActivity() {
                             if (gnss.bearingDeg != null) {
                                 vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(gnss.bearingDeg)  // [ROUND1] T1
                             }
+                            UiTraceLogger.logMarker("gnss", pt.latitude, pt.longitude, vehicleMarker?.rotation?.toDouble() ?: 0.0, true)
                             val lastPt = gnssPolyline.actualPoints.lastOrNull()
                             val distToLast = if (lastPt != null) pt.distanceToAsDouble(lastPt) else 1000.0
                             if (distToLast > 500.0) {
@@ -811,6 +873,7 @@ class MainActivity : AppCompatActivity() {
             // Synchronize scenario spinner if triggered externally
             val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
             if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
+                currentPreparedScenarioId = scId
                 spinnerScenarios.setSelection(targetPos)
             }
         } else {
@@ -889,6 +952,12 @@ class MainActivity : AppCompatActivity() {
             val gnssHdg = m.gnssBearingDeg
             tvHeadings.text = String.format("%.0f° / %.0f°", m.drHeadingDeg, gnssHdg)
 
+            UiTraceLogger.logHud("speed", tvSpeeds.text.toString(), m.drSpeedMps)
+            UiTraceLogger.logHud("heading", tvHeadings.text.toString(), m.drHeadingDeg)
+            UiTraceLogger.logHud("drift", tvDriftPct.text.toString(), m.driftPct)
+            UiTraceLogger.logHud("turns", tvCondMount.text.toString(), null)
+            UiTraceLogger.logHud("calib_s", tvCondBuffer.text.toString(), null)
+
             // If session summary received while stopped, show summary card unless dismissed
             if (!isInBlackout && m.sessionSummary != null && !isSummaryDismissed) {
                 renderSummary(m.sessionSummary)
@@ -912,6 +981,7 @@ class MainActivity : AppCompatActivity() {
                         drMarker?.position = pt
                         drMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)
                         drMarker?.isEnabled = true
+                        UiTraceLogger.logMarker("dr", pt.latitude, pt.longitude, drMarker?.rotation?.toDouble() ?: 0.0, true)
 
                         tilePrefetcher?.onMotionUpdate(
                             d.lat,
@@ -929,15 +999,20 @@ class MainActivity : AppCompatActivity() {
                         val rPt = GeoPoint(r.lat, r.lon)
                         reconciledMarker?.position = rPt
                         reconciledMarker?.isEnabled = true
+                        UiTraceLogger.logMarker("reconciled", rPt.latitude, rPt.longitude, 0.0, true)
                     } else {
                         reconciledMarker?.isEnabled = false
+                        UiTraceLogger.logMarker("reconciled", 0.0, 0.0, 0.0, false)
                     }
                 } ?: run {
                     reconciledMarker?.isEnabled = false
+                    UiTraceLogger.logMarker("reconciled", 0.0, 0.0, 0.0, false)
                 }
             } else {
                 drMarker?.isEnabled = false
+                UiTraceLogger.logMarker("dr", drMarker?.position?.latitude ?: 0.0, drMarker?.position?.longitude ?: 0.0, drMarker?.rotation?.toDouble() ?: 0.0, false)
                 reconciledMarker?.isEnabled = false
+                UiTraceLogger.logMarker("reconciled", 0.0, 0.0, 0.0, false)
             }
         } else if (currentMode == AppMode.BENCHMARK_EVALUATION) {
             hud.gnssPos?.let { g ->
@@ -967,6 +1042,7 @@ class MainActivity : AppCompatActivity() {
                     vehicleMarker?.position = pt
                     vehicleMarker?.rotation = MarkerHeading.toMarkerRotation(g.bearingDeg)
                     vehicleMarker?.isEnabled = true
+                    UiTraceLogger.logMarker("gnss", pt.latitude, pt.longitude, vehicleMarker?.rotation?.toDouble() ?: 0.0, true)
                 }
             }
 
@@ -990,6 +1066,7 @@ class MainActivity : AppCompatActivity() {
                     drMarker?.position = pt
                     drMarker?.rotation = MarkerHeading.toMarkerRotation(d.headingDeg)
                     drMarker?.isEnabled = true
+                    UiTraceLogger.logMarker("dr", pt.latitude, pt.longitude, drMarker?.rotation?.toDouble() ?: 0.0, true)
                 }
             }
 
@@ -999,11 +1076,14 @@ class MainActivity : AppCompatActivity() {
                     val rPt = GeoPoint(r.lat, r.lon)
                     reconciledMarker?.position = rPt
                     reconciledMarker?.isEnabled = true
+                    UiTraceLogger.logMarker("reconciled", rPt.latitude, rPt.longitude, 0.0, true)
                 } else {
                     reconciledMarker?.isEnabled = false
+                    UiTraceLogger.logMarker("reconciled", 0.0, 0.0, 0.0, false)
                 }
             } ?: run {
                 reconciledMarker?.isEnabled = false
+                UiTraceLogger.logMarker("reconciled", 0.0, 0.0, 0.0, false)
             }
         }
         mapView.invalidate()

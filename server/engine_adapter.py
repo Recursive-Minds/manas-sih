@@ -448,14 +448,35 @@ class EngineAdapterStageB:
 
         # If normalization params still not loaded, attempt to load from exported sidecar
         if (self.norm_mean is None or self.norm_std is None):
-            norm_sidecar = os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz")
-            if os.path.exists(norm_sidecar):
+            candidate_paths = [
+                os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "..", "models", "exported", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "..", "sih", "models", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "normalization_params.npz"),
+            ]
+            for p in candidate_paths:
+                p_abs = os.path.abspath(p)
+                if os.path.exists(p_abs):
+                    try:
+                        npz = np.load(p_abs)
+                        if self.norm_mean is None:
+                            self.norm_mean = npz["mean"].reshape(-1, 1)
+                        if self.norm_std is None:
+                            self.norm_std = npz["std"].reshape(-1, 1)
+                        break
+                    except Exception:
+                        pass
+            if (self.norm_mean is None or self.norm_std is None):
+                # Try pkgutil / importlib resources for zipped environments (Chaquopy)
                 try:
-                    npz = np.load(norm_sidecar)
-                    if self.norm_mean is None:
-                        self.norm_mean = npz["mean"].reshape(-1, 1)
-                    if self.norm_std is None:
-                        self.norm_std = npz["std"].reshape(-1, 1)
+                    import pkgutil, io
+                    data = pkgutil.get_data("sih.models", "normalization_params.npz")
+                    if data:
+                        npz = np.load(io.BytesIO(data))
+                        if self.norm_mean is None:
+                            self.norm_mean = npz["mean"].reshape(-1, 1)
+                        if self.norm_std is None:
+                            self.norm_std = npz["std"].reshape(-1, 1)
                 except Exception:
                     pass
 

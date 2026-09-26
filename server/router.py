@@ -97,6 +97,7 @@ class NavigationRouter:
             engine_type=engine_type,
             use_speed_smoother=True,
         )
+        self.core.set_trace_dir(os.environ.get("IDR_TRACE_DIR", "logs"))
 
         self.client_websockets: Set[web.WebSocketResponse] = set()
         self.stream_websockets: Set[web.WebSocketResponse] = set()

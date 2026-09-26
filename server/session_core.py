@@ -73,7 +73,10 @@ class SessionCore:
             self.norm_std = norm_std
             self.device = device
         elif predictor is not None and not isinstance(predictor, str):
-            self.ai_model, self.norm_mean, self.norm_std, self.device = None, None, None, None
+            self.ai_model = None
+            self.device = None
+            self.norm_mean = norm_mean
+            self.norm_std = norm_std
         else:
             try:
                 import torch
@@ -82,6 +85,38 @@ class SessionCore:
                 self.ai_model, self.norm_mean, self.norm_std, _ = load_ai_model(self.device)
             except Exception:
                 self.ai_model, self.norm_mean, self.norm_std, self.device = None, None, None, None
+
+        if self.norm_mean is None or self.norm_std is None:
+            candidate_paths = [
+                os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "..", "models", "exported", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "..", "sih", "models", "normalization_params.npz"),
+                os.path.join(os.path.dirname(__file__), "normalization_params.npz"),
+            ]
+            for p in candidate_paths:
+                p_abs = os.path.abspath(p)
+                if os.path.exists(p_abs):
+                    try:
+                        npz = np.load(p_abs)
+                        if self.norm_mean is None:
+                            self.norm_mean = npz["mean"].reshape(-1, 1)
+                        if self.norm_std is None:
+                            self.norm_std = npz["std"].reshape(-1, 1)
+                        break
+                    except Exception:
+                        pass
+            if self.norm_mean is None or self.norm_std is None:
+                try:
+                    import pkgutil, io
+                    data = pkgutil.get_data("sih.models", "normalization_params.npz")
+                    if data:
+                        npz = np.load(io.BytesIO(data))
+                        if self.norm_mean is None:
+                            self.norm_mean = npz["mean"].reshape(-1, 1)
+                        if self.norm_std is None:
+                            self.norm_std = npz["std"].reshape(-1, 1)
+                except Exception:
+                    pass
 
         if engine_type == "stage_a":
             self.engine = EngineAdapterStageA(
@@ -134,6 +169,31 @@ class SessionCore:
                 self.handoff_manager = SeamlessGNSSHandoffManager(HandoffConfig())
             except Exception:
                 self.handoff_manager = None
+
+        trace_dir = os.environ.get("IDR_TRACE_DIR")
+        self.trace_file: Optional[str] = os.path.join(trace_dir, "engine_trace.csv") if trace_dir else None
+        if self.trace_file:
+            self.init_trace_file()
+
+    def set_trace_dir(self, trace_dir: str) -> None:
+        """Configures trace directory and initializes engine_trace.csv."""
+        if trace_dir:
+            try:
+                os.makedirs(trace_dir, exist_ok=True)
+            except OSError:
+                pass
+            self.trace_file = os.path.join(trace_dir, "engine_trace.csv")
+            self.init_trace_file()
+
+    def init_trace_file(self) -> None:
+        """Initializes engine_trace.csv with the required header."""
+        if not self.trace_file:
+            return
+        try:
+            with open(self.trace_file, "w", encoding="utf-8") as f:
+                f.write("t,state,dr_lat,dr_lon,dr_heading,gnss_lat,gnss_lon,reconciled_lat,reconciled_lon,fsm_state\n")
+        except Exception as e:
+            print(f"[SessionCore] Failed to init trace file {self.trace_file}: {e}")
 
     def get_last_batch_timing(self) -> Dict[str, float]:
         """Returns the timing breakdown of the most recently processed batch."""
@@ -382,6 +442,36 @@ class SessionCore:
         self.last_batch_timing = timing
         hud = self.get_hud()
         hud["timing"] = self.last_batch_timing
+
+        if self.trace_file:
+            try:
+                t_val = ""
+                if imu_list:
+                    t_val = f"{int(imu_list[-1]['timestamp_ns']) / 1e9:.3f}"
+                elif gnss_list:
+                    t_val = f"{int(gnss_list[-1]['timestamp_ns']) / 1e9:.3f}"
+                else:
+                    t_val = f"{time.time():.3f}"
+
+                dr_d = hud.get("dr_pos")
+                gnss_d = hud.get("gnss_pos")
+                rec_d = hud.get("reconciled_pos")
+                wm = hud.get("warmup", {})
+
+                dr_lat = f"{dr_d['lat']:.8f}" if dr_d and dr_d.get("lat") is not None else ""
+                dr_lon = f"{dr_d['lon']:.8f}" if dr_d and dr_d.get("lon") is not None else ""
+                dr_hdg = f"{dr_d['heading_deg']:.2f}" if dr_d and dr_d.get("heading_deg") is not None else ""
+                gnss_lat = f"{gnss_d['lat']:.8f}" if gnss_d and gnss_d.get("lat") is not None else ""
+                gnss_lon = f"{gnss_d['lon']:.8f}" if gnss_d and gnss_d.get("lon") is not None else ""
+                rec_lat = f"{rec_d['lat']:.8f}" if rec_d and rec_d.get("lat") is not None else ""
+                rec_lon = f"{rec_d['lon']:.8f}" if rec_d and rec_d.get("lon") is not None else ""
+                fsm_st = wm.get("handoff_state", "") if wm else ""
+
+                with open(self.trace_file, "a", encoding="utf-8") as f:
+                    f.write(f"{t_val},{self.state},{dr_lat},{dr_lon},{dr_hdg},{gnss_lat},{gnss_lon},{rec_lat},{rec_lon},{fsm_st}\n")
+            except Exception:
+                pass
+
         return hud
 
     def control(self, cmd: str, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -508,6 +598,27 @@ class SessionCore:
         trip_name: str,
     ) -> None:
         """Sets up benchmark engine and evaluator for a specific scenario."""
+        if road_network is None and ref_lat != 0.0:
+            candidate_dirs = [
+                "/sdcard/Android/data/com.recursiveminds.idr.ondevice/files/maps_cache",
+                "/sdcard/Android/data/com.recursiveminds.idr/files/maps_cache",
+                os.path.join(os.path.dirname(self.trace_file), "maps_cache") if self.trace_file else "",
+                "data/maps/cache",
+            ]
+            for c_dir in candidate_dirs:
+                if c_dir and os.path.exists(c_dir) and os.path.isdir(c_dir):
+                    try:
+                        from sih.map.network import build_road_network_from_osm
+                        pad_deg = 2500.0 / 111139.0
+                        bbox = (ref_lat - pad_deg, ref_lon - pad_deg, ref_lat + pad_deg, ref_lon + pad_deg)
+                        rnet, _ = build_road_network_from_osm(bbox, ref_lat, ref_lon, cache_dir=c_dir)
+                        if rnet and len(rnet.segments) > 0:
+                            road_network = rnet
+                            print(f"[session_core] Loaded {len(rnet.segments)} cached road segments from {c_dir}")
+                            break
+                    except Exception as e:
+                        print(f"[session_core] Note: could not load road network from {c_dir}: {e}")
+
         self.ref_lat = ref_lat
         self.ref_lon = ref_lon
         self.ref_alt = ref_alt
@@ -540,6 +651,7 @@ class SessionCore:
         )
         self.benchmark_active = True
         self.is_preloaded_trip = True
+        self.init_trace_file()
 
     def deload_benchmark(self) -> None:
         """Restores live mode engine and evaluator."""

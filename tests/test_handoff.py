@@ -16,6 +16,7 @@ from sih.core.contracts import (
 )
 from sih.core.config import PipelineConfig, HandoffStageConfig
 from sih.core.pipeline import assemble_pipeline, SeamlessGNSSHandoffManager
+import sih.fusion
 from sih.handoff.integrity import (
     compute_position_nis,
     check_kinematic_feasibility,
