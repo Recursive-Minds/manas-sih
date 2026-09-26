@@ -24,9 +24,16 @@ from __future__ import annotations
 import os
 import sys
 import math
+import time
 import numpy as np
 from typing import Optional, Dict, Any, List, Tuple
-from scipy.signal import butter, sosfilt
+if os.environ.get("SIH_FORCE_SCIPY_SHIM", "0") == "1":
+    from sih.core.scipy_shim import butter, sosfilt, sosfilt_zi
+else:
+    try:
+        from scipy.signal import butter, sosfilt, sosfilt_zi
+    except ImportError:
+        from sih.core.scipy_shim import butter, sosfilt, sosfilt_zi
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
@@ -69,7 +76,6 @@ class CausalAntiAliasFilter:
         if not self.initialized:
             # Initialize filter steady-state with first sample to prevent step artifact
             for ch in range(3):
-                from scipy.signal import sosfilt_zi
                 zi_ch = sosfilt_zi(self.sos) * val_3d[ch]
                 self.zi[:, ch, :] = zi_ch
             self.initialized = True
@@ -503,6 +509,23 @@ class EngineAdapterStageB:
             enable_speed_scale=self.enable_speed_scale,
         )
 
+        # Per-batch timing split tracking (ms)
+        self.batch_features_ms: float = 0.0
+        self.batch_model_ms: float = 0.0
+        self.batch_ekf_map_ms: float = 0.0
+
+    def reset_batch_timing(self) -> None:
+        self.batch_features_ms = 0.0
+        self.batch_model_ms = 0.0
+        self.batch_ekf_map_ms = 0.0
+
+    def get_batch_timing(self) -> Dict[str, float]:
+        return {
+            "features_ms": float(self.batch_features_ms),
+            "model_ms": float(self.batch_model_ms),
+            "ekf_map_ms": float(self.batch_ekf_map_ms),
+        }
+
     @property
     def ekf(self) -> ErrorStateEKF:
         """Returns the active ErrorStateEKF filter (map-matched if enabled, else pure)."""
@@ -769,12 +792,14 @@ class EngineAdapterStageB:
             return float(override_speed)
 
         # Causal feature extraction
+        t_feat0 = time.perf_counter()
         f = self.feature_extractor.push(cal)
         self.feature_buf.append(f)
         if len(self.feature_buf) > 60:
             self.feature_buf.pop(0)
 
-        if self.model is None or len(self.feature_buf) < 1:
+        if self.model is None and self.predictor is None or len(self.feature_buf) < 1:
+            self.batch_features_ms += (time.perf_counter() - t_feat0) * 1000.0
             return max(0.0, float(np.linalg.norm(self.session.ekf_map._v)))
 
         # Build short (20) and long (60) feature windows with pad repetition
@@ -790,7 +815,9 @@ class EngineAdapterStageB:
             norm_w_l = w_l
 
         norm_w_s = norm_w_l[:, -20:].copy()
+        self.batch_features_ms += (time.perf_counter() - t_feat0) * 1000.0
 
+        t_mod0 = time.perf_counter()
         if self.predictor is not None:
             v_raw, _ = self.predictor.predict_window(norm_w_s, norm_w_l)
         elif self.model is not None:
@@ -802,7 +829,10 @@ class EngineAdapterStageB:
                 vf, _, _ = self.model(ts_s, ts_l)
             v_raw = float(vf.item())
         else:
+            self.batch_model_ms += (time.perf_counter() - t_mod0) * 1000.0
             return max(0.0, float(np.linalg.norm(self.session.ekf_map._v)))
+
+        self.batch_model_ms += (time.perf_counter() - t_mod0) * 1000.0
 
         if self.use_speed_smoother and self.speed_smoother is not None:
             return self.speed_smoother.update(v_raw, dt_s=0.1)
@@ -934,13 +964,16 @@ class EngineAdapterStageB:
         self.recent_ai_ts.append(imu.timestamp_ns)
 
         # Predict warmup
+        t_ekf0 = time.perf_counter()
         if self.state == "WARMING_UP":
             if self.has_ref_coords and self.session.ekf_pure._initialised and (self.session.ekf_pure._ref[0] != 0.0 or self.session.ekf_pure._ref[1] != 0.0):
                 self.session.predict_warmup(cal, v_raw, imu.timestamp_ns)
+            self.batch_ekf_map_ms += (time.perf_counter() - t_ekf0) * 1000.0
             return None
 
         # BLACKOUT propagation
         step_res = self.session.step(cal, v_raw, imu.timestamp_ns)
+        self.batch_ekf_map_ms += (time.perf_counter() - t_ekf0) * 1000.0
 
         pos_enu = self.session.ekf_map._p
         if step_res.matched_pos is not None and step_res.matched_pos.is_matched:

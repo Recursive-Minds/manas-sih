@@ -162,12 +162,48 @@ class TFLiteVelocityPredictor(VelocityPredictor):
         return preds
 
 
+class JavaBridgeVelocityPredictor(VelocityPredictor):
+    """
+    Velocity predictor delegating inference to an Android Kotlin/Java interpreter
+    via Chaquopy's Java reflection.
+    """
+
+    def __init__(self, java_bridge: Any) -> None:
+        self.bridge = java_bridge
+
+    def predict_window(self, x_short: np.ndarray, x_long: np.ndarray) -> Tuple[float, float]:
+        if x_short.ndim == 3:
+            x_short = x_short[0]
+        if x_long.ndim == 3:
+            x_long = x_long[0]
+
+        s_flat = np.ascontiguousarray(x_short, dtype=np.float32).flatten()
+        l_flat = np.ascontiguousarray(x_long, dtype=np.float32).flatten()
+
+        try:
+            from jarray import array
+            res = self.bridge.predictWindow(array(s_flat.tolist(), "f"), array(l_flat.tolist(), "f"))
+        except Exception:
+            res = self.bridge.predictWindow(s_flat.tolist(), l_flat.tolist())
+
+        return float(res[0]), float(res[1])
+
+    def predict_batch(self, x_short: np.ndarray, x_long: np.ndarray) -> np.ndarray:
+        N = len(x_short)
+        preds = np.empty(N, dtype=np.float32)
+        for i in range(N):
+            v, _ = self.predict_window(x_short[i], x_long[i])
+            preds[i] = v
+        return preds
+
+
 def create_predictor(
     kind: str = "torch",
     model: Optional[Any] = None,
     device: Optional[Any] = None,
     onnx_path: Optional[str] = None,
     tflite_path: Optional[str] = None,
+    bridge: Optional[Any] = None,
     root_dir: Optional[str] = None,
 ) -> VelocityPredictor:
     """Factory creating appropriate predictor by type name."""
@@ -195,5 +231,10 @@ def create_predictor(
             raise FileNotFoundError(f"Exported TFLite model not found: {target_path}")
         return TFLiteVelocityPredictor(target_path)
 
+    elif kind in ("java", "bridge", "kotlin"):
+        if bridge is None:
+            raise ValueError("Bridge instance must be provided for 'java' predictor kind")
+        return JavaBridgeVelocityPredictor(bridge)
+
     else:
-        raise ValueError(f"Unknown predictor kind: {kind}. Expected 'torch', 'onnx', or 'tflite'.")
+        raise ValueError(f"Unknown predictor kind: {kind}. Expected 'torch', 'onnx', 'tflite', or 'java'.")

@@ -22,8 +22,15 @@ Key Architecture:
 
 from __future__ import annotations
 from typing import Optional
+import os
 import numpy as np
-from scipy.spatial.transform import Rotation as R
+if os.environ.get("SIH_FORCE_SCIPY_SHIM", "0") == "1":
+    from sih.core.scipy_shim import Rotation as R
+else:
+    try:
+        from scipy.spatial.transform import Rotation as R
+    except ImportError:
+        from sih.core.scipy_shim import Rotation as R
 
 from sih.core.contracts import (
     IMUSample,

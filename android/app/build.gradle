@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'com.chaquo.python'
 }
 
 android {
@@ -13,6 +14,29 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
+        manifestPlaceholders = [appLabel: "SIH IDR"]
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    flavorDimensions += "mode"
+    productFlavors {
+        server {
+            dimension "mode"
+            manifestPlaceholders = [appLabel: "SIH IDR"]
+        }
+        ondevice {
+            dimension "mode"
+            applicationIdSuffix ".ondevice"
+            manifestPlaceholders = [appLabel: "IDR On-Device"]
+            python {
+                version "3.11"
+                pip {
+                    install "numpy"
+                }
+            }
+        }
     }
 
     buildTypes {
@@ -39,6 +63,9 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
+    // TFLite runtime for high-performance edge velocity inference
+    implementation 'org.tensorflow:tensorflow-lite:2.16.1'
+
     // osmdroid for OpenStreetMap rendering (no Google Play / API keys)
     implementation 'org.osmdroid:osmdroid-android:6.1.18'
     

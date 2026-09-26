@@ -23,7 +23,13 @@ import os
 import hashlib
 from collections import deque
 import numpy as np
-from scipy import signal
+if os.environ.get("SIH_FORCE_SCIPY_SHIM", "0") == "1":
+    from sih.core import scipy_shim as signal
+else:
+    try:
+        from scipy import signal
+    except ImportError:
+        from sih.core import scipy_shim as signal
 
 from sih.core.contracts import CalibratedSample
 
