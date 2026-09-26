@@ -148,5 +148,36 @@ This log records every command and process executed during the On-Device Phone P
      - `python scripts/round1_eval.py --assert-parity`: PARITY PASS (5.68e-14 m <= 1e-9 m).
      - Android `compileDebugSources`: 0 errors.
 
+---
+
+### Step 2.1: MoE Export (ONNX & TFLite) and Numerical Parity Verification
+- **Timestamp**: 2026-09-26 12:20:00 +05:30
+- **Branch**: `phone/s2-spike` (branched from `phone-s1`)
+- **Key Changes & Findings**:
+  1. **Model Determinism**:
+     - Verified `model.eval()`, `torch.no_grad()` on production checkpoint `round1_interval_lam0.5_s42.pt`.
+     - Determinism error across multiple evaluations on identical inputs: exactly `0.0 m/s`.
+  2. **Model Export**:
+     - Exported ONNX graph (`opset=14`, dynamic batch axes) to `models/exported/moe_velocity_model.onnx` (**2.48 MB**).
+     - Exported TFLite FP32 flatbuffer (via direct ONNX lowering with layout optimization) to `models/exported/moe_velocity_model.tflite` (**2.50 MB**).
+     - Exported TorchScript graph to `models/exported/moe_velocity_model.torchscript.pt` (**2.66 MB**).
+     - Checkpoint file size: `models/checkpoints/round1_interval_lam0.5_s42.pt` (**2.53 MB**).
+     - Bundled normalization parameters to `models/exported/normalization_params.npz` (12-channel mean and std).
+  3. **1000 Real Feature Windows Parity Benchmark**:
+     - Tested on 1000 consecutive windows from real trip `S-S3a.csv`:
+       - PyTorch CPU single-thread latency: **3.52 ms/step** (284.0 Hz)
+       - ONNX CPU: max abs diff = **8.58e-06 m/s** (< 1e-5 m/s target) | Latency = **0.71 ms/step** (1,401.6 Hz, 5x faster than PyTorch)
+       - TFLite CPU: max abs diff = **9.54e-06 m/s** (< 1e-5 m/s target) | Latency = **0.40 ms/step** (2,516.4 Hz, ~9x faster than PyTorch)
+  4. **Modular Predictor Interface**:
+     - Created `sih/models/predictor.py` implementing `VelocityPredictor`, `TorchVelocityPredictor`, `ONNXVelocityPredictor`, and `TFLiteVelocityPredictor`.
+     - Integrated `predictor` into `EngineAdapterStageB` in `server/engine_adapter.py`.
+     - Added `--predictor {torch,onnx,tflite}` flag to `scripts/quick_parity.py`.
+  5. **Quick Parity Verification**:
+     - `quick_parity.py --raw --cpu --predictor onnx`: **5/5 PASS** (exact 0.0000 m endpoint diff, max speed diff <= 5e-6 m/s).
+     - `quick_parity.py --raw --cpu --predictor tflite`: **5/5 PASS** (exact 0.0000 m endpoint diff, max speed diff <= 6e-6 m/s).
+  6. **Automated Unit Tests**:
+     - Added `tests/test_app_exported_parity.py` (4/4 tests passed in 3.47s).
+
+
 
 

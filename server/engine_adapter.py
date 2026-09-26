@@ -381,6 +381,7 @@ class EngineAdapterStageB:
         decimate_gnss: Optional[bool] = None,
         lock_saved_alignment: bool = False,
         use_speed_smoother: bool = True,
+        predictor: Optional[Any] = None,
     ) -> None:
         if decimate_gnss is not None:
             decimate_gnss_for_seeding = decimate_gnss
@@ -411,20 +412,46 @@ class EngineAdapterStageB:
         self.last_moving_gnss: Optional[GNSSSample] = None
         self.last_imu_ts_ns: Optional[int] = None
 
-        # AI model setup
+        # AI model & predictor setup
         self.device = device
         self.model = model
         self.norm_mean = norm_mean
         self.norm_std = norm_std
-        if self.model is None:
+        self.predictor = None
+
+        if predictor is not None:
+            if isinstance(predictor, str):
+                from sih.models.predictor import create_predictor
+                self.predictor = create_predictor(predictor, model=model, device=device)
+            else:
+                self.predictor = predictor
+        elif self.model is not None:
+            from sih.models.predictor import TorchVelocityPredictor
+            self.predictor = TorchVelocityPredictor(self.model, device=self.device)
+        else:
             from sih.models.inference import load_ai_model
+            from sih.models.predictor import TorchVelocityPredictor
             try:
                 import torch
                 dev = self.device or torch.device("cpu")
                 self.model, self.norm_mean, self.norm_std, _ = load_ai_model(dev)
                 self.device = dev
+                self.predictor = TorchVelocityPredictor(self.model, device=self.device)
             except Exception as e:
                 print(f"[EngineAdapterStageB] Could not load AI model: {e}")
+
+        # If normalization params still not loaded, attempt to load from exported sidecar
+        if (self.norm_mean is None or self.norm_std is None):
+            norm_sidecar = os.path.join(ROOT_DIR, "models", "exported", "normalization_params.npz")
+            if os.path.exists(norm_sidecar):
+                try:
+                    npz = np.load(norm_sidecar)
+                    if self.norm_mean is None:
+                        self.norm_mean = npz["mean"].reshape(-1, 1)
+                    if self.norm_std is None:
+                        self.norm_std = npz["std"].reshape(-1, 1)
+                except Exception:
+                    pass
 
         # Decimation & anti-alias filter
         self.accel_filter = CausalAntiAliasFilter(cutoff_hz=4.0, default_fs=50.0)
@@ -758,19 +785,25 @@ class EngineAdapterStageB:
             w_l = np.array(self.feature_buf[-60:], dtype=np.float32).T
 
         if self.norm_mean is not None and self.norm_std is not None:
-            norm_w_l = (w_l - self.norm_mean) / (self.norm_std + 1e-6)
+            norm_w_l = (w_l - self.norm_mean.reshape(-1, 1)) / (self.norm_std.reshape(-1, 1) + 1e-6)
         else:
             norm_w_l = w_l
 
         norm_w_s = norm_w_l[:, -20:].copy()
 
-        import torch
-        dev = self.device or torch.device("cpu")
-        ts_s = torch.from_numpy(norm_w_s[None, ...]).to(dev)
-        ts_l = torch.from_numpy(norm_w_l[None, ...]).to(dev)
-        with torch.no_grad():
-            vf, _, _ = self.model(ts_s, ts_l)
-        v_raw = float(vf.item())
+        if self.predictor is not None:
+            v_raw, _ = self.predictor.predict_window(norm_w_s, norm_w_l)
+        elif self.model is not None:
+            import torch
+            dev = self.device or torch.device("cpu")
+            ts_s = torch.from_numpy(norm_w_s[None, ...]).to(dev)
+            ts_l = torch.from_numpy(norm_w_l[None, ...]).to(dev)
+            with torch.no_grad():
+                vf, _, _ = self.model(ts_s, ts_l)
+            v_raw = float(vf.item())
+        else:
+            return max(0.0, float(np.linalg.norm(self.session.ekf_map._v)))
+
         if self.use_speed_smoother and self.speed_smoother is not None:
             return self.speed_smoother.update(v_raw, dt_s=0.1)
         return v_raw
@@ -831,16 +864,19 @@ class EngineAdapterStageB:
         windows_l = np.ascontiguousarray(windows_l.transpose(1, 0, 2)).astype(np.float32)
         windows_s = np.ascontiguousarray(windows_l[:, :, -short_len:]).astype(np.float32)
 
-        import torch
-        dev = self.device or torch.device("cpu")
-        batch_size = 2048
-        preds = []
-        with torch.no_grad():
-            for b in range(0, N, batch_size):
-                b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(dev)
-                b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(dev)
-                vf, _, _ = self.model(b_s, b_l)
-                preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
+        if self.predictor is not None:
+            preds = self.predictor.predict_batch(windows_s, windows_l)
+        else:
+            import torch
+            dev = self.device or torch.device("cpu")
+            batch_size = 2048
+            preds = []
+            with torch.no_grad():
+                for b in range(0, N, batch_size):
+                    b_s = torch.from_numpy(windows_s[b : b + batch_size]).to(dev)
+                    b_l = torch.from_numpy(windows_l[b : b + batch_size]).to(dev)
+                    vf, _, _ = self.model(b_s, b_l)
+                    preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
 
         for v_raw in preds:
             v_val = float(v_raw)

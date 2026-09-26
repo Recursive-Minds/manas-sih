@@ -30,8 +30,8 @@ from server.engine_adapter import EngineAdapterStageB
 from sih.round1.config import get_active_config
 
 
-def run_quick_parity(raw_mode: bool = False, no_smoother: bool = False, use_cpu: bool = False):
-    mode_str = "RAW INPUT MODE (adapter computes mount + features + AI speed)" if raw_mode else "ENGINE PARITY MODE (exact component comparison)"
+def run_quick_parity(raw_mode: bool = False, no_smoother: bool = False, use_cpu: bool = False, predictor: str = "torch"):
+    mode_str = f"RAW INPUT MODE [predictor={predictor}]" if raw_mode else "ENGINE PARITY MODE (exact component comparison)"
     if no_smoother:
         mode_str += " [NO SMOOTHER]"
     print("=" * 80)
@@ -162,6 +162,7 @@ def run_quick_parity(raw_mode: bool = False, no_smoother: bool = False, use_cpu:
             decimate_gnss_for_seeding=False,
             lock_saved_alignment=True,
             use_speed_smoother=not no_smoother,
+            predictor=predictor if (raw_mode and predictor != "torch") else None,
         )
 
         valid_gnss = [g for g in trip.gnss_samples if g.is_valid and g.timestamp_ns <= bo_start_ns]
@@ -290,7 +291,8 @@ if __name__ == "__main__":
     parser.add_argument("--raw", action="store_true", help="Run in raw-input mode (adapter computes mount + features + AI speeds)")
     parser.add_argument("--no-smoother", action="store_true", help="Disable speed smoother in both batch and streaming")
     parser.add_argument("--cpu", action="store_true", help="Force CPU inference for exact bit-parity (< 1e-5 m/s)")
+    parser.add_argument("--predictor", type=str, default="torch", choices=["torch", "onnx", "tflite"], help="Predictor backend in raw mode (default: torch)")
     args = parser.parse_args()
 
-    success = run_quick_parity(raw_mode=args.raw, no_smoother=args.no_smoother, use_cpu=args.cpu)
+    success = run_quick_parity(raw_mode=args.raw, no_smoother=args.no_smoother, use_cpu=args.cpu, predictor=args.predictor)
     sys.exit(0 if success else 1)
