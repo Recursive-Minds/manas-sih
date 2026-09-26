@@ -15,7 +15,10 @@ import re
 import random
 import unicodedata
 import numpy as np
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 from sih.core.contracts import IMUSample, GNSSSample
 from sih.data.schema import ColumnMapping, find_column

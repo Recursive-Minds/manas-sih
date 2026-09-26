@@ -169,8 +169,10 @@ class JavaBridgeVelocityPredictor(VelocityPredictor):
     via Chaquopy's Java reflection.
     """
 
-    def __init__(self, java_bridge: Any, use_bytes: bool = True) -> None:
+    def __init__(self, java_bridge: Any, use_bytes: bool = True, use_fast_path: Optional[bool] = None) -> None:
         self.bridge = java_bridge
+        if use_fast_path is not None:
+            use_bytes = use_fast_path
         self.use_bytes = use_bytes and hasattr(java_bridge, "predictWindowBytes")
         self.reset_stats()
 

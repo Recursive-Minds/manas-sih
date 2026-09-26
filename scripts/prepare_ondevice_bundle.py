@@ -47,6 +47,18 @@ def sync_python_sources():
         shutil.rmtree(server_dst)
     shutil.copytree(server_src, server_dst, ignore=ignore_patterns)
 
+    # 3. Bundle active production profile sibling into sih/round1/
+    prod_src = os.path.join(ROOT_DIR, "config", "round1", "production.json")
+    prod_dst = os.path.join(sih_dst, "round1", "production.json")
+    if os.path.exists(prod_src):
+        os.makedirs(os.path.dirname(prod_dst), exist_ok=True)
+        shutil.copy2(prod_src, prod_dst)
+
+    # 4. Sync ondevice test scripts
+    parity_src = os.path.join(ROOT_DIR, "scripts", "run_ondevice_parity.py")
+    if os.path.exists(parity_src):
+        shutil.copy2(parity_src, os.path.join(PYTHON_TARGET_DIR, "run_ondevice_parity.py"))
+
     print("Python sources synced successfully.")
 
 

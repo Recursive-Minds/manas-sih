@@ -186,12 +186,23 @@ PRODUCTION_PROFILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config", "round1", "production.json")
 
 
+DEFAULT_PRODUCTION_CONFIG: Dict[str, Any] = {
+    "name": "production",
+    "velocity_checkpoint": "models/checkpoints/round1_interval_lam0.5_s42.pt",
+    "online_calib": {"enabled": True},
+    "junction": {"enabled": True},
+    "scale_level": {"enabled": True, "source": "blend"},
+    "entry_doppler_bearing": False,
+}
+
+
 def get_active_config() -> Round1Config:
     """
     1. set_active_config(cfg)                       (orchestration scripts, tests)
     2. env SIH_ROUND1_CONFIG=<json path> | "off"    (manual override; "off" = old behaviour)
     3. config/round1/production.json if it exists   (the promoted production profile)
-    4. all OFF
+    4. packaged sibling production.json if present (edge runtimes like Chaquopy)
+    5. all OFF
     """
     if _ACTIVE is not None:
         return _ACTIVE
@@ -200,6 +211,10 @@ def get_active_config() -> Round1Config:
         return Round1Config()
     if env:
         return Round1Config.from_json(env)
-    if os.path.exists(PRODUCTION_PROFILE):
+    if PRODUCTION_PROFILE and os.path.exists(PRODUCTION_PROFILE):
         return Round1Config.from_json(PRODUCTION_PROFILE)
+    sibling_profile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "production.json")
+    if os.path.exists(sibling_profile):
+        return Round1Config.from_json(sibling_profile)
     return Round1Config()
+

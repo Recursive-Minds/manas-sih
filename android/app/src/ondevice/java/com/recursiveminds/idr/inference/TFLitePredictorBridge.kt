@@ -47,9 +47,11 @@ class TFLitePredictorBridge(private val interpreter: Interpreter) {
         val t0 = System.nanoTime()
         inputShortBuffer.rewind()
         inputShortBuffer.put(shortBytes)
+        inputShortBuffer.rewind()
 
         inputLongBuffer.rewind()
         inputLongBuffer.put(longBytes)
+        inputLongBuffer.rewind()
         val t1 = System.nanoTime()
 
         // (b) Interpreter invoke only
@@ -85,9 +87,11 @@ class TFLitePredictorBridge(private val interpreter: Interpreter) {
         val t0 = System.nanoTime()
         inputShortBuffer.rewind()
         for (f in shortFloats) inputShortBuffer.putFloat(f)
+        inputShortBuffer.rewind()
 
         inputLongBuffer.rewind()
         for (f in longFloats) inputLongBuffer.putFloat(f)
+        inputLongBuffer.rewind()
         val t1 = System.nanoTime()
 
         outputVBuffer.rewind()
@@ -124,8 +128,10 @@ class TFLitePredictorBridge(private val interpreter: Interpreter) {
         val lArr = FloatArray(longList.size) { (longList[it] as Number).toFloat() }
         inputShortBuffer.rewind()
         for (f in sArr) inputShortBuffer.putFloat(f)
+        inputShortBuffer.rewind()
         inputLongBuffer.rewind()
         for (f in lArr) inputLongBuffer.putFloat(f)
+        inputLongBuffer.rewind()
         val t1 = System.nanoTime()
 
         // (b) Interpreter invoke only

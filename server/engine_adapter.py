@@ -118,6 +118,7 @@ class EngineAdapterStageA:
         self.decimate_gnss_for_seeding = decimate_gnss_for_seeding
         self.decimate_gnss_for_mount = decimate_gnss_for_mount
         self.gnss_decimate_interval_s = gnss_decimate_interval_s
+        self.lock_saved_alignment = False
         self.last_mount_gnss_ns: Optional[int] = None
         self.last_seeding_gnss_ns: Optional[int] = None
         self.moving_gnss_fixes_count: int = 0
@@ -173,53 +174,48 @@ class EngineAdapterStageA:
         """Enforces the strict blackout state."""
         self.state = "BLACKOUT" if active else "WARMING_UP"
 
-    def get_mount_state_string(self) -> str:
-        if (self.lock_saved_alignment and self.saved_alignment is not None) or self.mount_reused:
-            return "REUSED"
-        if len(self.stream.calibrator._accel_buf) < 30:
-            return "UNLEVELLED"
-        if self.stream.calibrator._yaw_locked:
-            return "YAW_LOCKED"
-        return "LEVELLED"
-
     def get_mount_status(self) -> str:
-        state = self.get_mount_state_string()
-        n_turns = len(self.stream.calibrator._turn_events)
-        if state == "REUSED":
-            return "Mount: REUSED"
-        if state == "UNLEVELLED":
-            return "Mount: UNLEVELLED"
-        if state == "YAW_LOCKED":
-            return f"Mount: YAW_LOCKED (turns {n_turns}/15)"
-        return f"Mount: LEVELLED (turns {n_turns}/15)"
+        """
+        Returns the formatted mount status:
+        - "Mount: reused"
+        - "mount changed - drive turns"
+        - "Mount: locked"
+        - "Mount: calibrating n/8"
+        """
+        if self.mount_reused:
+            return "Mount: reused"
+        if self.mount_changed:
+            return "mount changed - drive turns"
+        if self.stream.calibrator._yaw_locked:
+            return "Mount: locked"
+        n_turns = min(len(self.stream.calibrator._turn_events), 8)
+        return f"Mount: calibrating {n_turns}/8"
 
     def get_warmup_status(self) -> Dict[str, Any]:
-        mount_state = self.get_mount_state_string()
-        n_turns = len(self.stream.calibrator._turn_events)
-        turns_str = "reused" if mount_state == "REUSED" else f"{n_turns}/15"
+        """
+        Evaluates explicit ready conditions for the warm-up panel.
+        """
         gravity_converged = len(self.stream.calibrator._accel_buf) >= 30
-        mount_locked = bool(mount_state in ("YAW_LOCKED", "REUSED"))
+        mount_locked = bool(self.mount_reused or self.stream.calibrator._yaw_locked)
         buffer_warm = bool(self.stream.feature_extractor.is_warm)
         alpha_learned = bool(self.moving_gnss_fixes_count >= 3)
+        n_turns = min(len(self.stream.calibrator._turn_events), 8)
+        turns_str = "reused" if self.mount_reused else f"{n_turns}/8"
+
+        # Mount is ready once initial SO(3) leveling settles (30 accel samples).
         mount_ready = bool(mount_locked or self.stream.calibrator.is_calibrated or gravity_converged)
         is_ready = bool(gravity_converged and buffer_warm and mount_ready)
-
-        speed_calib_s = min(180, int(self.moving_gnss_fixes_count))
-        speed_calib_display = f"Speed calibration {speed_calib_s}/180 s"
 
         return {
             "is_ready": is_ready,
             "gravity_converged": gravity_converged,
-            "mount_locked": mount_locked,
-            "mount_state": mount_state,
+            "mount_locked": mount_ready,
             "mount_status": self.get_mount_status(),
             "turn_events": n_turns,
-            "turn_events_target": 15,
+            "turn_events_target": 8,
             "turns_display": f"turns: {turns_str}",
             "buffer_warm": buffer_warm,
             "alpha_learned": alpha_learned,
-            "speed_calib_s": speed_calib_s,
-            "speed_calib_display": speed_calib_display,
         }
 
     def _evaluate_mount_guard(self) -> None:
@@ -873,7 +869,7 @@ class EngineAdapterStageB:
             self.recent_imu_calib.append(c)
             self.recent_ai_ts.append(imu.timestamp_ns)
 
-        if self.model is None:
+        if self.model is None and self.predictor is None:
             for c in c_list:
                 f = self.feature_extractor.push(c)
                 self.feature_buf.append(f)

@@ -24,16 +24,59 @@ class SmokeTestActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val mode = intent.getStringExtra("mode") ?: "smoke"
+
         scrollView = ScrollView(this)
         logView = TextView(this).apply {
             textSize = 12f
             setPadding(24, 24, 24, 24)
-            text = "Starting Phone Smoke Test...\n"
+            text = "Starting Phone ${mode.uppercase()} Test...\n"
         }
         scrollView.addView(logView)
         setContentView(scrollView)
 
-        runSmokeTest()
+        if (mode == "parity") {
+            runParityTest()
+        } else {
+            runSmokeTest()
+        }
+    }
+
+    private fun runParityTest() {
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                appendLog("=== ON-DEVICE PARITY & NO-FUTURE-LEAK TEST INITIALIZING ===")
+                appendLog("DEVICE: ro.product.model=${Build.MODEL}, ro.build.version.release=${Build.VERSION.RELEASE}, ro.product.cpu.abi=${Build.SUPPORTED_ABIS[0]}")
+
+                if (!Python.isStarted()) {
+                    Python.start(AndroidPlatform(applicationContext))
+                }
+                val py = Python.getInstance()
+                val bridge = TFLitePredictorBridge.create(applicationContext, "moe_velocity_model.tflite")
+                appendLog("TFLitePredictorBridge created (fast bytes transfer)")
+
+                val parityModule = py.getModule("run_ondevice_parity")
+                val bundleFile = File(getExternalFilesDir(null), "s_s3a_parity_bundle.pkl")
+                val reportFile = File(getExternalFilesDir(null), "step4_parity_report.json")
+                appendLog("Using bundle: ${bundleFile.absolutePath}")
+                appendLog("Invoking run_ondevice_parity.run_all_tests...")
+
+                val res = parityModule.callAttr("run_all_tests", bridge, bundleFile.absolutePath, reportFile.absolutePath)
+                val status = res.callAttr("get", "overall_status").toString()
+                appendLog("PARITY_TEST_COMPLETED: overall_status=$status")
+                appendLog("Report saved to ${reportFile.absolutePath}")
+
+                // Also copy to /sdcard/step4_parity_report.json for adb pull convenience
+                try {
+                    val sdcardReport = File("/sdcard/step4_parity_report.json")
+                    reportFile.copyTo(sdcardReport, overwrite = true)
+                    appendLog("Copied report to /sdcard/step4_parity_report.json")
+                } catch (_: Exception) {}
+            } catch (e: Throwable) {
+                appendLog("PARITY TEST FAILED: ${e.message}")
+                Log.e("PHONE", "Parity test crashed", e)
+            }
+        }
     }
 
     private fun appendLog(msg: String) {
