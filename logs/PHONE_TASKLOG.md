@@ -311,3 +311,17 @@ This log records every command and process executed during the On-Device Phone P
      - python scripts/check_links.py: 237/237 PASS.
      - python scripts/check_latex.py: PASS (0 LaTeX syntax).
      - pytest tests/test_doc_numbers.py: 3/3 PASS.
+---
+
+### Step 6: PPT Pack Packaging & Delivery
+- **Timestamp**: 2026-09-27 16:22:00 +05:30
+- **Branch**: docs/final-ppt
+- **Output**: ppt_pack.zip (1,399,110 bytes / 1.33 MB)
+- **Contents**:
+  - data/runs_6seed.csv: 236 evaluated runs on canonical dev seeds.
+  - data/summary_6seed.json: Overall stats, regime scorecard, and per-scenario scatter metrics.
+  - data/stages.json: Progressive pipeline drift across 4 architectural stages.
+  - data/ondevice.json: Measured on-device facts (Galaxy F12, Android 13).
+  - images/*.png: 1600px trajectory plots (#06, #18, #30, #33) and physical Galaxy F12 screenshots (handoff, summary, airplane status bar).
+  - images/README.txt: Image metadata and scenario details.
+  - FACTS.md: One-page verified numbers and 'do not claim' list.
