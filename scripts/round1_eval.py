@@ -92,6 +92,7 @@ def main() -> int:
     ap.add_argument("--model-path", default=None, help="checkpoint, or comma-separated list = mean ensemble")
     ap.add_argument("--map-source", default="osm", choices=["osm", "masked", "trip"])
     ap.add_argument("--assert-parity", default=None, help="reference *_scenarios.csv; first config must match exactly")
+    ap.add_argument("--out-dir", default=None, help="override output directory")
     args = ap.parse_args()
 
     if args.seeds == "canonical":
@@ -107,7 +108,10 @@ def main() -> int:
             print("List contains held-out seeds; approval flag required.")
             return 2
 
-    out_dir = os.path.join(ROOT, "results", "round1", args.tag)
+    if args.out_dir:
+        out_dir = os.path.abspath(args.out_dir)
+    else:
+        out_dir = os.path.join(ROOT, "results", "round1", args.tag)
     os.makedirs(out_dir, exist_ok=True)
     cfgs = [Round1Config.from_json(p) for p in args.configs]
 
