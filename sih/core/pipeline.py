@@ -142,12 +142,15 @@ VELOCITY_FACTORIES: Dict[str, Callable[..., IVelocityEstimator]] = {
 
 FUSION_FACTORIES: Dict[str, Callable[..., IFusionFilter]] = {}
 
-from sih.map.matcher import HMMMapMatcher
 from sih.handoff.manager import SeamlessGNSSHandoffManager
+
+def _create_hmm_matcher(**params) -> IMapMatcher:
+    from sih.map.matcher import HMMMapMatcher
+    return HMMMapMatcher(**params)
 
 MAP_MATCHER_FACTORIES: Dict[str, Callable[..., IMapMatcher]] = {
     "pass_through": lambda **params: PassThroughMapMatcher(**params),
-    "hmm_matcher": lambda **params: HMMMapMatcher(**params),
+    "hmm_matcher": _create_hmm_matcher,
 }
 
 HANDOFF_FACTORIES: Dict[str, Callable[..., IGNSSHandoffPolicy]] = {
@@ -289,15 +292,31 @@ def assemble_pipeline(config: PipelineConfig) -> IDRPipeline:
     """
     calib_algo = config.calibration.algorithm
     if calib_algo not in CALIBRATION_FACTORIES:
+        try:
+            import sih.calibration.mount  # noqa: F401
+        except ImportError:
+            pass
+    if calib_algo not in CALIBRATION_FACTORIES:
         raise ValueError(f"Unknown calibration algorithm: {calib_algo}. Available: {list(CALIBRATION_FACTORIES.keys())}")
     calibration = CALIBRATION_FACTORIES[calib_algo](**config.calibration.params)
 
     vel_algo = config.velocity.algorithm
     if vel_algo not in VELOCITY_FACTORIES:
+        try:
+            import sih.velocity.ai_estimator  # noqa: F401
+        except ImportError:
+            pass
+    if vel_algo not in VELOCITY_FACTORIES:
         raise ValueError(f"Unknown velocity algorithm: {vel_algo}. Available: {list(VELOCITY_FACTORIES.keys())}")
     velocity_estimator = VELOCITY_FACTORIES[vel_algo](**config.velocity.params)
 
     fusion_algo = config.fusion.algorithm
+    if fusion_algo not in FUSION_FACTORIES:
+        try:
+            import sih.fusion.naive  # noqa: F401
+            import sih.fusion.es_ekf  # noqa: F401
+        except ImportError:
+            pass
     if fusion_algo not in FUSION_FACTORIES:
         raise ValueError(f"Unknown fusion algorithm: {fusion_algo}. Available: {list(FUSION_FACTORIES.keys())}")
     fusion_filter = FUSION_FACTORIES[fusion_algo](**config.fusion.params)

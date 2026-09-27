@@ -9,8 +9,11 @@ import android.widget.TextView
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import com.recursiveminds.idr.inference.TFLitePredictorBridge
+import com.recursiveminds.idr.engine.LocalChaquopyEngineBridge
+import com.recursiveminds.idr.data.HudUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -35,10 +38,10 @@ class SmokeTestActivity : Activity() {
         scrollView.addView(logView)
         setContentView(scrollView)
 
-        if (mode == "parity") {
-            runParityTest()
-        } else {
-            runSmokeTest()
+        when (mode) {
+            "parity" -> runParityTest()
+            "drawer_benchmark" -> runDrawerBenchmarkTest()
+            else -> runSmokeTest()
         }
     }
 
@@ -267,6 +270,134 @@ class SmokeTestActivity : Activity() {
             } catch (e: Throwable) {
                 appendLog("FATAL ERROR IN SMOKE TEST: ${e.message}")
                 Log.e("PHONE", "Smoke test crashed", e)
+            }
+        }
+    }
+
+    private fun runDrawerBenchmarkTest() {
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                appendLog("================================================================================")
+                appendLog("=== PHYSICAL PHONE ON-DEVICE BENCHMARK DRAWER ACCEPTANCE TEST ===")
+                appendLog("DEVICE: ro.product.model=${Build.MODEL}, ro.build.version.release=${Build.VERSION.RELEASE}, ro.product.cpu.abi=${Build.SUPPORTED_ABIS[0]}")
+                appendLog("================================================================================")
+
+                val engineBridge = LocalChaquopyEngineBridge(applicationContext)
+
+                // Wait until engine is connected
+                var waitCount = 0
+                while (!engineBridge.isConnected && waitCount < 100) {
+                    delay(100)
+                    waitCount++
+                }
+                if (!engineBridge.isConnected) {
+                    throw IllegalStateException("LocalChaquopyEngineBridge failed to connect within 10s")
+                }
+                appendLog("LocalChaquopyEngineBridge connected and ready")
+
+                val scenarios = listOf(
+                    Triple(1, 80.59, 26.73),
+                    Triple(22, 16.77, 3.53),
+                    Triple(23, 67.76, 6.01),
+                    Triple(25, 77.30, 12.58),
+                    Triple(26, 122.80, 13.75),
+                    Triple(30, 7.04, 2.88)
+                )
+
+                val results = mutableListOf<JSONObject>()
+                var allPassed = true
+
+                for ((scId, expErr, expDrift) in scenarios) {
+                    appendLog("--------------------------------------------------------------------------------")
+                    appendLog("Running On-Device Benchmark Scenario #$scId...")
+
+                    val hudUpdates = mutableListOf<HudUpdate>()
+                    engineBridge.onHudUpdateListener = { hud ->
+                        synchronized(hudUpdates) {
+                            hudUpdates.add(hud)
+                        }
+                    }
+
+                    engineBridge.prepareBenchmark(scId)
+                    delay(1000) // Allow bundle extraction and SessionCore initialization
+
+                    val tStart = System.currentTimeMillis()
+                    // Replay at 50x speed for smooth and rapid on-device execution
+                    engineBridge.startBenchmark(scId, 50.0)
+
+                    // Await completion via isBenchmarkRunning
+                    delay(500)
+                    while (engineBridge.isBenchmarkRunning) {
+                        delay(100)
+                    }
+                    val elapsedMs = System.currentTimeMillis() - tStart
+
+                    val lastHud = synchronized(hudUpdates) { hudUpdates.lastOrNull() }
+                    val metrics = lastHud?.metrics
+                    val finalErr = metrics?.sessionSummary?.finalErrorM ?: (metrics?.horizontalErrorM ?: 0.0)
+                    val finalDrift = metrics?.sessionSummary?.driftPct ?: (metrics?.driftPct ?: 0.0)
+                    val warmup = lastHud?.warmup
+                    val mountState = warmup?.mountState ?: ""
+                    val mapStatus = warmup?.mapMatchingStatus ?: (if (warmup?.mapMatchingEnabled == true) "MAP MATCH: ON" else "MAP MATCH: OFF")
+
+                    val errDiff = kotlin.math.abs(finalErr - expErr)
+                    val driftDiff = kotlin.math.abs(finalDrift - expDrift)
+                    val passed = errDiff <= 0.05 && driftDiff <= 0.05 && mountState == "REUSED"
+
+                    if (!passed) allPassed = false
+
+                    // Compute distinct DR positions
+                    val drPositions = synchronized(hudUpdates) { hudUpdates.mapNotNull { it.drPos } }
+                    val distinctDrPositions = drPositions.distinctBy { Pair(it.lat, it.lon) }.size
+                    val totalDrPositions = drPositions.size
+                    val distinctDrRatio = if (totalDrPositions > 0) distinctDrPositions.toDouble() / totalDrPositions else 0.0
+
+                    appendLog("Scenario #$scId Result:")
+                    appendLog("  Final Error: %.2f m (Expected: %.2f m, Diff: %.3f m)".format(finalErr, expErr, errDiff))
+                    appendLog("  Drift: %.2f %% (Expected: %.2f %%, Diff: %.3f pp)".format(finalDrift, expDrift, driftDiff))
+                    appendLog("  Mount State: $mountState | Map Matching: $mapStatus")
+                    appendLog("  Distinct DR Positions: $distinctDrPositions / $totalDrPositions (%.1f%%)".format(distinctDrRatio * 100.0))
+                    appendLog("  Replay Time: %d ms | Status: %s".format(elapsedMs, if (passed) "PASS" else "FAIL"))
+
+                    val scJson = JSONObject().apply {
+                        put("scenario_id", scId)
+                        put("expected_error_m", expErr)
+                        put("phone_error_m", finalErr)
+                        put("error_diff_m", errDiff)
+                        put("expected_drift_pct", expDrift)
+                        put("phone_drift_pct", finalDrift)
+                        put("drift_diff_pp", driftDiff)
+                        put("mount_state", mountState)
+                        put("map_status", mapStatus)
+                        put("distinct_dr_ratio", distinctDrRatio)
+                        put("passed", passed)
+                    }
+                    results.add(scJson)
+                    engineBridge.stopBenchmark()
+                    delay(300)
+                }
+
+                appendLog("================================================================================")
+                appendLog("=== ON-DEVICE BENCHMARK DRAWER SUMMARY ===")
+                appendLog("OVERALL RESULT: ${if (allPassed) "ALL PASS" else "FAIL"}")
+                appendLog("================================================================================")
+
+                val fullReport = JSONObject().apply {
+                    put("device_model", Build.MODEL)
+                    put("android_version", Build.VERSION.RELEASE)
+                    put("overall_passed", allPassed)
+                    put("results", org.json.JSONArray(results))
+                }
+
+                val reportFile = File(getExternalFilesDir(null), "drawer_benchmark_report.json")
+                reportFile.writeText(fullReport.toString(2))
+                try {
+                    File("/sdcard/drawer_benchmark_report.json").writeText(fullReport.toString(2))
+                } catch (_: Exception) {}
+                appendLog("Saved full report to ${reportFile.absolutePath} and /sdcard/drawer_benchmark_report.json")
+            } catch (e: Throwable) {
+                appendLog("FATAL ERROR IN DRAWER BENCHMARK TEST: ${e.message}")
+                Log.e("PHONE", "Drawer benchmark test crashed", e)
             }
         }
     }

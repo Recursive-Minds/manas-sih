@@ -24,10 +24,12 @@ class LocalGISProvider(IRoadNetworkProvider):
 
     def __init__(self, gis_data_dir: str = "data/maps/indian_gis") -> None:
         self.gis_data_dir = gis_data_dir
+        self._cached_geojson_data: List[Dict[str, Any]] = []
         try:
             os.makedirs(self.gis_data_dir, exist_ok=True)
         except OSError:
             pass
+        self._load_available_datasets()
 
     def _load_available_datasets(self) -> None:
         """Discovers and parses all available .geojson files in the GIS directory."""

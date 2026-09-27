@@ -910,8 +910,12 @@ class EngineAdapterStageB:
             feats.append(f)
 
         feats_arr = np.array(feats, dtype=np.float32)
-        norm_mean = self.norm_mean if self.norm_mean is not None else np.zeros(12, dtype=np.float32)
-        norm_std = self.norm_std if self.norm_std is not None else np.ones(12, dtype=np.float32)
+        norm_mean = self.norm_mean if self.norm_mean is not None else np.zeros((12, 1), dtype=np.float32)
+        norm_std = self.norm_std if self.norm_std is not None else np.ones((12, 1), dtype=np.float32)
+        if isinstance(norm_mean, np.ndarray) and norm_mean.ndim == 1:
+            norm_mean = norm_mean.reshape(-1, 1)
+        if isinstance(norm_std, np.ndarray) and norm_std.ndim == 1:
+            norm_std = norm_std.reshape(-1, 1)
         norm_feats = (feats_arr.T - norm_mean) / (norm_std + 1e-6)
         short_len, long_len = 20, 60
         pad_l = np.repeat(norm_feats[:, 0:1], long_len - 1, axis=1)
