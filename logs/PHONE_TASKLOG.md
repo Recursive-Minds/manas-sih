@@ -222,7 +222,106 @@ This log records every command and process executed during the On-Device Phone P
      - `pytest tests/test_app_benchmark_bundle.py`: 6/6 PASS.
      - `pytest tests/test_doc_numbers.py`: 3/3 PASS.
      - `pytest tests/test_map_ingestion.py`: 6/6 PASS.
+---
 
+### Step 1: Main Benchmark Evaluation (6 Dev Seeds x 40 Scenarios)
+- **Timestamp**: 2026-09-27 15:52:00 +05:30
+- **Branch**: `docs/final-ppt` (branched from `demo-ready` at `466fe14`)
+- **Commands Executed**:
+  1. Updated `scripts/round1_eval.py` to support `--out-dir`.
+  2. `python scripts/round1_eval.py --seeds canonical --configs config/round1/production.json --tag six_seed --out-dir results/final/six_seed`:
+     - Total evaluated runs: 236 (6 canonical dev seeds x 40 scenarios nominal; 4 dropped: (45736, 39), (45736, 40), (12345, 40), (987654, 40) due to S-S4 blackout interval boundary limits).
+  3. Parity Check vs `results/round1/hdg_seed/production_scenarios.csv`:
+     - Evaluated row-by-row `map_err_m` diff: max absolute difference = **5.684e-14 m** (EXACT MATCH).
+  4. Executed `scripts/export_ppt_data.py`:
+     - Generated `ppt_pack/data/runs_6seed.csv` (236 rows with speed regime and unseen flags).
+     - Generated `ppt_pack/data/summary_6seed.json`:
+       - Overall: Median drift 12.03%, Mean of seed medians 12.32 +- 1.13%, P90 37.30%, Share < 10% 42.37%, Share < 30% 83.90%, Beats pure DR 82.20%, Pure DR median 22.46%.
+       - Regime Scorecard: Crawl: 15.82 m vs < 10 m (Not met, n=43); City: 12.16% vs < 15% (Met, n=152); Highway: 13.98% vs < 10% (Near, n=41); All: 12.03% vs < 10% (Near, n=236).
+       - Per-scenario scatter: 38/40 (95.0%) improved vs pure DR, 15/40 (37.5%) < 10%, 38/40 (95.0%) < 30%.
+       - Frozen held-out 120 copied from `FINAL_NUMBERS_FOR_PPT.md` as independent confirmation.
 
+---
 
+### Step 2: Progressive Pipeline Drift Stages Export
+- **Timestamp**: 2026-09-27 15:58:00 +05:30
+- **Branch**: `docs/final-ppt`
+- **Output**: `ppt_pack/data/stages.json`
+- **Values Recorded**:
+  - (a) Naive double integration: 424.13% (3452.9 m error / 814.0 m on S-S1, `benchmarks/run_phase2_es_ekf.py`, commit `519a202`).
+  - (b) ES-EKF + NHC: 178.79% (1455.57 m error / 814.0 m on S-S1, `benchmarks/run_phase2_es_ekf.py`, commit `519a202`).
+  - (c) AI speed + EKF, no map: 22.46% (pure DR median across 236 runs).
+  - (d) Full Smart IDR pipeline: 12.03% (final median across 236 runs).
 
+---
+
+### Step 3: Trajectory Visualizations & Physical Phone Screenshots
+- **Timestamp**: 2026-09-27 16:02:00 +05:30
+- **Branch**: `docs/final-ppt`
+- **Commands Executed**:
+  1. Executed `scripts/generate_ppt_trajectory_plots.py`:
+     - Rendered 4 white-background 1600x1000 px PNG plots for dev seed 541098:
+       - `ppt_pack/images/trajectory_scenario_06.png` (#06 Highway, 427.1 m, drift: 1.88%, pure DR: 7.10%).
+       - `ppt_pack/images/trajectory_scenario_18.png` (#18 Urban, 98.9 m, drift: 6.85%, pure DR: 58.13%).
+       - `ppt_pack/images/trajectory_scenario_30.png` (#30 Mixed, 244.2 m, drift: 9.55%, pure DR: 6.43%).
+       - `ppt_pack/images/trajectory_scenario_33.png` (#33 Arterial, 443.5 m, drift: 4.46%, pure DR: 11.50%).
+     - Generated `ppt_pack/images/README.txt` with scenario metadata.
+  2. Captured on-device screenshots from physical Samsung Galaxy F12 (`SM-F127G`) with airplane mode enabled:
+     - `ppt_pack/images/phone_screenshot_30_handoff.png` (reacquisition blending at t=47.0s with yellow DR, green truth, cyan blend markers).
+     - `ppt_pack/images/phone_screenshot_30_summary.png` (Scenario #30 summary card: 7.0 m / 2.88%).
+     - `ppt_pack/images/phone_statusbar_airplane.png` (status bar crop showing airplane icon).
+
+---
+
+### Step 4: Measured On-Device Facts Export
+- **Timestamp**: 2026-09-27 16:06:00 +05:30
+- **Branch**: `docs/final-ppt`
+- **Output**: `ppt_pack/data/ondevice.json` and `ppt_pack/FACTS.md`
+- **Summary of Measured Facts**:
+  - Device: Samsung Galaxy F12 (`SM-F127G`), Exynos 850 (8x Cortex-A55 @ 2.0 GHz), Android 13 (API 33).
+  - Sizes: APK 50.12 MB, TFLite model 2.50 MB, ONNX 2.48 MB, TorchScript 2.66 MB.
+  - Export Parity: TFLite vs PyTorch max abs diff = 4.77e-6 m/s, ONNX vs PyTorch = 5.72e-6 m/s (< 1e-5 m/s target).
+  - Latency: 5.06 ms mean batch latency (P95: 7.18 ms, max: 8.94 ms, 94.94% budget headroom; split: features 0.32 ms, model 3.37 ms, smoother 0.04 ms, EKF+map 1.29 ms).
+  - Resources: PSS = 320.3 MB, RSS = 399.8 MB, active CPU = 9.2% normalized (73.6% single-core active replay).
+  - Setup: First open cold = 2.8s, snapshot restore = 0.4s (7.0x speedup).
+  - Direct bundle read table: #1 (80.59m / 26.73%), #22 (16.77m / 3.53%), #23 (67.76m / 6.00%), #25 (77.30m / 12.58%), #26 (122.80m / 13.75%), #30 (7.04m / 2.88%). Exact 0.000m diff on device.
+  - Pending: Battery drain and real vehicle road drive.
+  - Test suite count: 160 passed, 2 skipped, 0 failed (162 total).
+---
+
+### Step 5: Documentation Synchronization & Number Registry Audit
+- **Timestamp**: 2026-09-27 16:18:00 +05:30
+- **Branch**: docs/final-ppt
+- **Files Modified**:
+  - README.md
+  - SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md
+  - docs/NUMBER_SOURCES.json
+  - scripts/check_number_registry.py
+  - logs/PHONE_TASKLOG.md
+- **Actions Executed**:
+  1. Replaced stale pre-T1-T10 numbers across documentation.
+  2. Set production headline to Step 1 (6 dev seeds, 236 runs): 12.03% median drift, 12.32% +- 1.13% mean of seed medians, P90 37.30%, with held-out 120 (10.71% +- 1.17% mean, 11.15% median) as independent confirmation (not used for tuning).
+  3. Replaced regime table with Step 1 scorecard and computed statuses (Crawl 15.82 m Not met; City 12.16% Met; Highway 13.98% Near; All 12.03% Near).
+  4. Updated On-Device mode with measured phone facts: Galaxy F12 (Android 13), APK 50.12 MB, TFLite 2.50 MB, 5.06 ms latency (94.94% headroom), 320.3 MB PSS, 9.2% CPU, and 0.000m parity across all 6 bundled drawer scenarios.
+  5. Declared limitations: 6 bundled scenarios, session mount lock, start prefetch, pending road drive and battery tests.
+  6. Declared not-implemented: Barometer, lean-aware NHC, NDK sensor capture, INT8 quantization as 'design, not implemented'; C++ engine as 'reference prototype, not used'.
+  7. Registered 41 new numbers in docs/NUMBER_SOURCES.json with dynamic selector recomputation.
+  8. Audits verified:
+     - python scripts/check_number_registry.py: ALL PASS (140/140 registered, label consistency PASS, unregistered scanner PASS).
+     - python scripts/check_links.py: 237/237 PASS.
+     - python scripts/check_latex.py: PASS (0 LaTeX syntax).
+     - pytest tests/test_doc_numbers.py: 3/3 PASS.
+---
+
+### Step 6: PPT Pack Packaging & Delivery
+- **Timestamp**: 2026-09-27 16:22:00 +05:30
+- **Branch**: docs/final-ppt
+- **Output**: ppt_pack.zip (1,399,110 bytes / 1.33 MB)
+- **Contents**:
+  - data/runs_6seed.csv: 236 evaluated runs on canonical dev seeds.
+  - data/summary_6seed.json: Overall stats, regime scorecard, and per-scenario scatter metrics.
+  - data/stages.json: Progressive pipeline drift across 4 architectural stages.
+  - data/ondevice.json: Measured on-device facts (Galaxy F12, Android 13).
+  - images/*.png: 1600px trajectory plots (#06, #18, #30, #33) and physical Galaxy F12 screenshots (handoff, summary, airplane status bar).
+  - images/README.txt: Image metadata and scenario details.
+  - FACTS.md: One-page verified numbers and 'do not claim' list.

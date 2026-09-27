@@ -3,9 +3,9 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C.svg)](https://pytorch.org/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-21%20Round1%20%7C%20124%20Passing-brightgreen.svg)](#19-quickstart-reproduction-guide--test-verification)
-[![Held-Out Benchmark](https://img.shields.io/badge/Held--Out%20Benchmark-10.71%25%20%C2%B1%201.17%25%20(Near%20Target)-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
-[![Dev Seeds Matrix](https://img.shields.io/badge/Dev%20Seeds%20(6%20seeds)-10.86%25%20%C2%B1%202.47%25-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-160%20Passing%20%7C%20162%20Total-brightgreen.svg)](#19-quickstart-reproduction-guide--test-verification)
+[![Held-Out Benchmark](https://img.shields.io/badge/Held--Out%20Benchmark-10.71%25%20%C2%B1%201.17%25%20(Confirmation)-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
+[![Dev Seeds Matrix](https://img.shields.io/badge/Dev%20Seeds%20(6%20seeds)-12.03%25%20Median%20%7C%2012.32%25%20%C2%B1%201.13%25-blue.svg)](#16-definitive-empirical-benchmark-evaluation)
 [![Production Release](https://img.shields.io/badge/Production%20Release-Round%202%20Frozen-brightgreen.svg)](#17-active-tuned-parameters--configuration-registry)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -13,11 +13,28 @@
 
 ---
 
-### Executive Headline Benchmark: Baseline vs Final Production
+### Executive Headline Benchmark: Development Tuning vs Independent Confirmation
 
-The table below presents the authoritative, empirical comparison between the pre-round 1 baseline and the finalized production system (`round2-release`) across 3 strictly held-out evaluation seeds (`[319976, 480577, 473995]`, 120 total scenarios; used only for confirmation; 2 pre-declared looks in total (one per round)).
+The primary development evaluation is executed across 6 canonical development seeds (236 evaluated scenarios across 5 diverse driving trips; nominal 240 runs with 4 dropped due to sequence boundary intervals). These development seeds were utilized for system tuning, algorithmic hardening, and parameter optimization. An independent set of 3 strictly held-out seeds (120 blackout scenarios) was frozen and evaluated with zero tuning solely for independent confirmation to prove absence of hyperparameter memorization.
 
-| Evaluation Metric | Pre-Round 1 Base | Final Production (Round 2 Promoted) | Improvement / Delta | Data Source File |
+#### 1. Production Headline Benchmark (6 Development Seeds x 40 Scenarios, 236 Runs)
+
+| Evaluation Metric | Production Pipeline (`round2-release`) | Target Benchmark | Status | Data Source File |
+| :--- | :--- | :--- | :--- | :--- |
+| **Total Scenarios Evaluated** | 236 runs (6 seeds x 40 scenarios nominal) | 240 scenarios | Complete (4 dropped at boundary limits) | `ppt_pack/data/runs_6seed.csv` |
+| **Overall Median Drift** | **12.03%** | < 10.0% | **NEAR TARGET** | `ppt_pack/data/summary_6seed.json` |
+| **Mean of Seed Medians +- Std** | **12.32% +- 1.13%** | < 10.0% | **NEAR TARGET** (Std down to 1.13%) | `ppt_pack/data/summary_6seed.json` |
+| **P90 Drift (Worst Decile)** | **37.30%** | Sub-35% | **NEAR TARGET** | `ppt_pack/data/summary_6seed.json` |
+| **Share < 10% Drift** | **42.37% (100 / 236)** | > 50% | **42.4%** | `ppt_pack/data/summary_6seed.json` |
+| **High Reliability (<= 30% Drift)** | **83.90% (198 / 236)** | > 85% | **83.9% (NEAR TARGET)** | `ppt_pack/data/summary_6seed.json` |
+| **Beats Pure Dead-Reckoning Rate** | **82.20% (194 / 236)** | > 80% | **MET** | `ppt_pack/data/summary_6seed.json` |
+| **Pure Dead-Reckoning Median** | **22.46%** | Open-loop AI + EKF | Baseline Reference | `ppt_pack/data/summary_6seed.json` |
+
+*Historical note*: An earlier dev evaluation (`benchmark_results.json`) reported 10.86% +- 2.47% mean of seed medians, 11.76% median, and 36.6% P90.
+
+#### 2. Independent Confirmation Benchmark (Held-Out 3 Seeds, 120 Scenarios; Not Used for Tuning)
+
+| Evaluation Metric | Pre-Round-1 Base | Final Production (Round 2 Promoted) | Improvement / Delta | Data Source File |
 | :--- | :--- | :--- | :--- | :--- |
 | **Total Scenarios Evaluated** | 120 | 120 | 3 seeds x 40 scenarios | `results/round1/heldout_base/summary.json` & `results/round1/heldout_r2_blend180/summary.json` |
 | **Share < 10% Drift** | 42.50% (51/120) | 48.33% (58/120) | +5.83 pp (+7 scenarios into < 10% drift) | `results/round1/heldout_base/summary.json` & `results/round1/heldout_r2_blend180/summary.json` |
@@ -27,7 +44,7 @@ The table below presents the authoritative, empirical comparison between the pre
 | **Unseen Trips Median (S-S3a, S-S4)** | 11.89% (n=60) | 9.66% (n=60) | -2.23 pp (breaks the 10% barrier) | `results/round1/heldout_base/baseline_off_scenarios.csv` & `results/round1/heldout_r2_blend180/r2_blend180_scenarios.csv` |
 | **Beats Pure Dead-Reckoning Rate**| 83.33% (100/120) | 86.67% (104/120) | +3.34 pp | `results/round1/heldout_base/summary.json` & `artifacts/heldout_seed_results.json` |
 
-*Metric Definition Note for P90*: P90 drift is defined as the 90th percentile of map-matched endpoint drift percentage evaluated across all 120 pooled scenarios (`p90` in `summary.json`), reflecting worst-decile outage reliability. All mathematical expressions and metrics are reported in clean plain-text notation.
+*Metric Definition Note for P90*: P90 drift is defined as the 90th percentile of map-matched endpoint drift percentage evaluated across all pooled scenarios, reflecting worst-decile outage reliability. All mathematical expressions and metrics are reported in clean plain-text notation.
 
 ---
 
@@ -132,15 +149,15 @@ The problem statement defines three operational regimes:
 1. **Tier 1: Traffic Crawl (< 20 km/h, < 200m)**:
    - Evaluates stop-and-go behavior, red light idling, and pedestrian-speed congestion.
    - Challenge: Engine idle vibrations falsely simulate forward motion, causing phantom distance accumulation while stationary.
-   - Target: Absolute position error < 10m (< 5m over 50m). (Empirical benchmark status: 27.9m median position error, NOT MET).
+   - Target: Absolute position error < 10m (< 5m over 50m). (Empirical benchmark status: 15.82m median position error across 43 scenarios, NOT MET).
 2. **Tier 2: City Maneuvers (20 – 50 km/h, 200m – 500m)**:
    - Evaluates 90-degree intersection turns, roundabouts, lane changes, and short underpasses.
    - Challenge: Uncompensated gyroscope bias rapidly rotates forward velocity into the lateral plane, inducing quadratic trajectory curvature.
-   - Target: Drift < 15% of distance travelled (corridor-level positioning).
+   - Target: Drift < 15% of distance travelled (corridor-level positioning). (Empirical benchmark status: 12.16% median drift across 152 scenarios, MET).
 3. **Tier 3: Highway Cruising (> 50 km/h, 500m – 1.2km)**:
    - Evaluates high-speed tunnel transits (e.g. Mumbai-Pune Expressway tunnels) at 60 – 100 km/h.
    - Challenge: Ultra-smooth asphalt attenuates chassis vibrations, causing neural speed under-prediction, while small angular drift accumulates massive cross-track error over 1 km.
-   - Target: Drift < 10% (< 100m over 1km drive).
+   - Target: Drift < 10% (< 100m over 1km drive). (Empirical benchmark status: 13.98% median drift across 41 scenarios, NEAR TARGET).
 
 ---
 
@@ -757,7 +774,7 @@ Indian roadway conditions present unique challenges: dense traffic congestion, a
 * **Predictive Lookahead**: `PredictiveCorridorManager` (`sih/map/corridor_manager.py`) is implemented and unit-tested for dynamic Overpass API corridor prefetching based on vehicle speed. *(Status: offline cache active in production; dynamic lookahead prefetcher planned for phone phase).*
 
 ### 15.3 Zero-Dependency 200 Hz C++ NDK Engine
-A standalone C++17 reference prototype (`engine/cpp/src/idr_core.cpp`, `engine/cpp/include/idr_core.h`) implements open-loop inertial navigation and compiles to `idr_core.dll` (113 KB). *(Status: reference prototype, not benchmarked, does not include Round 1/2 features; Python and Android prototypes currently execute independently).*
+A standalone C++17 reference prototype (`engine/cpp/src/idr_core.cpp`, `engine/cpp/include/idr_core.h`) implements open-loop inertial navigation and compiles to `idr_core.dll` (113 KB). *(Status: reference prototype, not used; does not include Round 1/2 features; Python engine and Android Chaquopy runtime currently execute).*
 
 ### 15.4 PyTorch Mobile TorchScript Export & Android Runtime Spec
 * The Dual-Brain MoE speed estimator is exported as an optimized TorchScript graph (`models/exported/moe_velocity_model.torchscript.pt`, 2.66 MB, 1.84 ms on laptop CPU; not measured on phone).
@@ -765,23 +782,23 @@ A standalone C++17 reference prototype (`engine/cpp/src/idr_core.cpp`, `engine/c
 
 #### Dedicated Architectural Pillars
 
-### Pillar 1: Motorcycle Roll Dynamics & Virtual Contact Patch Frame (DESIGN — planned, not implemented)
+### Pillar 1: Motorcycle Roll Dynamics & Virtual Contact Patch Frame (design, not implemented)
 * **The Physical Challenge**: Two-wheelers lean into corners at roll angles between 20° and 45°, violating standard 4-wheeler NHC constraints.
 * **The Planned Design**: Roll estimation via complementary filter `theta_roll = arctan2(a_y_level, a_z_level)`, coordinate transformation into contact patch frame, and lean-adaptive NHC covariance inflation `R_lat(theta_roll) = R_lat_nominal * (1.0 + (theta_roll / 15 deg)^4)`.
 
-### Pillar 2: Real-Time Android Sensor Daemon & NDK Native Bridge (DESIGN — planned, not implemented; current app uses Java SensorManager)
+### Pillar 2: Real-Time Android Sensor Daemon & NDK Native Bridge (design, not implemented)
 * **The System Challenge**: Android battery optimization and GC pauses introduce jitter into high-frequency sensor capture.
 * **The Planned Design**: Native sensor acquisition in C++ via Android NDK `ASensorManager` (`ASENSOR_TYPE_ACCELEROMETER`, `ASENSOR_TYPE_GYROSCOPE`) with circular native ring buffers. (The current app operates via Android Java `SensorManager`).
 
-### Pillar 3: Multi-Level Flyover Disambiguation via Barometer Fusion (DESIGN — planned, not implemented)
+### Pillar 3: Multi-Level Flyover Disambiguation via Barometer Fusion (design, not implemented)
 * **The Physical Challenge**: Elevated flyovers stacked directly above surface service roads cannot be distinguished via 2D horizontal GNSS fixes.
 * **The Planned Design**: Barometric altitude estimation `h_baro = 44330.0 * (1.0 - (P_meas / P_0)^0.190295)` and vertical map-matching separation gating (`delta_z > 4.5m`).
 
-### Pillar 4: Non-Lane Road Dynamics & Probabilistic Ribbon Corridors (DESIGN — planned, not implemented)
+### Pillar 4: Non-Lane Road Dynamics & Probabilistic Ribbon Corridors (design, not implemented)
 * **The Physical Challenge**: Indian roads frequently lack lane markings, causing opportunistic vehicle trajectories across the roadway.
 * **The Planned Design**: 2D ribbon corridor bounding `d_perp_effective = max(0.0, |d_perp| - W_road / 2.0)`, applying lateral constraints only when the vehicle exits the physical roadway boundary.
 
-### Pillar 5: INT8 / FP16 Quantized Mobile Neural Inference & C++ Engine (DESIGN — planned, not implemented; FP32 TorchScript exported, on-device runtime planned)
+### Pillar 5: INT8 / FP16 Quantized Mobile Neural Inference & C++ Engine (design, not implemented)
 * **The Hardware Challenge**: Unquantized neural models consume mobile CPU and cause thermal throttling under direct sunlight.
 * **The Planned Design**: Quantization of neural velocity graph to INT8 for mobile NPU/DSP execution. (Currently exported as FP32 TorchScript graph, 2.66 MB).
 
@@ -962,9 +979,10 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Operational Regime | Speed & Distance Scale | Blackout Duration | Pipeline Performance (Multi-Trip Benchmark) | Official SIH Benchmark Target | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200m | 30s – 60s | **27.9m Median Position Error** | &lt; 10m absolute error (&lt; 5m / 50m) | **NOT MET** |
-| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **6.03% Median Drift** | &lt; 15% of distance traveled (Corridor-level) | **PASSED** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **12.58% Median Drift** (Corridor-level accuracy) | &lt; 100m over 1km (&lt; 10%) | **NEAR TARGET** |
+| **Tier 1: Traffic Crawl** | < 20 km/h / < 200m | 30s - 60s | **15.82m Median Position Error (n=43)** | < 10m absolute error (< 5m / 50m) | **Not met** |
+| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200m - 500m | 30s - 60s | **12.16% Median Drift (n=152)** | < 15% of distance traveled (Corridor-level) | **Met** |
+| **Tier 3: Highway Cruising** | > 50 km/h / > 500m - 1.2km | 60s - 75s | **13.98% Median Drift (n=41)** | < 100m over 1km (< 10%) | **Near** |
+| **All Scenarios Combined** | Full Operational Spectrum | 30s - 75s | **12.03% Median Drift (n=236)** | < 10% of distance traveled | **Near** |
 
 ---
 
@@ -1017,7 +1035,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #03 | S-M (Highway) | 75s | 1174.6m | 30.47% | **8.56%** | +21.91% | [View 3-Panel Plot](artifacts/map_scenario_03_s_m_highway_75s.png) |
 | #04 | S-M (Highway) | 45s | 326.7m | 26.47% | **16.95%** | +9.52% | [View 3-Panel Plot](artifacts/map_scenario_04_s_m_highway_45s.png) |
 | #05 | S-M (Highway) | 75s | 288.6m | 29.21% | **6.03%** | +23.18% | [View 3-Panel Plot](artifacts/map_scenario_05_s_m_highway_75s.png) |
-| #06 | S-M (Highway) | 30s | 427.1m | 8.89% | **8.62%** | +0.27% | [View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png) |
+| #06 | S-M (Highway) | 30s | 427.1m | 7.10% | **1.88%** | +5.22% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_06.png) |
 | #07 | S-M (Highway) | 60s | 603.3m | 67.98% | **12.09%** | +55.89% | [View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png) |
 | #08 | S-M (Highway) | 60s | 314.7m | 36.54% | **16.01%** | +20.54% | [View 3-Panel Plot](artifacts/map_scenario_08_s_m_highway_60s.png) |
 | #09 | S-S2 (Arterial) | 75s | 872.1m | 114.78% | **119.00%** | +-4.22% | [View 3-Panel Plot](artifacts/map_scenario_09_s_s2_arterial_75s.png) |
@@ -1029,7 +1047,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #15 | S-S1 (Urban) | 45s | 399.7m | 19.57% | **17.98%** | +1.59% | [View 3-Panel Plot](artifacts/map_scenario_15_s_s1_urban_45s.png) |
 | #16 | S-S1 (Urban) | 30s | 200.5m | 5.92% | **11.91%** | +-5.99% | [View 3-Panel Plot](artifacts/map_scenario_16_s_s1_urban_30s.png) |
 | #17 | S-S1 (Urban) | 75s | 102.8m | 16.61% | **17.21%** | +-0.60% | [View 3-Panel Plot](artifacts/map_scenario_17_s_s1_urban_75s.png) |
-| #18 | S-S1 (Urban) | 45s | 98.9m | 52.69% | **10.68%** | +42.01% | [View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_45s.png) |
+| #18 | S-S1 (Urban) | 45s | 98.9m | 58.13% | **6.85%** | +51.28% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_18.png) |
 | #19 | S-S1 (Urban) | 30s | 361.8m | 10.48% | **3.77%** | +6.71% | [View 3-Panel Plot](artifacts/map_scenario_19_s_s1_urban_30s.png) |
 | #20 | S-S1 (Urban) | 60s | 135.1m | 75.66% | **29.34%** | +46.32% | [View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_60s.png) |
 | #21 | S-S3a (Mixed) | 30s | 325.9m | 13.80% | **4.52%** | +9.28% | [View 3-Panel Plot](artifacts/map_scenario_21_s_s3a_mixed_30s.png) |
@@ -1041,10 +1059,10 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #27 | S-S3a (Mixed) | 60s | 591.9m | 4.48% | **0.59%** | +3.90% | [View 3-Panel Plot](artifacts/map_scenario_27_s_s3a_mixed_60s.png) |
 | #28 | S-S3a (Mixed) | 45s | 374.5m | 27.47% | **3.45%** | +24.01% | [View 3-Panel Plot](artifacts/map_scenario_28_s_s3a_mixed_45s.png) |
 | #29 | S-S3a (Mixed) | 30s | 164.3m | 49.66% | **4.09%** | +45.58% | [View 3-Panel Plot](artifacts/map_scenario_29_s_s3a_mixed_30s.png) |
-| #30 | S-S3a (Mixed) | 60s | 244.2m | 7.94% | **2.88%** | +5.06% | [View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_60s.png) |
+| #30 | S-S3a (Mixed) | 60s | 244.2m | 6.43% | **9.55%** | -3.12% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_30.png) |
 | #31 | S-S4 (Arterial) | 45s | 490.9m | 4.30% | **3.07%** | +1.23% | [View 3-Panel Plot](artifacts/map_scenario_31_s_s4_arterial_45s.png) |
 | #32 | S-S4 (Arterial) | 75s | 610.9m | 28.91% | **24.98%** | +3.93% | [View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_75s.png) |
-| #33 | S-S4 (Arterial) | 60s | 443.5m | 10.23% | **5.59%** | +4.64% | [View 3-Panel Plot](artifacts/map_scenario_33_s_s4_arterial_60s.png) |
+| #33 | S-S4 (Arterial) | 60s | 443.5m | 11.50% | **4.46%** | +7.04% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_33.png) |
 | #34 | S-S4 (Arterial) | 45s | 328.3m | 58.22% | **0.93%** | +57.29% | [View 3-Panel Plot](artifacts/map_scenario_34_s_s4_arterial_45s.png) |
 | #35 | S-S4 (Arterial) | 75s | 466.0m | 33.19% | **34.14%** | +-0.95% | [View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_75s.png) |
 | #36 | S-S4 (Arterial) | 45s | 739.7m | 29.81% | **6.90%** | +22.90% | [View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_45s.png) |

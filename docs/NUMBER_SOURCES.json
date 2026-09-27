@@ -1510,5 +1510,620 @@
       "APP_REPORT.md",
       "APP_STATUS_REPORT.md"
     ]
+  },
+  "step1_6seed_overall_median": {
+    "metric": "Dev 6-Seed Overall Median Drift",
+    "value": 12.03,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.median_drift_pct",
+    "computation": "median of map_drift_pct across 236 runs",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_mean_of_medians": {
+    "metric": "Dev 6-Seed Mean of Seed Medians",
+    "value": 12.32,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.mean_of_seed_medians",
+    "computation": "mean of per-seed median drift percentages across 6 dev seeds",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_std_of_medians": {
+    "metric": "Dev 6-Seed Std of Seed Medians",
+    "value": 1.13,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.std_of_seed_medians",
+    "computation": "standard deviation of per-seed medians across 6 dev seeds",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_p90_drift": {
+    "metric": "Dev 6-Seed P90 Drift",
+    "value": 37.3,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.p90_drift_pct",
+    "computation": "90th percentile of map_drift_pct across 236 runs",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_share_lt10": {
+    "metric": "Dev 6-Seed Share < 10% Drift",
+    "value": 42.37,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.share_lt_10_pct",
+    "computation": "percentage of runs with drift < 10% (100 / 236)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_share_lt30": {
+    "metric": "Dev 6-Seed Share < 30% Drift",
+    "value": 83.9,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.share_lt_30_pct",
+    "computation": "percentage of runs with drift <= 30% (198 / 236)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_beats_pure_rate": {
+    "metric": "Dev 6-Seed Beats Pure DR Share",
+    "value": 82.2,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.beats_pure_dr_pct",
+    "computation": "percentage of runs beating pure DR (194 / 236)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_6seed_pure_dr_median": {
+    "metric": "Dev 6-Seed Pure DR Median Drift",
+    "value": 22.46,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "overall.pure_dr_median_drift_pct",
+    "computation": "median of pure_dr_drift_pct across 236 runs",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 236 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_crawl_median_error": {
+    "metric": "Regime Crawl Median Position Error",
+    "value": 15.82,
+    "unit": "m",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "regime_scorecard.crawl.value",
+    "computation": "median error in meters for crawl regime (< 20 km/h, n=43)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 43 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_city_median_drift": {
+    "metric": "Regime City Median Drift",
+    "value": 12.16,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "regime_scorecard.city.value",
+    "computation": "median drift for city regime (20-50 km/h, n=152)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 152 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "step1_highway_median_drift": {
+    "metric": "Regime Highway Median Drift",
+    "value": 13.98,
+    "unit": "%",
+    "source_file": "ppt_pack/data/summary_6seed.json",
+    "selector": "regime_scorecard.highway.value",
+    "computation": "median drift for highway regime (> 50 km/h, n=41)",
+    "model": "production (round1_interval_lam0.5_s42.pt + production.json)",
+    "seed_set": "dev 6 seeds, 41 sc.",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_apk_size": {
+    "metric": "On-Device Debug APK Size",
+    "value": 50.12,
+    "unit": "MB",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "device_and_sizes.apk_size_mb",
+    "computation": "file size of app-ondevice-debug.apk in MB",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_tflite_size": {
+    "metric": "On-Device TFLite Model Size",
+    "value": 2.5,
+    "unit": "MB",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "device_and_sizes.tflite_model_size_mb",
+    "computation": "file size of moe_velocity_model.tflite in MB",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_onnx_size": {
+    "metric": "On-Device ONNX Model Size",
+    "value": 2.48,
+    "unit": "MB",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "device_and_sizes.onnx_model_size_mb",
+    "computation": "file size of moe_velocity_model.onnx in MB",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_batch_latency_mean": {
+    "metric": "On-Device Batch Latency Mean",
+    "value": 5.06,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.per_batch_latency_ms.mean_ms",
+    "computation": "mean batch processing time per 100ms interval",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_batch_latency_p95": {
+    "metric": "On-Device Batch Latency P95",
+    "value": 7.18,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.per_batch_latency_ms.p95_ms",
+    "computation": "95th percentile batch latency",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_batch_latency_max": {
+    "metric": "On-Device Batch Latency Max",
+    "value": 8.94,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.per_batch_latency_ms.max_ms",
+    "computation": "maximum recorded batch processing time",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_subsystem_features_ms": {
+    "metric": "On-Device Feature Extraction Latency",
+    "value": 0.32,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.subsystem_latency_breakdown_ms.feature_extraction_ms",
+    "computation": "time spent computing 12 streaming features",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_subsystem_model_ms": {
+    "metric": "On-Device Model Inference Latency",
+    "value": 3.37,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.subsystem_latency_breakdown_ms.model_inference_ms",
+    "computation": "time spent executing neural velocity estimator",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_subsystem_smoother_ms": {
+    "metric": "On-Device Speed Smoother Latency",
+    "value": 0.04,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.subsystem_latency_breakdown_ms.speed_smoother_ms",
+    "computation": "time spent applying causal slew filter",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_subsystem_ekf_map_ms": {
+    "metric": "On-Device EKF and Map Matching Latency",
+    "value": 1.29,
+    "unit": "ms",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.subsystem_latency_breakdown_ms.ekf_and_map_matching_ms",
+    "computation": "time spent updating 15-state ES-EKF and topological map matcher",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_cpu_normalized": {
+    "metric": "On-Device Normalized CPU Usage",
+    "value": 9.2,
+    "unit": "%",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.cpu_usage_pct.normalized_8core_pct",
+    "computation": "normalized 8-core CPU usage during replay",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_cpu_active": {
+    "metric": "On-Device Single Core Active CPU",
+    "value": 73.6,
+    "unit": "%",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.cpu_usage_pct.active_replay_2x_pct",
+    "computation": "active core CPU usage during 2x speed replay",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_pss_mb": {
+    "metric": "On-Device RAM PSS Footprint",
+    "value": 320.3,
+    "unit": "MB",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.memory_footprint_mb.pss_total_mb",
+    "computation": "PSS memory allocated on Android 13",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "ondevice_rss_mb": {
+    "metric": "On-Device RAM RSS Footprint",
+    "value": 399.8,
+    "unit": "MB",
+    "source_file": "ppt_pack/data/ondevice.json",
+    "selector": "speed_and_resources.memory_footprint_mb.rss_total_mb",
+    "computation": "RSS memory allocated on Android 13",
+    "model": "on-device release",
+    "seed_set": "N/A",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc06_prod_map_drift_pct": {
+    "metric": "Scenario 06 Map Drift Pct",
+    "value": 1.88,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_drift_pct",
+    "computation": "evaluated map drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc06_prod_map_err_m": {
+    "metric": "Scenario 06 Map Error Meters",
+    "value": 8.04,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_err_m",
+    "computation": "evaluated map error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc06_prod_pure_drift_pct": {
+    "metric": "Scenario 06 Pure DR Drift Pct",
+    "value": 7.1,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_drift_pct",
+    "computation": "evaluated pure dr drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc06_prod_pure_err_m": {
+    "metric": "Scenario 06 Pure DR Error Meters",
+    "value": 30.31,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_err_m",
+    "computation": "evaluated pure dr error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.02,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc18_prod_map_drift_pct": {
+    "metric": "Scenario 18 Map Drift Pct",
+    "value": 6.85,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_drift_pct",
+    "computation": "evaluated map drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc18_prod_map_err_m": {
+    "metric": "Scenario 18 Map Error Meters",
+    "value": 6.77,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_err_m",
+    "computation": "evaluated map error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc18_prod_pure_drift_pct": {
+    "metric": "Scenario 18 Pure DR Drift Pct",
+    "value": 58.13,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_drift_pct",
+    "computation": "evaluated pure dr drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc18_prod_pure_err_m": {
+    "metric": "Scenario 18 Pure DR Error Meters",
+    "value": 57.49,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_err_m",
+    "computation": "evaluated pure dr error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.02,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc30_prod_map_drift_pct": {
+    "metric": "Scenario 30 Map Drift Pct",
+    "value": 9.55,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_drift_pct",
+    "computation": "evaluated map drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc30_prod_map_err_m": {
+    "metric": "Scenario 30 Map Error Meters",
+    "value": 23.31,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_err_m",
+    "computation": "evaluated map error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc30_prod_pure_drift_pct": {
+    "metric": "Scenario 30 Pure DR Drift Pct",
+    "value": 6.43,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_drift_pct",
+    "computation": "evaluated pure dr drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc30_prod_pure_err_m": {
+    "metric": "Scenario 30 Pure DR Error Meters",
+    "value": 15.71,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_err_m",
+    "computation": "evaluated pure dr error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.02,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc33_prod_map_drift_pct": {
+    "metric": "Scenario 33 Map Drift Pct",
+    "value": 4.46,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_drift_pct",
+    "computation": "evaluated map drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc33_prod_map_err_m": {
+    "metric": "Scenario 33 Map Error Meters",
+    "value": 19.76,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "map_err_m",
+    "computation": "evaluated map error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc33_prod_pure_drift_pct": {
+    "metric": "Scenario 33 Pure DR Drift Pct",
+    "value": 11.5,
+    "unit": "%",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_drift_pct",
+    "computation": "evaluated pure dr drift pct on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.01,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
+  },
+  "sc33_prod_pure_err_m": {
+    "metric": "Scenario 33 Pure DR Error Meters",
+    "value": 51.02,
+    "unit": "m",
+    "source_file": "results/final/six_seed/production_scenarios.csv",
+    "selector": "pure_err_m",
+    "computation": "evaluated pure dr error in meters on seed 541098",
+    "model": "production",
+    "seed_set": "seed 541098",
+    "tolerance": 0.02,
+    "docs": [
+      "README.md",
+      "SYSTEM_IMPLEMENTATION_AND_ARCHITECTURE.md"
+    ]
   }
 }

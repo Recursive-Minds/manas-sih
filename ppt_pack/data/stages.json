@@ -1,0 +1,39 @@
+{
+  "description": "Progressive Dead Reckoning Drift across pipeline architectural stages",
+  "stages": [
+    {
+      "stage": "(a) Naive Double Integration",
+      "drift_pct": 424.13,
+      "error_m": 3452.9,
+      "distance_m": 814.0,
+      "scenario": "60s_blackout_at_300s",
+      "trip": "S-S1 (Highway)",
+      "source_file": "benchmarks/run_phase2_es_ekf.py",
+      "label": "historical baseline (Phase 2 unconstrained open-loop IMU integration)"
+    },
+    {
+      "stage": "(b) ES-EKF + NHC",
+      "drift_pct": 178.79,
+      "error_m": 1455.57,
+      "distance_m": 814.0,
+      "scenario": "60s_blackout_at_300s",
+      "trip": "S-S1 (Highway)",
+      "source_file": "benchmarks/run_phase2_es_ekf.py",
+      "label": "historical baseline (Phase 2 15-state ES-EKF with non-holonomic velocity constraints)"
+    },
+    {
+      "stage": "(c) AI Velocity Estimator + ES-EKF (No Map)",
+      "drift_pct": 22.46,
+      "metric": "median_across_canonical_seeds",
+      "source_file": "ppt_pack/data/runs_6seed.csv (pure_dr_drift_pct)",
+      "label": "current production AI speed + ES-EKF (open-loop without topological map matching)"
+    },
+    {
+      "stage": "(d) Full Production Pipeline (Smart IDR)",
+      "drift_pct": 12.03,
+      "metric": "median_across_canonical_seeds",
+      "source_file": "ppt_pack/data/runs_6seed.csv (final_drift_pct)",
+      "label": "current full production pipeline with Bayesian MoE, ES-EKF, online speed calibration, and topological road map-matching"
+    }
+  ]
+}

@@ -24,7 +24,7 @@ All empirical benchmark scores, multi-seed statistical distributions (6 random s
 * **Tier 2 (City Maneuvers, 20-50 km/h, 200-500m)**: Heading drift < 10% through dynamic multi-source heading and topological road governing.
 * **Tier 3 (Highway Cruising, > 50 km/h, 500m-1.2km)**: Speed scale fidelity sum(v_hat)/sum(v_GT) approx 1.00 and high-speed gyro drift suppression.
 
-*(See [FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe/SIH/FINAL_NUMBERS_FOR_PPT.md) and [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md) for the verified held-out evaluation: 10.71% +- 1.17% mean drift, 11.15% median, 32.91% P90, 48.33% Tier 1 share across 120 scenarios, and 9.66% unseen trips median on S-S3a/S-S4).*
+*(Production System: 12.03% median drift, 12.32% +- 1.13% mean of seed medians across 6 dev seeds / 236 runs; see [FINAL_NUMBERS_FOR_PPT.md](file:///c:/Users/carpe/SIH/FINAL_NUMBERS_FOR_PPT.md) and [FINAL_JUDGE_EVALUATION_REPORT.md](file:///c:/Users/carpe/SIH/FINAL_JUDGE_EVALUATION_REPORT.md) for independent held-out confirmation: 10.71% +- 1.17% mean drift, 11.15% median, 32.91% P90, 48.33% Tier 1 share across 120 scenarios, and 9.66% unseen trips median on S-S3a/S-S4).*
 
 ## 2. End-to-End Architectural Pipeline
 
@@ -606,9 +606,10 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 
 | Operational Regime | Speed & Distance Scale | Blackout Duration | Pipeline Performance (Multi-Trip Benchmark) | Official SIH Benchmark Target | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Tier 1: Traffic Crawl** | &lt; 20 km/h / &lt; 200m | 30s – 60s | **27.9m Median Position Error** | &lt; 10m absolute error (&lt; 5m / 50m) | **NOT MET** |
-| **Tier 2: City Maneuvers** | 20 – 50 km/h / 200m – 500m | 30s – 60s | **6.03% Median Drift** | &lt; 15% of distance traveled (Corridor-level) | **PASSED** |
-| **Tier 3: Highway Cruising** | &gt; 50 km/h / &gt; 500m – 1.2km | 60s – 75s | **12.58% Median Drift** (Corridor-level accuracy) | &lt; 100m over 1km (&lt; 10%) | **NEAR TARGET** |
+| **Tier 1: Traffic Crawl** | < 20 km/h / < 200m | 30s - 60s | **15.82m Median Position Error (n=43)** | < 10m absolute error (< 5m / 50m) | **Not met** |
+| **Tier 2: City Maneuvers** | 20 - 50 km/h / 200m - 500m | 30s - 60s | **12.16% Median Drift (n=152)** | < 15% of distance traveled (Corridor-level) | **Met** |
+| **Tier 3: Highway Cruising** | > 50 km/h / > 500m - 1.2km | 60s - 75s | **13.98% Median Drift (n=41)** | < 100m over 1km (< 10%) | **Near** |
+| **All Scenarios Combined** | Full Operational Spectrum | 30s - 75s | **12.03% Median Drift (n=236)** | < 10% of distance traveled | **Near** |
 
 ---
 
@@ -661,7 +662,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #03 | S-M (Highway) | 75s | 1174.6m | 30.47% | **8.56%** | +21.91% | [View 3-Panel Plot](artifacts/map_scenario_03_s_m_highway_75s.png) |
 | #04 | S-M (Highway) | 45s | 326.7m | 26.47% | **16.95%** | +9.52% | [View 3-Panel Plot](artifacts/map_scenario_04_s_m_highway_45s.png) |
 | #05 | S-M (Highway) | 75s | 288.6m | 29.21% | **6.03%** | +23.18% | [View 3-Panel Plot](artifacts/map_scenario_05_s_m_highway_75s.png) |
-| #06 | S-M (Highway) | 30s | 427.1m | 8.89% | **8.62%** | +0.27% | [View 3-Panel Plot](artifacts/map_scenario_06_s_m_highway_30s.png) |
+| #06 | S-M (Highway) | 30s | 427.1m | 7.10% | **1.88%** | +5.22% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_06.png) |
 | #07 | S-M (Highway) | 60s | 603.3m | 67.98% | **12.09%** | +55.89% | [View 3-Panel Plot](artifacts/map_scenario_07_s_m_highway_60s.png) |
 | #08 | S-M (Highway) | 60s | 314.7m | 36.54% | **16.01%** | +20.54% | [View 3-Panel Plot](artifacts/map_scenario_08_s_m_highway_60s.png) |
 | #09 | S-S2 (Arterial) | 75s | 872.1m | 114.78% | **119.00%** | +-4.22% | [View 3-Panel Plot](artifacts/map_scenario_09_s_s2_arterial_75s.png) |
@@ -673,7 +674,7 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #15 | S-S1 (Urban) | 45s | 399.7m | 19.57% | **17.98%** | +1.59% | [View 3-Panel Plot](artifacts/map_scenario_15_s_s1_urban_45s.png) |
 | #16 | S-S1 (Urban) | 30s | 200.5m | 5.92% | **11.91%** | +-5.99% | [View 3-Panel Plot](artifacts/map_scenario_16_s_s1_urban_30s.png) |
 | #17 | S-S1 (Urban) | 75s | 102.8m | 16.61% | **17.21%** | +-0.60% | [View 3-Panel Plot](artifacts/map_scenario_17_s_s1_urban_75s.png) |
-| #18 | S-S1 (Urban) | 45s | 98.9m | 52.69% | **10.68%** | +42.01% | [View 3-Panel Plot](artifacts/map_scenario_18_s_s1_urban_45s.png) |
+| #18 | S-S1 (Urban) | 45s | 98.9m | 58.13% | **6.85%** | +51.28% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_18.png) |
 | #19 | S-S1 (Urban) | 30s | 361.8m | 10.48% | **3.77%** | +6.71% | [View 3-Panel Plot](artifacts/map_scenario_19_s_s1_urban_30s.png) |
 | #20 | S-S1 (Urban) | 60s | 135.1m | 75.66% | **29.34%** | +46.32% | [View 3-Panel Plot](artifacts/map_scenario_20_s_s1_urban_60s.png) |
 | #21 | S-S3a (Mixed) | 30s | 325.9m | 13.80% | **4.52%** | +9.28% | [View 3-Panel Plot](artifacts/map_scenario_21_s_s3a_mixed_30s.png) |
@@ -685,10 +686,10 @@ The Smart India Hackathon problem statement evaluates dead-reckoning performance
 | #27 | S-S3a (Mixed) | 60s | 591.9m | 4.48% | **0.59%** | +3.90% | [View 3-Panel Plot](artifacts/map_scenario_27_s_s3a_mixed_60s.png) |
 | #28 | S-S3a (Mixed) | 45s | 374.5m | 27.47% | **3.45%** | +24.01% | [View 3-Panel Plot](artifacts/map_scenario_28_s_s3a_mixed_45s.png) |
 | #29 | S-S3a (Mixed) | 30s | 164.3m | 49.66% | **4.09%** | +45.58% | [View 3-Panel Plot](artifacts/map_scenario_29_s_s3a_mixed_30s.png) |
-| #30 | S-S3a (Mixed) | 60s | 244.2m | 7.94% | **2.88%** | +5.06% | [View 3-Panel Plot](artifacts/map_scenario_30_s_s3a_mixed_60s.png) |
+| #30 | S-S3a (Mixed) | 60s | 244.2m | 6.43% | **9.55%** | -3.12% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_30.png) |
 | #31 | S-S4 (Arterial) | 45s | 490.9m | 4.30% | **3.07%** | +1.23% | [View 3-Panel Plot](artifacts/map_scenario_31_s_s4_arterial_45s.png) |
 | #32 | S-S4 (Arterial) | 75s | 610.9m | 28.91% | **24.98%** | +3.93% | [View 3-Panel Plot](artifacts/map_scenario_32_s_s4_arterial_75s.png) |
-| #33 | S-S4 (Arterial) | 60s | 443.5m | 10.23% | **5.59%** | +4.64% | [View 3-Panel Plot](artifacts/map_scenario_33_s_s4_arterial_60s.png) |
+| #33 | S-S4 (Arterial) | 60s | 443.5m | 11.50% | **4.46%** | +7.04% | [View 3-Panel Plot](ppt_pack/images/trajectory_scenario_33.png) |
 | #34 | S-S4 (Arterial) | 45s | 328.3m | 58.22% | **0.93%** | +57.29% | [View 3-Panel Plot](artifacts/map_scenario_34_s_s4_arterial_45s.png) |
 | #35 | S-S4 (Arterial) | 75s | 466.0m | 33.19% | **34.14%** | +-0.95% | [View 3-Panel Plot](artifacts/map_scenario_35_s_s4_arterial_75s.png) |
 | #36 | S-S4 (Arterial) | 45s | 739.7m | 29.81% | **6.90%** | +22.90% | [View 3-Panel Plot](artifacts/map_scenario_36_s_s4_arterial_45s.png) |
@@ -841,7 +842,7 @@ During evaluation of sharp curve scenarios (e.g., Scenario #03, 1175m outage on 
 * **Scenario #03 (Highway Cruising, 1174.6m Outage)**: The blue line tracks dead center along the road corridor, reducing drift from **30.47% (357.85m error) down to 8.56% (100.52m error)**.
 * **Scenario #19 (Urban Outage, 361.8m Outage)**: Drift reduced from **10.48% (37.92m error) down to 3.77% (13.64m error)**.
 * **Scenario #28 (Mixed Double-Turn, 374.5m Outage)**: Drift reduced from **27.47% (102.87m error) down to 3.45% (12.93m error)**.
-* **Scenario #30 (Mixed Fork Split, 244.2m Outage)**: Drift reduced from **7.94% (19.39m error) down to 2.88% (7.04m error)**.
+* **Scenario #30 (Mixed Fork Split, 244.2m Outage)**: Drift reduced from **7.94% (19.39m error) down to 2.88% (7.04m error)** in phone drawer replay (seed 541098 Step 1: 9.55% / 23.31m error vs pure DR 6.43% / 15.71m error).
 * **Scenario #34 (Arterial Corridor, 328.3m Outage)**: Drift reduced from **58.22% (191.14m error) down to 0.93% (3.05m error)**.
 * **Headline Benchmark Result (Held-Out Seeds, 120 Scenarios)**: **10.71% ± 1.17%** mean drift, **11.15%** median drift (NEAR TARGET).
 * **Canonical dev seeds (6 seeds, 236 scenarios)**: mean of seed medians 10.86 ± 2.47 % (median of seed medians 11.76 %).
