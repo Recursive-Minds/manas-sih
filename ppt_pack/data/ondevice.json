@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "title": "On-Device Smartphone Intelligent Dead Reckoning Implementation Facts",
+    "date": "2026-09-27",
+    "git_tag": "demo-ready"
+  },
+  "device_and_sizes": {
+    "device_model": "Samsung Galaxy F12 (SM-F127G)",
+    "processor": "Samsung Exynos 850 (8x ARM Cortex-A55 @ 2.0 GHz, 8 nm LPP)",
+    "android_version": "Android 13 (API 33, One UI Core 5.1)",
+    "apk_size_mb": 50.12,
+    "apk_size_bytes": 52550301,
+    "apk_path": "android/app/build/outputs/apk/ondevice/debug/app-ondevice-debug.apk",
+    "tflite_model_size_mb": 2.5,
+    "tflite_model_size_bytes": 2620284,
+    "onnx_model_size_mb": 2.48,
+    "onnx_model_size_bytes": 2597048,
+    "torchscript_model_size_mb": 2.66,
+    "torchscript_model_size_bytes": 2787310
+  },
+  "export_parity": {
+    "tflite_vs_pytorch_max_abs_diff_mps": 4.77e-06,
+    "tflite_status": "PASS (< 1.0e-5 m/s target)",
+    "tflite_source": "tests/test_app_exported_parity.py, measured on 1000 real S-S3a feature windows",
+    "onnx_vs_pytorch_max_abs_diff_mps": 5.72e-06,
+    "onnx_status": "PASS (< 1.0e-5 m/s target)",
+    "onnx_source": "tests/test_app_exported_parity.py, measured on 1000 real S-S3a feature windows"
+  },
+  "speed_and_resources": {
+    "batch_interval_ms": 100.0,
+    "per_batch_latency_ms": {
+      "mean_ms": 5.06,
+      "p50_ms": 4.92,
+      "p90_ms": 6.3,
+      "p95_ms": 7.18,
+      "p99_ms": 8.06,
+      "max_ms": 8.94,
+      "budget_ms": 100.0,
+      "headroom_pct": 94.94,
+      "source": "logs/phone/step0_stage_b_latency.log, measured over 1000 consecutive real IMU steps"
+    },
+    "subsystem_latency_breakdown_ms": {
+      "feature_extraction_ms": 0.32,
+      "model_inference_ms": 3.37,
+      "speed_smoother_ms": 0.04,
+      "ekf_and_map_matching_ms": 1.29,
+      "source": "scratch/measure_stage_b_latency.py decomposition over 1000 real S-S3a steps"
+    },
+    "cpu_usage_pct": {
+      "active_replay_2x_pct": 73.6,
+      "normalized_8core_pct": 9.2,
+      "idle_pct": 1.5,
+      "source": "adb shell top -b -n 1 on Samsung Galaxy F12"
+    },
+    "memory_footprint_mb": {
+      "pss_total_mb": 320.3,
+      "pss_total_kb": 327992,
+      "rss_total_mb": 399.8,
+      "source": "adb shell dumpsys meminfo com.recursiveminds.idr.ondevice"
+    },
+    "drawer_setup_time_s": {
+      "first_open_cold_s": 2.8,
+      "rerun_cached_snapshot_s": 0.4,
+      "speedup_factor": 7.0,
+      "source": "on-device logcat timestamps during Scenario #30 warmup and restore"
+    }
+  },
+  "correctness_and_verification": {
+    "phone_vs_laptop_endpoint_diff_m": 0.0,
+    "scenarios_evaluated_on_device": 6,
+    "scenarios_passing_parity": 6,
+    "ondevice_no_leak_test": "PASSED (exact 0.000 m and 0.000 pp difference across 3 consecutive replay runs)",
+    "drawer_flow_regression_test": "PASSED (tests/test_app_drawer_flow.py 6/6 passed in 104s)",
+    "quick_parity_raw_cpu": "PASSED (scripts/quick_parity.py --raw --cpu, 5/5 passed with exact 0.0000 m difference)"
+  },
+  "drawer_scenario_table": [
+    {
+      "scenario_id": 1,
+      "bundle_file": "bench_1.bin",
+      "trip": "S-M",
+      "domain": "Highway",
+      "blackout_duration_s": 30.0,
+      "gt_distance_m": 301.5,
+      "expected_error_m": 80.59,
+      "phone_error_m": 80.59,
+      "expected_drift_pct": 26.73,
+      "phone_drift_pct": 26.73,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    },
+    {
+      "scenario_id": 22,
+      "bundle_file": "bench_22.bin",
+      "trip": "S-S3a",
+      "domain": "Mixed",
+      "blackout_duration_s": 45.0,
+      "gt_distance_m": 475.1,
+      "expected_error_m": 16.77,
+      "phone_error_m": 16.77,
+      "expected_drift_pct": 3.53,
+      "phone_drift_pct": 3.53,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    },
+    {
+      "scenario_id": 23,
+      "bundle_file": "bench_23.bin",
+      "trip": "S-S3a",
+      "domain": "Mixed",
+      "blackout_duration_s": 75.0,
+      "gt_distance_m": 1128.4,
+      "expected_error_m": 67.76,
+      "phone_error_m": 67.76,
+      "expected_drift_pct": 6.0,
+      "phone_drift_pct": 6.0,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    },
+    {
+      "scenario_id": 25,
+      "bundle_file": "bench_25.bin",
+      "trip": "S-S3a",
+      "domain": "Mixed",
+      "blackout_duration_s": 45.0,
+      "gt_distance_m": 614.3,
+      "expected_error_m": 77.3,
+      "phone_error_m": 77.3,
+      "expected_drift_pct": 12.58,
+      "phone_drift_pct": 12.58,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    },
+    {
+      "scenario_id": 26,
+      "bundle_file": "bench_26.bin",
+      "trip": "S-S3a",
+      "domain": "Mixed",
+      "blackout_duration_s": 75.0,
+      "gt_distance_m": 892.8,
+      "expected_error_m": 122.8,
+      "phone_error_m": 122.8,
+      "expected_drift_pct": 13.75,
+      "phone_drift_pct": 13.75,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    },
+    {
+      "scenario_id": 30,
+      "bundle_file": "bench_30.bin",
+      "trip": "S-S3a",
+      "domain": "Mixed",
+      "blackout_duration_s": 60.0,
+      "gt_distance_m": 244.2,
+      "expected_error_m": 7.04,
+      "phone_error_m": 7.04,
+      "expected_drift_pct": 2.88,
+      "phone_drift_pct": 2.88,
+      "endpoint_difference_m": 0.0,
+      "parity_status": "PASS"
+    }
+  ],
+  "not_measured": {
+    "battery_drain_rate": "PENDING (requires continuous field driving test protocol)",
+    "real_vehicle_drive_test": "PENDING (requires physical vehicle in tunnel/canyon)"
+  },
+  "test_suite_status": {
+    "total_pytest_tests": 162,
+    "passed": 160,
+    "skipped": 2,
+    "failed": 0,
+    "full_suite_duration_s": 284.5
+  }
+}
