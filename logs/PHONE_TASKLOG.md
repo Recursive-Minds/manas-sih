@@ -325,3 +325,16 @@ This log records every command and process executed during the On-Device Phone P
   - images/*.png: 1600px trajectory plots (#06, #18, #30, #33) and physical Galaxy F12 screenshots (handoff, summary, airplane status bar).
   - images/README.txt: Image metadata and scenario details.
   - FACTS.md: One-page verified numbers and 'do not claim' list.
+
+---
+
+### Step 7: Scenario #23 Physical Screenshot & PPT Pack Update
+- **Timestamp**: 2026-09-27 16:33:00 +05:30
+- **Branch**: main / docs/final-ppt
+- **Action**:
+  1. Captured live evaluation summary screenshot from physical Samsung Galaxy F12 (`SM-F127G`) for Scenario #23 (Highway / Mixed 75.0s, 1128.4 m ground truth, drift 6.00% / 67.76 m final error) via direct binary ADB screencap.
+  2. Verified visual quality: clean orange DR path tracking along road corridor, green vehicle navigation cursor, session evaluation summary modal, and clear status bar in Airplane mode.
+  3. Cropped airplane icon from top-right status bar to `ppt_pack/images/phone_statusbar_airplane.png` (verifying 100% battery, GPS active, airplane mode icon, zero cellular/Wi-Fi connection).
+  4. Updated `ppt_pack/images/README.txt` with Scenario #23 physical execution metadata.
+  5. Rebuilt `ppt_pack.zip` (1,786,793 bytes / 1.70 MB).
+  6. Verified all documentation audits (`check_number_registry.py`, `check_links.py`, `check_latex.py`, `test_doc_numbers.py`): 100% PASS.

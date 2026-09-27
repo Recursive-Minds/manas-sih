@@ -46,3 +46,35 @@ Generated with current production system (round1_interval_lam0.5_s42.pt, T7 spee
   Smart IDR Drift: 4.46% (19.76 m)
   Resolution: 1600 x 1000 px, 100 DPI, white background
 
+- File: phone_screenshot_23_summary.png
+  Scenario: #23 (Physical Samsung Galaxy F12 Execution)
+  Trip: S-S3a
+  Domain: Highway / Mixed (>50 km/h)
+  Blackout Duration: 75.0 s
+  Ground Truth Distance: 1128.4 m
+  Smart IDR Drift: 6.00% (67.76 m final error, 81.8 m max error)
+  Along / Cross Track: -67.5 m / -6.4 m
+  Device: Samsung Galaxy F12 (SM-F127G, Android 13) in full Airplane Mode
+  Resolution: 720 x 1600 px
+
+- File: phone_statusbar_airplane.png
+  Cropped top-right status bar from phone_screenshot_23_summary.png
+  Demonstrates physical device running in strict Airplane Mode (airplane icon, GPS active, 100% battery, no cellular/Wi-Fi connection)
+  Resolution: 220 x 70 px
+
+- File: phone_screenshot_30_summary.png
+  Scenario: #30 (Physical Samsung Galaxy F12 Execution)
+  Trip: S-S3a
+  Domain: Mixed
+  Blackout Duration: 60.0 s
+  Ground Truth Distance: 244.2 m
+  Smart IDR Drift: 2.88% (7.04 m final error)
+  Device: Samsung Galaxy F12 (SM-F127G, Android 13) in full Airplane Mode
+  Resolution: 720 x 1600 px
+
+- File: phone_screenshot_30_handoff.png
+  Scenario: #30 (Physical Samsung Galaxy F12 Execution during reacquisition)
+  FSM State: REACQUISITION_BLENDING
+  Device: Samsung Galaxy F12 (SM-F127G, Android 13) in full Airplane Mode
+  Resolution: 720 x 1600 px
+
