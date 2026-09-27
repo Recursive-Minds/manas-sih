@@ -185,6 +185,11 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Failed to load scenarios from assets: ${e.message}")
         }
+        if (packageName.endsWith(".ondevice")) {
+            // [DEMOFIX] the phone can only replay scenarios that have a bench_<id>.bin bundle
+            val available = assets.list("")?.toSet() ?: emptySet()
+            list.retainAll { it.isRandom || available.contains("bench_${it.id}.bin") }
+        }
         return list
     }
     private lateinit var scenarioAdapter: ArrayAdapter<BenchmarkScenarioItem>
@@ -321,7 +326,7 @@ class MainActivity : AppCompatActivity() {
         btnRunBenchmark.setOnClickListener {
             val s = streamService
             if (s == null || !s.isConnected.get()) {
-                Toast.makeText(this, "Connect to IDR server first!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, if (packageName.endsWith(".ondevice")) "On-device engine is still starting - try again in a few seconds" else "Connect to IDR server first!", Toast.LENGTH_SHORT).show()  // [DEMOFIX]
                 return@setOnClickListener
             }
 
@@ -809,7 +814,7 @@ class MainActivity : AppCompatActivity() {
         if (hud.benchmarkActive) {
             currentMode = AppMode.BENCHMARK_EVALUATION
             val scId = hud.benchmarkScenario ?: currentSelectedScenarioId
-            if (isInBlackout || (latestMetrics != null && latestMetrics?.isBlackout == true)) {
+            if (hud.benchmarkRunning == true || isInBlackout || (latestMetrics != null && latestMetrics?.isBlackout == true)) {  // [DEMOFIX]
                 tvBenchmarkBadge.text = "REPLAYING #$scId"
                 tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
                 btnRunBenchmark.text = "REPLAYING..."
@@ -955,8 +960,15 @@ class MainActivity : AppCompatActivity() {
                     reconciledMarker?.isEnabled = false
                 }
             } else {
-                drMarker?.isEnabled = false
-                reconciledMarker?.isEnabled = false
+                // [DEMOFIX] after STOP keep the DR marker until the handoff blend ends; show the blend marker
+                if (hud.drVisible != true) drMarker?.isEnabled = false
+                val r = hud.reconciledPos
+                if (r != null && r.lat != 0.0 && r.lon != 0.0) {
+                    reconciledMarker?.position = GeoPoint(r.lat, r.lon)
+                    reconciledMarker?.isEnabled = true
+                } else {
+                    reconciledMarker?.isEnabled = false
+                }
             }
         } else if (currentMode == AppMode.BENCHMARK_EVALUATION) {
             hud.gnssPos?.let { g ->
@@ -989,7 +1001,9 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            hud.drPos?.let { d ->
+            if (hud.drVisible == false) {
+                drMarker?.isEnabled = false  // [DEMOFIX] handoff finished: hide DR marker, keep its trail
+            } else hud.drPos?.let { d ->
                 if (d.lat != 0.0 && d.lon != 0.0) {
                     val pt = GeoPoint(d.lat, d.lon)
                     tilePrefetcher?.onMotionUpdate(

@@ -303,7 +303,7 @@ def load_any_trip(file_path: str, trip_id: Optional[str] = None) -> TripSequence
 
 
 def slice_scenario(
-    trip: TripSequence, scenario_id: int, warmup_s: float = 60.0
+    trip: TripSequence, scenario_id: int, warmup_s: float = 60.0, tail_s: float = 5.0
 ) -> Tuple[TripSequence, float, float]:
     """
     Slices a TripSequence to replay a canonical benchmark scenario with a clean warm-up interval.
@@ -329,7 +329,7 @@ def slice_scenario(
 
         slice_start_ns = max(trip.imu_samples[0].timestamp_ns, bo_start_ns - int(warmup_s * 1e9))
         actual_warmup_s = (bo_start_ns - slice_start_ns) * 1e-9
-        slice_end_ns = bo_end_ns + int(5.0 * 1e9)
+        slice_end_ns = bo_end_ns + int(tail_s * 1e9)  # [DEMOFIX] default 5 s unchanged
 
         sub_imu = [im for im in trip.imu_samples if slice_start_ns <= im.timestamp_ns <= slice_end_ns]
         sub_gnss = [g for g in trip.gnss_samples if slice_start_ns <= g.timestamp_ns <= slice_end_ns]

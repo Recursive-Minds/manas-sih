@@ -120,6 +120,7 @@ def evaluate_bundle_error(sess: Any, rnet: RoadNetwork) -> Tuple[float, float]:
     )
     adapter.session.init_from_gnss(sess.warmup_gnss)
     adapter.prime_features(sess.preroll_imu, calib_samples=sess.preroll_calib)
+    preroll_raw = list(getattr(adapter, "_last_prime_raw_preds", []) or [])  # [DEMOFIX]
     adapter.recent_gnss_window = list(sess.gnss_history)
 
     last_valid_gnss = sess.warmup_gnss
@@ -166,7 +167,7 @@ def evaluate_bundle_error(sess: Any, rnet: RoadNetwork) -> Tuple[float, float]:
     n = float(np.interp(eval_t, stream_ts, stream_pts[:, 1]))
     err = float(np.linalg.norm(np.array([e, n]) - gt_end))
     drift = (err / max(sess.gt_dist_m, 1.0)) * 100.0
-    return err, drift
+    return err, drift, preroll_raw
 
 
 def export_benchmark_bundles(scenario_ids: List[int] = [1, 22, 23, 25, 26, 30]) -> None:
@@ -195,7 +196,7 @@ def export_benchmark_bundles(scenario_ids: List[int] = [1, 22, 23, 25, 26, 30]) 
             crop_mode = "corridor_1km"
 
         # Evaluate expected metrics on laptop with this exact network
-        err_m, drift_pct = evaluate_bundle_error(sess, rnet)
+        err_m, drift_pct, preroll_raw = evaluate_bundle_error(sess, rnet)
         expected_parity_target = CANONICAL_TARGET_ERRORS.get(sc_id, err_m)
         print(f"  Network mode: {crop_mode} ({len(rnet.segments)} segments)")
         print(f"  Laptop Replay Error: {err_m:.2f} m ({drift_pct:.2f}% drift) | Target: {expected_parity_target:.2f} m")
@@ -254,6 +255,7 @@ def export_benchmark_bundles(scenario_ids: List[int] = [1, 22, 23, 25, 26, 30]) 
                 }
                 for c in sess.preroll_calib
             ],
+            "preroll_v_raw": preroll_raw,  # [DEMOFIX] phone skips the pre-roll model calls
             "batches": sess.batches,
             "norm_mean": [float(x) for x in sess.norm_mean.flatten()] if sess.norm_mean is not None else [0.0] * 12,
             "norm_std": [float(x) for x in sess.norm_std.flatten()] if sess.norm_std is not None else [1.0] * 12,
@@ -275,8 +277,7 @@ def export_benchmark_bundles(scenario_ids: List[int] = [1, 22, 23, 25, 26, 30]) 
 
         with open(out_ondevice, "wb") as f:
             f.write(gz_bytes)
-        with open(out_main, "wb") as f:
-            f.write(gz_bytes)
+        # [DEMOFIX] bundles live only in the ondevice flavor (no duplicate copy in src/main/assets)
 
         print(f"  -> Saved {out_ondevice}: {len(rnet.segments)} segments, {len(sess.batches)} batches, {size_mb:.2f} MB ({len(gz_bytes) / 1024:.1f} KB)")
         if size_mb > 3.0:
