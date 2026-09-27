@@ -42,10 +42,11 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     private val _isConnected = AtomicBoolean(false)
     private val _isBlackout = AtomicBoolean(false)
+    private val isBenchmarkMode = AtomicBoolean(false)
 
     override val isConnected: Boolean get() = _isConnected.get()
     override val isBlackout: Boolean get() = _isBlackout.get()
-    override val isBenchmarkRunning: Boolean get() = benchmarkJob?.isActive == true
+    override val isBenchmarkRunning: Boolean get() = benchmarkJob?.isActive == true || isBenchmarkMode.get()
 
     override var onHudUpdateListener: ((HudUpdate) -> Unit)? = null
     override var onConnectionStateChanged: ((Boolean) -> Unit)? = null
@@ -159,12 +160,18 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     override fun resetSession() {
         _isBlackout.set(false)
+        isBenchmarkMode.set(false)
+        batchQueue.clear()
         executor.execute {
             sessionCore?.callAttr("reset", false)
         }
     }
 
     override fun pushBatch(batch: SensorBatch) {
+        // Discard live desk sensor batches during benchmark mode or replay to prevent queue buildup
+        if (batch.source == "device" && (isBenchmarkMode.get() || benchmarkJob?.isActive == true)) {
+            return
+        }
         // Enqueue batch - NEVER drop IMU samples
         batchQueue.offer(batch)
         val backlog = batchQueue.size
@@ -259,6 +266,8 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
     }
 
     override fun prepareBenchmark(scenarioId: Int) {
+        isBenchmarkMode.set(true)
+        batchQueue.clear()
         executor.execute {
             try {
                 Log.i("PHONE", "Preparing benchmark scenario $scenarioId on-device")
@@ -293,6 +302,8 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     override fun startBenchmark(scenarioId: Int, speed: Double) {
         Log.i("PHONE", "Starting benchmark scenario $scenarioId on-device @ ${speed}x")
+        isBenchmarkMode.set(true)
+        batchQueue.clear()
         benchmarkJob?.cancel()
         benchmarkJob = scope.launch(Dispatchers.IO) {
             try {
@@ -356,8 +367,10 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     override fun stopBenchmark() {
         Log.i("PHONE", "Stopping benchmark on-device")
+        isBenchmarkMode.set(false)
         benchmarkJob?.cancel()
         benchmarkJob = null
+        batchQueue.clear()
         executor.execute {
             sessionCore?.callAttr("deload_benchmark")
         }

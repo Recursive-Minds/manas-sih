@@ -195,7 +195,12 @@ class EngineAdapterStageA:
         """
         Evaluates explicit ready conditions for the warm-up panel.
         """
-        gravity_converged = len(self.stream.calibrator._accel_buf) >= 30
+        gravity_converged = bool(
+            self.stream.calibrator.is_calibrated
+            or self.mount_reused
+            or getattr(self.stream.calibrator, "_yaw_locked", False)
+            or len(self.stream.calibrator._accel_buf) >= 30
+        )
         mount_locked = bool(self.mount_reused or self.stream.calibrator._yaw_locked)
         buffer_warm = bool(self.stream.feature_extractor.is_warm)
         alpha_learned = bool(self.moving_gnss_fixes_count >= 3)
@@ -619,14 +624,24 @@ class EngineAdapterStageB:
         mount_state = self.get_mount_state_string()
         n_turns = len(self.calibrator._turn_events)
         turns_str = "reused" if mount_state == "REUSED" else f"{n_turns}/15"
-        gravity_converged = len(self.calibrator._accel_buf) >= 30
+        gravity_converged = bool(
+            self.calibrator.is_calibrated
+            or self.mount_reused
+            or getattr(self.calibrator, "_yaw_locked", False)
+            or len(self.calibrator._accel_buf) >= 30
+        )
         mount_locked = bool(mount_state in ("YAW_LOCKED", "REUSED"))
         buffer_warm = bool(self.feature_extractor.is_warm)
-        alpha_learned = bool(self.moving_gnss_fixes_count >= 3)
+        has_history = len(self.recent_gnss_window) >= 3
+        alpha_learned = bool(self.moving_gnss_fixes_count >= 3 or has_history)
         mount_ready = bool(mount_locked or self.calibrator.is_calibrated or gravity_converged)
         is_ready = bool(gravity_converged and buffer_warm and mount_ready)
 
-        speed_calib_s = min(180, int(self.moving_gnss_fixes_count))
+        if has_history and len(self.recent_gnss_window) >= 2:
+            hist_dur_s = int((self.recent_gnss_window[-1].timestamp_ns - self.recent_gnss_window[0].timestamp_ns) * 1e-9)
+            speed_calib_s = min(180, max(int(self.moving_gnss_fixes_count), hist_dur_s))
+        else:
+            speed_calib_s = min(180, int(self.moving_gnss_fixes_count))
         speed_calib_display = f"Speed calibration {speed_calib_s}/180 s"
 
         has_network = bool(self.road_network is not None and len(self.road_network.segments) > 0)

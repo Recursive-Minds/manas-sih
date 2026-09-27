@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var spinnerSpeed: Spinner
     private lateinit var btnRunBenchmark: Button
     private lateinit var btnCloseBenchmark: Button
+    private var isSyncingSpinner: Boolean = false
 
     // Warm-Up Readiness Panel
     private lateinit var tvReadyHeadline: TextView
@@ -158,6 +159,7 @@ class MainActivity : AppCompatActivity() {
     private var isEngineReady = false
     private var isInBlackout = false
     private var isSummaryDismissed = false
+    private var currentSelectedScenarioId: Int = 30
 
     private val benchmarkScenarioList = mutableListOf<BenchmarkScenarioItem>()
 
@@ -284,17 +286,22 @@ class MainActivity : AppCompatActivity() {
                 cardBenchmark.visibility = View.GONE
                 // User closed benchmark: deload benchmark mode
                 streamService?.stopBenchmark()
+                streamService?.setSensorStreamingMuted(false)
                 currentMode = AppMode.LIVE_DRIVE
                 tvBenchmarkBadge.text = "LIVE SENSORS"
                 tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
             } else {
                 cardBenchmark.visibility = View.VISIBLE
                 cardCsvRecording.visibility = View.GONE
+                streamService?.setSensorStreamingMuted(true)
                 // User opened benchmark: prepare scenario and load ticks!
-                val scItem = benchmarkScenarioList.getOrNull(spinnerScenarios.selectedItemPosition)
-                    ?: benchmarkScenarioList.firstOrNull { it.id == 30 }
-                    ?: benchmarkScenarioList[0]
-                val scId = if (scItem.id > 0) scItem.id else 30
+                val scId = currentSelectedScenarioId
+                val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
+                if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
+                    isSyncingSpinner = true
+                    spinnerScenarios.setSelection(targetPos)
+                    spinnerScenarios.post { isSyncingSpinner = false }
+                }
                 currentMode = AppMode.BENCHMARK_EVALUATION
                 tvBenchmarkBadge.text = "PRELOADING #${scId}..."
                 tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_amber))
@@ -305,6 +312,7 @@ class MainActivity : AppCompatActivity() {
         btnCloseBenchmark.setOnClickListener {
             cardBenchmark.visibility = View.GONE
             streamService?.stopBenchmark()
+            streamService?.setSensorStreamingMuted(false)
             currentMode = AppMode.LIVE_DRIVE
             tvBenchmarkBadge.text = "LIVE SENSORS"
             tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_emerald))
@@ -317,10 +325,8 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val scenarioItem = benchmarkScenarioList.getOrNull(spinnerScenarios.selectedItemPosition)
-                ?: benchmarkScenarioList.firstOrNull { it.id == 30 }
-                ?: benchmarkScenarioList[0]
-            val scenarioId = scenarioItem.id
+            // Always run the explicitly selected scenario ID
+            val scenarioId = currentSelectedScenarioId
 
             val speed = when (spinnerSpeed.selectedItemPosition) {
                 0 -> 2.0 // Demo 2.0x
@@ -508,6 +514,7 @@ class MainActivity : AppCompatActivity() {
         btnDismissSummary.setOnClickListener {
             isSummaryDismissed = true
             cardSummaryModal.visibility = View.GONE
+            cardBenchmark.visibility = View.VISIBLE
         }
 
         updateControlButtons()
@@ -534,9 +541,12 @@ class MainActivity : AppCompatActivity() {
         scenarioAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinnerScenarios.adapter = scenarioAdapter
 
-        // Default selection to Scenario #30 (pos 1)
-        if (benchmarkScenarioList.size > 1) {
-            spinnerScenarios.setSelection(1)
+        // Default selection to Scenario #30
+        val defaultIdx = benchmarkScenarioList.indexOfFirst { it.id == currentSelectedScenarioId }
+        if (defaultIdx >= 0) {
+            isSyncingSpinner = true
+            spinnerScenarios.setSelection(defaultIdx)
+            spinnerScenarios.post { isSyncingSpinner = false }
         }
 
         val speeds = arrayOf("2.0x (Demo Replay)", "1.0x (Real-Time)", "5.0x (Rapid)")
@@ -546,14 +556,17 @@ class MainActivity : AppCompatActivity() {
 
         spinnerScenarios.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (isSyncingSpinner) return
+                val scItem = benchmarkScenarioList.getOrNull(position) ?: return
+                val scId = if (scItem.id > 0) scItem.id else 30
+                if (scId == currentSelectedScenarioId && latestWarmup?.isReady == true && !isInBlackout) {
+                    return
+                }
+                currentSelectedScenarioId = scId
                 if (cardBenchmark.visibility == View.VISIBLE) {
-                    val scItem = benchmarkScenarioList.getOrNull(position)
-                    if (scItem != null) {
-                        val scId = if (scItem.id > 0) scItem.id else 30
-                        tvBenchmarkBadge.text = "PRELOADING #${scId}..."
-                        tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_amber))
-                        streamService?.prepareBenchmark(scId)
-                    }
+                    tvBenchmarkBadge.text = "PRELOADING #${scId}..."
+                    tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.accent_amber))
+                    streamService?.prepareBenchmark(scId)
                 }
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -795,7 +808,7 @@ class MainActivity : AppCompatActivity() {
         // Benchmark mode badge tracking
         if (hud.benchmarkActive) {
             currentMode = AppMode.BENCHMARK_EVALUATION
-            val scId = hud.benchmarkScenario ?: 30
+            val scId = hud.benchmarkScenario ?: currentSelectedScenarioId
             if (isInBlackout || (latestMetrics != null && latestMetrics?.isBlackout == true)) {
                 tvBenchmarkBadge.text = "REPLAYING #$scId"
                 tvBenchmarkBadge.setTextColor(ContextCompat.getColor(this, R.color.accent_rose))
@@ -808,10 +821,16 @@ class MainActivity : AppCompatActivity() {
                 btnRunBenchmark.isEnabled = true
             }
 
-            // Synchronize scenario spinner if triggered externally
-            val targetPos = benchmarkScenarioList.indexOfFirst { it.id == scId }
-            if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
-                spinnerScenarios.setSelection(targetPos)
+            // Only synchronize scenario spinner if triggered externally and not in the middle of user selection
+            if (hud.benchmarkScenario != null && hud.benchmarkScenario != currentSelectedScenarioId && (hud.benchmarkScenario ?: 0) > 0) {
+                val newScId = hud.benchmarkScenario!!
+                val targetPos = benchmarkScenarioList.indexOfFirst { it.id == newScId }
+                if (targetPos >= 0 && spinnerScenarios.selectedItemPosition != targetPos) {
+                    currentSelectedScenarioId = newScId
+                    isSyncingSpinner = true
+                    spinnerScenarios.setSelection(targetPos)
+                    spinnerScenarios.post { isSyncingSpinner = false }
+                }
             }
         } else {
             btnRunBenchmark.text = "RUN BENCHMARK"
