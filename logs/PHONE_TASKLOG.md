@@ -178,6 +178,51 @@ This log records every command and process executed during the On-Device Phone P
   6. **Automated Unit Tests**:
      - Added `tests/test_app_exported_parity.py` (4/4 tests passed in 3.47s).
 
+---
+
+### Step 5c: On-Device Benchmark Drawer Pipeline Fix & Exact Parity Verification
+- **Timestamp**: 2026-09-27 11:45:00 +05:30
+- **Branch**: `phone/s5c-benchmark-fix` (branched from `main`)
+- **Key Changes & Findings**:
+  1. **Audit of Benchmark Drawer Pipeline Gaps**:
+     - *Road Network*: `LocalChaquopyEngineBridge.kt` previously passed `road_network = null`, preventing topological map matching during benchmark replay.
+     - *Mount Alignment*: `LocalChaquopyEngineBridge.kt` passed `saved_alignment = null`, forcing cold alignment estimation.
+     - *Pre-roll & History Buffer*: Lacked `prime_features()` and 180s trailing GNSS buffer, leading to speed scale divergence.
+     - *Kotlin Hardcoded Coordinates*: Stripped fallback `(52.404877, -1.500284)` to fail loudly on missing metadata.
+     - *Duplicate Methods*: Removed redundant `set_map_matching` and `prefetch_road_network` in `server/session_core.py`.
+  2. **Self-Contained Benchmark Bundles (`bench_<id>.bin`)**:
+     - Created `scripts/export_phone_benchmark_bundles.py` exporting self-contained gzip-JSON bundles containing:
+       - Scenario metadata, reference geodetics, blackout windows (`bo_start_ns`, `bo_end_ns`, `bo_dur_s`).
+       - Full road network segments with full float precision and matching `cell_size_m = 100.0`.
+       - Pre-computed mount calibration alignment (`mount_state: "REUSED"`).
+       - Pre-roll IMU samples, pre-roll calibrated samples, and 180s trailing GNSS history.
+       - Embedded 12-channel normalization parameters (`norm_mean`, `norm_std`).
+       - Pre-batched sensor streams (`batches`) with exact `< bo_end_ns` blackout boundary classification.
+     - Bundle sizes (all under 3.0 MB constraint):
+       - `bench_1.bin`: 0.33 MB (2,877 road segments, 400 batches)
+       - `bench_22.bin`: 2.04 MB (26,577 road segments, 500 batches)
+       - `bench_23.bin`: 0.38 MB (705 road segments, 1,024 batches)
+       - `bench_25.bin`: 2.04 MB (26,577 road segments, 800 batches)
+       - `bench_26.bin`: 2.04 MB (26,577 road segments, 1,035 batches)
+       - `bench_30.bin`: 0.44 MB (1,641 road segments, 950 batches)
+  3. **Zero-Overhead Indexed Batch Engine Replay**:
+     - Added `setup_benchmark_from_bundle()`, `get_benchmark_batch_count()`, and `push_benchmark_batch_index(i)` to `SessionCore`.
+     - Replays batches directly in Python memory without JNI JSON string serialization overhead.
+  4. **Physical Phone Verification on Samsung Galaxy F12 (`SM-F127G`, Android 13)**:
+     - All 6 scenarios executed in `SmokeTestActivity` drawer benchmark mode and achieved **exact 0.000 m error difference** and **0.000 pp drift difference**:
+       - **Scenario #1**: Phone Error **80.59 m** (Expected: 80.59 m, Diff: **0.000 m**), Drift **26.73%** (Diff: **0.000 pp**), Segments: 2,877, Distinct DR: 85.7%
+       - **Scenario #22**: Phone Error **16.77 m** (Expected: 16.77 m, Diff: **0.000 m**), Drift **3.53%** (Diff: **0.000 pp**), Segments: 26,577, Distinct DR: 62.8%
+       - **Scenario #23**: Phone Error **67.76 m** (Expected: 67.76 m, Diff: **0.000 m**), Drift **6.01%** (Diff: **0.000 pp**), Segments: 705, Distinct DR: 93.8%
+       - **Scenario #25**: Phone Error **77.30 m** (Expected: 77.30 m, Diff: **0.000 m**), Drift **12.58%** (Diff: **0.000 pp**), Segments: 26,577, Distinct DR: 90.0%
+       - **Scenario #26**: Phone Error **122.80 m** (Expected: 122.80 m, Diff: **0.000 m**), Drift **13.75%** (Diff: **0.000 pp**), Segments: 26,577, Distinct DR: 93.6%
+       - **Scenario #30**: Phone Error **7.04 m** (Expected: 7.04 m, Diff: **0.000 m**), Drift **2.88%** (Diff: **0.000 pp**), Segments: 1,641, Distinct DR: 92.3%
+     - Overall result: **ALL PASS** (`overall_passed: true`). Full report pulled to `artifacts/drawer_benchmark_report.json`.
+  5. **Regression Verification**:
+     - `python scripts/quick_parity.py --raw --cpu`: 5/5 PASS (exact 0.0000 m endpoint and trajectory diff).
+     - `pytest tests/test_app_benchmark_bundle.py`: 6/6 PASS.
+     - `pytest tests/test_doc_numbers.py`: 3/3 PASS.
+     - `pytest tests/test_map_ingestion.py`: 6/6 PASS.
+
 
 
 

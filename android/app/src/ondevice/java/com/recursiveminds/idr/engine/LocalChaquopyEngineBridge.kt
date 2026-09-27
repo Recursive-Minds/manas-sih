@@ -19,6 +19,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
@@ -43,6 +45,7 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     override val isConnected: Boolean get() = _isConnected.get()
     override val isBlackout: Boolean get() = _isBlackout.get()
+    override val isBenchmarkRunning: Boolean get() = benchmarkJob?.isActive == true
 
     override var onHudUpdateListener: ((HudUpdate) -> Unit)? = null
     override var onConnectionStateChanged: ((Boolean) -> Unit)? = null
@@ -245,35 +248,33 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
         }
     }
 
+    private fun extractAssetFile(assetName: String): File {
+        val outFile = File(context.cacheDir, assetName)
+        context.assets.open(assetName).use { input ->
+            FileOutputStream(outFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+        return outFile
+    }
+
     override fun prepareBenchmark(scenarioId: Int) {
         executor.execute {
             try {
                 Log.i("PHONE", "Preparing benchmark scenario $scenarioId on-device")
-                val assetName = "scenario_${scenarioId}.json"
-                val hasAsset = try {
-                    context.assets.open(assetName).close()
+                val binName = "bench_${scenarioId}.bin"
+                val hasBin = try {
+                    context.assets.open(binName).close()
                     true
                 } catch (e: Exception) {
                     false
                 }
-                val filename = if (hasAsset) assetName else "smoke_test_60s.json"
-                val jsonStr = context.assets.open(filename).bufferedReader().use { it.readText() }
-                val root = JSONObject(jsonStr)
-                val refLat = root.optDouble("reference_lat_deg", 52.404877)
-                val refLon = root.optDouble("reference_lon_deg", -1.500284)
-                val refAlt = root.optDouble("reference_alt_m", 166.93)
-                val domain = root.optString("domain", "Mixed")
-                val tripName = root.optString("trip", "Scenario_${scenarioId}")
-
-                sessionCore?.callAttr(
-                    "setup_benchmark_engine",
-                    refLat, refLon, refAlt,
-                    null, // saved_alignment
-                    null, // road_network
-                    domain,
-                    scenarioId,
-                    tripName
-                )
+                if (!hasBin) {
+                    throw IllegalStateException("Benchmark bundle $binName not found in assets. Cannot run benchmark without bundle.")
+                }
+                val bundleFile = extractAssetFile(binName)
+                val setupRes = sessionCore?.callAttr("setup_benchmark_from_bundle", bundleFile.absolutePath)
+                Log.i("PHONE", "Benchmark scenario $scenarioId setup result: $setupRes")
 
                 val hudDict = sessionCore?.callAttr("get_hud")
                 if (hudDict != null && pyJson != null) {
@@ -295,34 +296,37 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
         benchmarkJob?.cancel()
         benchmarkJob = scope.launch(Dispatchers.IO) {
             try {
-                val assetName = "scenario_${scenarioId}.json"
-                val hasAsset = try {
-                    context.assets.open(assetName).close()
-                    true
-                } catch (e: Exception) {
-                    false
+                var totalBatches = executor.submit(Callable<Int> {
+                    sessionCore?.callAttr("get_benchmark_batch_count")?.toInt() ?: 0
+                }).get()
+
+                if (totalBatches == 0) {
+                    Log.w("PHONE", "No benchmark batches loaded for scenario $scenarioId; re-preparing bundle")
+                    val binName = "bench_${scenarioId}.bin"
+                    val bundleFile = extractAssetFile(binName)
+                    executor.submit(Callable<Unit> {
+                        sessionCore?.callAttr("setup_benchmark_from_bundle", bundleFile.absolutePath)
+                    }).get()
+                    totalBatches = executor.submit(Callable<Int> {
+                        sessionCore?.callAttr("get_benchmark_batch_count")?.toInt() ?: 0
+                    }).get()
                 }
-                val filename = if (hasAsset) assetName else "smoke_test_60s.json"
-                val jsonStr = context.assets.open(filename).bufferedReader().use { it.readText() }
-                val root = JSONObject(jsonStr)
-                val batchesArray = root.getJSONArray("batches")
-                val nBatches = batchesArray.length()
+
+                if (totalBatches == 0) {
+                    throw IllegalStateException("No benchmark batches found for scenario $scenarioId after setup")
+                }
+
                 val dtTargetMs = (100.0 / max(speed, 0.2)).toLong()
+                Log.i("PHONE", "Replaying $totalBatches batches for scenario $scenarioId @ ${speed}x...")
 
-                Log.i("PHONE", "Replaying $nBatches batches for scenario $scenarioId from $filename @ ${speed}x...")
-
-                for (i in 0 until nBatches) {
+                for (i in 0 until totalBatches) {
                     if (!isActive) break
                     val tStart = System.currentTimeMillis()
-                    val batchObj = batchesArray.getJSONObject(i)
-                    batchObj.put("source", "benchmark")
-                    val batchStr = batchObj.toString()
 
                     val hudJson = executor.submit(Callable<String?> {
                         val pj = pyJson ?: return@Callable null
                         val sc = sessionCore ?: return@Callable null
-                        val batchDict = pj.callAttr("loads", batchStr)
-                        val hudDict = sc.callAttr("push_batch", batchDict, "benchmark")
+                        val hudDict = sc.callAttr("push_benchmark_batch_index", i)
                         if (hudDict != null) pj.callAttr("dumps", hudDict).toString() else null
                     }).get()
 

@@ -128,6 +128,10 @@ class SessionCore:
         }
         self.enable_handoff = enable_handoff
         self.handoff_manager = None
+        self.last_valid_gnss: Optional[GNSSSample] = None
+        self.benchmark_batches: List[Dict[str, Any]] = []
+        self.expected_metrics: Dict[str, Any] = {}
+        self.map_matching_status_msg: str = "MAP MATCH: ON"
         if enable_handoff:
             try:
                 from sih.handoff.manager import SeamlessGNSSHandoffManager, HandoffConfig
@@ -139,20 +143,22 @@ class SessionCore:
         """Returns the timing breakdown of the most recently processed batch."""
         return dict(self.last_batch_timing)
 
-    def set_blackout(self, active: bool = True, entry_gnss: Optional[GNSSSample] = None) -> None:
+    def set_blackout(self, active: bool = True, entry_gnss: Optional[GNSSSample] = None, timestamp_ns: Optional[int] = None) -> None:
         self.state = "BLACKOUT" if active else "WARMING_UP"
         self.engine.set_blackout(active, entry_gnss=entry_gnss)
         if active:
-            ts_ns = entry_gnss.timestamp_ns if entry_gnss else None
+            ts_ns = timestamp_ns or (entry_gnss.timestamp_ns if entry_gnss else None)
             self.evaluator.start_blackout(timestamp_ns=ts_ns)
         else:
-            self.evaluator.stop_blackout()
+            self.evaluator.stop_blackout(timestamp_ns=timestamp_ns or getattr(self, "benchmark_bo_end_ns", None))
 
     def reset(self, clear_trip: bool = False, keep_ref: Optional[bool] = None) -> None:
         self.state = "WARMING_UP"
         self.benchmark_active = False
         self.is_preloaded_trip = False
         self.current_benchmark_scenario = None
+        self.benchmark_bo_start_ns = None
+        self.benchmark_bo_end_ns = None
         if clear_trip:
             self.current_trip_name = ""
             self.ref_lat = 0.0
@@ -173,27 +179,6 @@ class SessionCore:
         if hasattr(self.engine, "session") and hasattr(self.engine.session, "enable_map_matching"):
             self.engine.session.enable_map_matching = bool(enabled)
 
-    def prefetch_road_network(self, lat: float, lon: float, radius_m: float = 3000.0) -> Dict[str, Any]:
-        """
-        Prefetches road network geometry around (lat, lon) using Overpass client
-        and assigns it to the engine.
-        """
-        try:
-            from sih.map.osm_client import OSMOverpassClient
-            client = OSMOverpassClient()
-            net = client.fetch_road_network(lat, lon, radius_m=radius_m)
-            if net is not None:
-                self.engine.road_network = net
-                if hasattr(self.engine, "session") and hasattr(self.engine.session, "road_network"):
-                    self.engine.session.road_network = net
-                return {
-                    "success": True,
-                    "segments": len(net.segments),
-                    "message": f"Prefetched {len(net.segments)} segments ({radius_m:.0f}m radius)",
-                }
-            return {"success": False, "segments": 0, "message": "No roads returned"}
-        except Exception as e:
-            return {"success": False, "segments": 0, "message": str(e)}
 
     def get_mount_state(self) -> str:
         """Returns mount state string (UNLEVELLED / LEVELLED / YAW_LOCKED / REUSED)."""
@@ -239,6 +224,7 @@ class SessionCore:
         else:
             warmup["handoff_state"] = "INITIALIZING"
         warmup["map_matching_enabled"] = getattr(self.engine, "enable_map_matching", True)
+        warmup["map_matching_status"] = getattr(self, "map_matching_status_msg", "MAP MATCH: ON" if getattr(self.engine, "enable_map_matching", True) else "MAP MATCH: OFF")
 
         reconciled_dict = None
         if self.handoff_manager is not None and getattr(self.handoff_manager.reconciler, "is_active", False):
@@ -312,6 +298,8 @@ class SessionCore:
             if self.state == "WARMING_UP":
                 self.engine.on_gnss(gnss)
             latest_g_in_batch = gnss
+            if gnss.is_valid:
+                self.last_valid_gnss = gnss
             if self.handoff_manager is not None:
                 try:
                     self.handoff_manager.on_gnss(gnss)
@@ -343,7 +331,11 @@ class SessionCore:
         if "state" in batch_data:
             req_state = batch_data["state"]
             if req_state in ("WARMING_UP", "BLACKOUT") and req_state != self.state:
-                entry_g = latest_g_in_batch or (self.evaluator.gnss_fixes[-1] if self.evaluator.gnss_fixes else None)
+                entry_g = (
+                    latest_g_in_batch
+                    or self.last_valid_gnss
+                    or (self.evaluator.gnss_fixes[-1] if self.evaluator.gnss_fixes else None)
+                )
                 self.set_blackout(req_state == "BLACKOUT", entry_gnss=entry_g)
 
         # 3. Ingest IMU samples
@@ -427,10 +419,6 @@ class SessionCore:
         else:
             return {"status": "error", "message": f"Unknown control command: {cmd}"}
 
-    def set_map_matching(self, enabled: bool) -> None:
-        """Enables or disables map matching in the engine."""
-        if hasattr(self.engine, "enable_map_matching"):
-            self.engine.enable_map_matching = bool(enabled)
 
     def prefetch_road_network(
         self,
@@ -533,6 +521,17 @@ class SessionCore:
             use_speed_smoother=self.use_speed_smoother,
             predictor=self.predictor,
         )
+
+        if road_network is None or len(getattr(road_network, "segments", [])) == 0:
+            import logging
+            logging.warning("[Benchmark] WARNING: No road network loaded for Scenario #%s. MAP MATCH: OFF (no roads for this area)", scenario_id)
+            print(f"[Benchmark] WARNING: No road network loaded for Scenario #{scenario_id}. MAP MATCH: OFF (no roads for this area)")
+            self.engine.enable_map_matching = False
+            self.map_matching_status_msg = "MAP MATCH: OFF (no roads for this area)"
+        else:
+            self.engine.enable_map_matching = True
+            self.map_matching_status_msg = f"MAP MATCH: ON ({len(road_network.segments)} segments)"
+
         self.evaluator = LiveEvaluator(
             ref_lat=ref_lat,
             ref_lon=ref_lon,
@@ -540,6 +539,200 @@ class SessionCore:
         )
         self.benchmark_active = True
         self.is_preloaded_trip = True
+
+    def setup_benchmark_from_bundle(self, bundle_source: Any) -> Dict[str, Any]:
+        """
+        Loads and sets up a complete, deterministic, parity-tested benchmark session
+        from an exported benchmark bundle (bench_<id>.bin or dict).
+        
+        Args:
+            bundle_source: File path (str), raw gzip bytes (bytes), or parsed bundle dict.
+            
+        Returns:
+            Dict containing scenario metadata, expected metrics, and batch count.
+        """
+        import gzip
+        import json
+        try:
+            from scipy.spatial.transform import Rotation as R
+        except ImportError:
+            from sih.core.scipy_shim import Rotation as R
+        from sih.map.network import RoadNetwork, RoadSegment
+        from sih.calibration.mount import MountAlignment, CalibratedSample
+
+        if isinstance(bundle_source, str):
+            if not os.path.exists(bundle_source):
+                raise FileNotFoundError(f"Benchmark bundle not found: {bundle_source}")
+            with gzip.open(bundle_source, "rt", encoding="utf-8") as f:
+                bundle = json.load(f)
+        elif isinstance(bundle_source, bytes):
+            bundle = json.loads(gzip.decompress(bundle_source).decode("utf-8"))
+        elif isinstance(bundle_source, dict):
+            bundle = bundle_source
+        else:
+            raise TypeError(f"Unsupported bundle_source type: {type(bundle_source)}")
+
+        scenario_id = int(bundle["scenario_id"])
+        trip_name = str(bundle.get("trip", ""))
+        domain = str(bundle.get("domain", "Mixed"))
+        ref_lat = float(bundle["reference_lat_deg"])
+        ref_lon = float(bundle["reference_lon_deg"])
+        ref_alt = float(bundle.get("reference_alt_m", 0.0))
+        self.benchmark_bo_start_ns = bundle.get("bo_start_ns")
+        self.benchmark_bo_end_ns = bundle.get("bo_end_ns")
+
+        # 1. Deserialize MountAlignment
+        align_dict = bundle.get("saved_alignment")
+        saved_alignment = None
+        if align_dict:
+            rot = R.from_quat(align_dict["quat"])
+            saved_alignment = MountAlignment(
+                is_calibrated=bool(align_dict.get("is_calibrated", True)),
+                R_phone_to_vehicle=rot,
+                forward_axis_phone=np.array(align_dict["forward_axis_phone"], dtype=np.float64),
+                lateral_axis_phone=np.array(align_dict["lateral_axis_phone"], dtype=np.float64),
+                vertical_axis_phone=np.array(align_dict["vertical_axis_phone"], dtype=np.float64),
+                yaw_axis_index=int(align_dict["yaw_axis_index"]),
+                yaw_axis_sign=float(align_dict["yaw_axis_sign"]),
+                mount_yaw_offset_rad=float(align_dict.get("mount_yaw_offset_rad", 0.0)),
+                pitch_deg=float(align_dict.get("pitch_deg", 0.0)),
+                roll_deg=float(align_dict.get("roll_deg", 0.0)),
+            )
+
+        # 2. Deserialize RoadNetwork
+        rnet_dict = bundle.get("road_network")
+        road_network = None
+        if rnet_dict and "segments" in rnet_dict:
+            cell_size = float(rnet_dict.get("cell_size_m", 100.0))
+            road_network = RoadNetwork(cell_size_m=cell_size)
+            for s in rnet_dict["segments"]:
+                seg = RoadSegment(
+                    segment_id=str(s["id"]),
+                    start_enu_m=np.array(s["s_enu"], dtype=np.float64),
+                    end_enu_m=np.array(s["e_enu"], dtype=np.float64),
+                    start_lat_lon=(float(s["s_ll"][0]), float(s["s_ll"][1])),
+                    end_lat_lon=(float(s["e_ll"][0]), float(s["e_ll"][1])),
+                    bearing_deg=float(s["brg"]),
+                    length_m=float(s["len"]),
+                    road_type=str(s.get("type", "motorway")),
+                    speed_limit_mps=float(s.get("spd", 25.0)),
+                    is_oneway=bool(s.get("ow", False)),
+                    start_node_id=s.get("sn"),
+                    end_node_id=s.get("en"),
+                )
+                road_network.add_segment(seg)
+
+        # 3. Setup Benchmark Engine
+        self.setup_benchmark_engine(
+            ref_lat=ref_lat,
+            ref_lon=ref_lon,
+            ref_alt=ref_alt,
+            saved_alignment=saved_alignment,
+            road_network=road_network,
+            domain=domain,
+            scenario_id=scenario_id,
+            trip_name=trip_name,
+        )
+
+        # 3b. Load normalization vectors from bundle
+        if "norm_mean" in bundle and "norm_std" in bundle:
+            nm = np.array(bundle["norm_mean"], dtype=np.float32).reshape(-1, 1)
+            ns = np.array(bundle["norm_std"], dtype=np.float32).reshape(-1, 1)
+            self.norm_mean = nm
+            self.norm_std = ns
+            if hasattr(self.engine, "norm_mean"):
+                self.engine.norm_mean = nm
+                self.engine.norm_std = ns
+
+        # 4. Initialize engine from warmup GNSS
+        warmup_g_dict = bundle.get("warmup_gnss")
+        if warmup_g_dict:
+            warmup_g = GNSSSample(
+                timestamp_ns=int(warmup_g_dict["t"]),
+                latitude_deg=float(warmup_g_dict["lat"]),
+                longitude_deg=float(warmup_g_dict["lon"]),
+                altitude_m=float(warmup_g_dict.get("alt", 0.0)),
+                speed_mps=float(warmup_g_dict["spd"]) if warmup_g_dict.get("spd") is not None else None,
+                bearing_deg=float(warmup_g_dict["brg"]) if warmup_g_dict.get("brg") is not None else None,
+                accuracy_h_m=float(warmup_g_dict.get("acc", 5.0)),
+                is_valid=bool(warmup_g_dict.get("valid", True)),
+            )
+            self.engine.session.init_from_gnss(warmup_g)
+            self.evaluator.on_gnss(warmup_g)
+            self.last_valid_gnss = warmup_g
+
+        # 5. Prime feature extractor with pre-roll IMU + calib
+        preroll_imu_dicts = bundle.get("preroll_imu", [])
+        preroll_calib_dicts = bundle.get("preroll_calib", [])
+        if preroll_imu_dicts:
+            preroll_imu = [
+                IMUSample(
+                    timestamp_ns=int(im["t"]),
+                    accel=np.array(im["a"], dtype=np.float64),
+                    gyro=np.array(im["g"], dtype=np.float64),
+                )
+                for im in preroll_imu_dicts
+            ]
+            R_mat = saved_alignment.R_phone_to_vehicle.as_matrix() if saved_alignment else np.eye(3, dtype=np.float64)
+            grav_v = np.array([0.0, 0.0, 9.80665], dtype=np.float64)
+            preroll_calib = [
+                CalibratedSample(
+                    timestamp_ns=int(c["t"]),
+                    accel_vehicle=np.array(c["av"], dtype=np.float64),
+                    gyro_vehicle=np.array(c["gv"], dtype=np.float64),
+                    rotation_body_to_vehicle=R_mat,
+                    gravity_vehicle=grav_v,
+                    is_calibrated=True,
+                )
+                for c in preroll_calib_dicts
+            ]
+            self.engine.prime_features(preroll_imu, calib_samples=preroll_calib)
+
+        # 6. Seed GNSS history buffer for T7 online speed calibration
+        gnss_history_dicts = bundle.get("gnss_history", [])
+        gnss_history = [
+            GNSSSample(
+                timestamp_ns=int(g["t"]),
+                latitude_deg=float(g["lat"]),
+                longitude_deg=float(g["lon"]),
+                altitude_m=float(g.get("alt", 0.0)),
+                speed_mps=float(g["spd"]) if g.get("spd") is not None else None,
+                bearing_deg=float(g["brg"]) if g.get("brg") is not None else None,
+                accuracy_h_m=float(g.get("acc", 5.0)),
+                is_valid=bool(g.get("valid", True)),
+            )
+            for g in gnss_history_dicts
+        ]
+        self.engine.recent_gnss_window = list(gnss_history)
+        if gnss_history:
+            self.engine.moving_gnss_fixes_count = max(len(gnss_history), 180)
+            for gh in gnss_history:
+                self.evaluator.on_gnss(gh)
+
+        # Store batches in memory ready for replay
+        self.benchmark_batches = bundle.get("batches", [])
+        self.expected_metrics = bundle.get("expected", {})
+
+        return {
+            "success": True,
+            "scenario_id": scenario_id,
+            "trip": trip_name,
+            "segments_count": len(road_network.segments) if road_network else 0,
+            "batches_count": len(self.benchmark_batches),
+            "expected_error_m": self.expected_metrics.get("endpoint_error_m", 0.0),
+            "expected_drift_pct": self.expected_metrics.get("drift_pct", 0.0),
+            "gt_dist_m": self.expected_metrics.get("gt_dist_m", 0.0),
+        }
+
+    def get_benchmark_batch_count(self) -> int:
+        """Returns the number of loaded benchmark batches."""
+        return len(self.benchmark_batches)
+
+    def push_benchmark_batch_index(self, index: int) -> Dict[str, Any]:
+        """Replays the benchmark batch at index and returns updated HUD dictionary."""
+        if 0 <= index < len(self.benchmark_batches):
+            return self.push_batch(self.benchmark_batches[index], source="benchmark")
+        return self.get_hud()
 
     def deload_benchmark(self) -> None:
         """Restores live mode engine and evaluator."""

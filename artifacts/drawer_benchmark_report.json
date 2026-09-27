@@ -1,0 +1,85 @@
+{
+  "device_model": "SM-F127G",
+  "android_version": "13",
+  "overall_passed": true,
+  "results": [
+    {
+      "scenario_id": 1,
+      "expected_error_m": 80.59,
+      "phone_error_m": 80.59,
+      "error_diff_m": 0,
+      "expected_drift_pct": 26.73,
+      "phone_drift_pct": 26.73,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (2877 segments)",
+      "distinct_dr_ratio": 0.8571428571428571,
+      "passed": true
+    },
+    {
+      "scenario_id": 22,
+      "expected_error_m": 16.77,
+      "phone_error_m": 16.77,
+      "error_diff_m": 0,
+      "expected_drift_pct": 3.53,
+      "phone_drift_pct": 3.53,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (26577 segments)",
+      "distinct_dr_ratio": 0.628,
+      "passed": true
+    },
+    {
+      "scenario_id": 23,
+      "expected_error_m": 67.76,
+      "phone_error_m": 67.76,
+      "error_diff_m": 0,
+      "expected_drift_pct": 6.01,
+      "phone_drift_pct": 6.01,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (705 segments)",
+      "distinct_dr_ratio": 0.9375,
+      "passed": true
+    },
+    {
+      "scenario_id": 25,
+      "expected_error_m": 77.3,
+      "phone_error_m": 77.3,
+      "error_diff_m": 0,
+      "expected_drift_pct": 12.58,
+      "phone_drift_pct": 12.58,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (26577 segments)",
+      "distinct_dr_ratio": 0.9,
+      "passed": true
+    },
+    {
+      "scenario_id": 26,
+      "expected_error_m": 122.8,
+      "phone_error_m": 122.8,
+      "error_diff_m": 0,
+      "expected_drift_pct": 13.75,
+      "phone_drift_pct": 13.75,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (26577 segments)",
+      "distinct_dr_ratio": 0.9363295880149812,
+      "passed": true
+    },
+    {
+      "scenario_id": 30,
+      "expected_error_m": 7.04,
+      "phone_error_m": 7.04,
+      "error_diff_m": 0,
+      "expected_drift_pct": 2.88,
+      "phone_drift_pct": 2.88,
+      "drift_diff_pp": 0,
+      "mount_state": "REUSED",
+      "map_status": "MAP MATCH: ON (1641 segments)",
+      "distinct_dr_ratio": 0.9230769230769231,
+      "passed": true
+    }
+  ]
+}

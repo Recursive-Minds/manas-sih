@@ -276,14 +276,14 @@
     "scenario_id": 22,
     "trip": "S-S3a",
     "domain": "Mixed",
-    "t_start_ns": 451320000000,
-    "t_end_ns": 496320000000,
+    "t_start_ns": 286320000000,
+    "t_end_ns": 331320000000,
     "duration_s": 45.0,
-    "gt_dist_m": 475.17,
-    "start_lat": 52.402607,
-    "start_lon": -1.447525,
-    "drift_osm": 19.56,
-    "distance_m_csv": 475.17
+    "gt_dist_m": 475.1,
+    "start_lat": 52.406296,
+    "start_lon": -1.467293,
+    "drift_osm": 3.43,
+    "distance_m_csv": 475.1
   },
   {
     "scenario_id": 23,

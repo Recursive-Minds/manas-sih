@@ -99,7 +99,7 @@ def build_sensor_batches(
             })
             g_idx += 1
 
-        is_bo = (curr_window_start_ns >= bo_start_ns and curr_window_start_ns <= bo_end_ns)
+        is_bo = (curr_window_start_ns >= bo_start_ns and curr_window_start_ns < bo_end_ns)
         state_str = "BLACKOUT" if is_bo else "WARMING_UP"
 
         if imu_batch or gnss_batch:

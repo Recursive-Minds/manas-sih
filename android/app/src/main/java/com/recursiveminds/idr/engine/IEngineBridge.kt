@@ -11,6 +11,7 @@ import com.recursiveminds.idr.data.SensorBatch
 interface IEngineBridge {
     val isConnected: Boolean
     val isBlackout: Boolean
+    val isBenchmarkRunning: Boolean get() = false
 
     var onHudUpdateListener: ((HudUpdate) -> Unit)?
     var onConnectionStateChanged: ((Boolean) -> Unit)?

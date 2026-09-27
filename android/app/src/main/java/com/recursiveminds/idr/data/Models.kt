@@ -103,7 +103,8 @@ data class WarmupStatus(
     @SerializedName("speed_calib_s") val speedCalibS: Int = 0,
     @SerializedName("speed_calib_display") val speedCalibDisplay: String = "Speed calibration 0/180 s",
     @SerializedName("handoff_state") val handoffState: String = "INITIALIZING",
-    @SerializedName("map_matching_enabled") val mapMatchingEnabled: Boolean = true
+    @SerializedName("map_matching_enabled") val mapMatchingEnabled: Boolean = true,
+    @SerializedName("map_matching_status") val mapMatchingStatus: String? = null
 )
 
 data class HudUpdate(
