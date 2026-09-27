@@ -132,10 +132,17 @@ class SessionCore:
         self.benchmark_batches: List[Dict[str, Any]] = []
         self.expected_metrics: Dict[str, Any] = {}
         self.map_matching_status_msg: str = "MAP MATCH: ON"
+        # [DEMOFIX] handoff display + benchmark run state
+        self._handoff_pending: bool = False
+        self._handoff_target_enu = None
+        self._last_dr_display_enu = None
+        self._last_imu_ts = None
+        self.benchmark_running: bool = False
+        self._bundle_cache: Dict[str, Any] = {}
         if enable_handoff:
             try:
                 from sih.handoff.manager import SeamlessGNSSHandoffManager, HandoffConfig
-                self.handoff_manager = SeamlessGNSSHandoffManager(HandoffConfig())
+                self.handoff_manager = SeamlessGNSSHandoffManager(HandoffConfig(blend_duration_s=3.0))  # [DEMOFIX] visible blend
             except Exception:
                 self.handoff_manager = None
 
@@ -144,8 +151,10 @@ class SessionCore:
         return dict(self.last_batch_timing)
 
     def set_blackout(self, active: bool = True, entry_gnss: Optional[GNSSSample] = None, timestamp_ns: Optional[int] = None) -> None:
+        was_blackout = (self.state == "BLACKOUT")
         self.state = "BLACKOUT" if active else "WARMING_UP"
         self.engine.set_blackout(active, entry_gnss=entry_gnss)
+        self._handoff_on_blackout(active, was_blackout)  # [DEMOFIX]
         if active:
             ts_ns = timestamp_ns or (entry_gnss.timestamp_ns if entry_gnss else None)
             self.evaluator.start_blackout(timestamp_ns=ts_ns)
@@ -171,6 +180,10 @@ class SessionCore:
         self.engine.reset()
         if self.handoff_manager is not None:
             self.handoff_manager.reset()
+        self._handoff_pending = False  # [DEMOFIX]
+        self._handoff_target_enu = None
+        self._last_dr_display_enu = None
+        self._last_imu_ts = None
 
     def set_map_matching(self, enabled: bool) -> None:
         """Enables or disables map matching in the underlying engine."""
@@ -194,6 +207,81 @@ class SessionCore:
         """Passthrough pre-rolling features into the underlying engine adapter."""
         if hasattr(self.engine, "prime_features"):
             self.engine.prime_features(imu_samples, calib_samples=calib_samples)
+
+
+    # ------------------------------------------------------------------
+    # [DEMOFIX] Handoff display wiring (DISPLAY ONLY - never feeds the engine)
+    # Blackout is defined by the app state (START/STOP or the benchmark
+    # batches), so the FSM is driven by set_blackout(), not by GNSS timeouts.
+    # On exit: hold the DR marker until the first valid post-blackout fix,
+    # then Hermite-blend the display from the last DR position to that fix.
+    # ------------------------------------------------------------------
+    def _handoff_ref(self):
+        e = self.engine
+        return (float(getattr(e, "ref_lat", self.ref_lat) or self.ref_lat),
+                float(getattr(e, "ref_lon", self.ref_lon) or self.ref_lon),
+                float(getattr(e, "ref_alt", self.ref_alt) or 0.0))
+
+    def _to_enu(self, lat: float, lon: float) -> np.ndarray:
+        from sih.data.geo import geodetic_to_enu
+        rl, ro, ra = self._handoff_ref()
+        return np.asarray(geodetic_to_enu(lat, lon, ra, rl, ro, ra), dtype=np.float64)
+
+    def _handoff_on_blackout(self, active: bool, was_blackout: bool) -> None:
+        hm = self.handoff_manager
+        if hm is None:
+            return
+        from sih.handoff.manager import HandoffState
+        if active:
+            hm.reset()
+            hm._state = HandoffState.INS_DEAD_RECKONING
+            self._handoff_pending = False
+            self._handoff_target_enu = None
+        elif was_blackout:
+            self._handoff_pending = True            # wait for first valid fix after exit
+            hm._state = HandoffState.REACQUISITION_VERIFY
+
+    def _handoff_on_gnss(self, gnss: GNSSSample) -> None:
+        hm = self.handoff_manager
+        if hm is None or not gnss.is_valid or self.state != "WARMING_UP":
+            return
+        from sih.handoff.manager import HandoffState
+        if self._handoff_pending and self._last_dr_display_enu is not None:
+            target = self._to_enu(gnss.latitude_deg, gnss.longitude_deg)
+            hm.reconciler.initiate_blend(timestamp_ns=gnss.timestamp_ns,
+                                         p_dead_reckoning=self._last_dr_display_enu.copy(),
+                                         p_fused=target)
+            self._handoff_target_enu = target
+            self._handoff_pending = False
+            hm._state = HandoffState.REACQUISITION_BLENDING if hm.reconciler.is_blending else HandoffState.GNSS_HEALTHY
+        elif hm.reconciler.is_blending:
+            self._handoff_target_enu = self._to_enu(gnss.latitude_deg, gnss.longitude_deg)
+        elif hm._state in (HandoffState.INITIALIZING, HandoffState.GNSS_DEGRADED, HandoffState.REACQUISITION_VERIFY) and not self._handoff_pending:
+            hm._state = HandoffState.GNSS_HEALTHY
+
+    def _handoff_on_fused(self, fused: Any) -> None:
+        self._last_dr_display_enu = self._to_enu(fused.latitude_deg, fused.longitude_deg)
+
+    def _handoff_display(self) -> Optional[Dict[str, Any]]:
+        hm = self.handoff_manager
+        if hm is None or self._handoff_pending or self._handoff_target_enu is None or self._last_imu_ts is None:
+            return None
+        if not hm.reconciler.is_blending:
+            return None
+        from sih.handoff.manager import HandoffState
+        from sih.data.geo import enu_to_geodetic
+        p, alpha = hm.reconciler.get_blended_position(int(self._last_imu_ts), self._handoff_target_enu)
+        if not hm.reconciler.is_blending:
+            hm._state = HandoffState.GNSS_HEALTHY
+            return None
+        rl, ro, ra = self._handoff_ref()
+        lat, lon, _ = enu_to_geodetic(p[0], p[1], p[2], rl, ro, ra)
+        return {"lat": float(lat), "lon": float(lon), "alpha": float(alpha)}
+
+    def _dr_visible(self) -> bool:
+        hm = self.handoff_manager
+        blending = bool(hm is not None and hm.reconciler.is_blending)
+        return bool(self.state == "BLACKOUT" or self._handoff_pending or blending)
 
     def get_hud(self) -> Dict[str, Any]:
         """Returns structured HUD snapshot dictionary."""
@@ -226,19 +314,11 @@ class SessionCore:
         warmup["map_matching_enabled"] = getattr(self.engine, "enable_map_matching", True)
         warmup["map_matching_status"] = getattr(self, "map_matching_status_msg", "MAP MATCH: ON" if getattr(self.engine, "enable_map_matching", True) else "MAP MATCH: OFF")
 
-        reconciled_dict = None
-        if self.handoff_manager is not None and getattr(self.handoff_manager.reconciler, "is_active", False):
-            try:
-                from sih.data.geo import enu_to_geodetic
-                p_disp = self.handoff_manager.reconciler.get_reconciled_position(time.time_ns())
-                if p_disp is not None and self.ref_lat != 0.0:
-                    r_lat, r_lon, _ = enu_to_geodetic(
-                        p_disp[0], p_disp[1], p_disp[2],
-                        self.ref_lat, self.ref_lon, self.ref_alt
-                    )
-                    reconciled_dict = {"lat": float(r_lat), "lon": float(r_lon)}
-            except Exception:
-                pass
+        reconciled_dict = self._handoff_display()  # [DEMOFIX] sensor-time Hermite blend
+        if self.handoff_manager is not None:
+            warmup["handoff_state"] = self.handoff_manager.state.value
+        if self.benchmark_active:
+            warmup["speed_calib_display"] = "Speed calibration: trip history (bench bundle)"
 
         return {
             "type": "hud_update",
@@ -251,6 +331,8 @@ class SessionCore:
             "gnss_pos": gnss_dict,
             "reconciled_pos": reconciled_dict,
             "metrics": self.evaluator.get_summary_dict(),
+            "dr_visible": self._dr_visible(),  # [DEMOFIX]
+            "benchmark_running": bool(self.benchmark_running),  # [DEMOFIX]
         }
 
     def push_batch(self, batch_data: Dict[str, Any], source: str = "phone") -> Dict[str, Any]:
@@ -300,11 +382,7 @@ class SessionCore:
             latest_g_in_batch = gnss
             if gnss.is_valid:
                 self.last_valid_gnss = gnss
-            if self.handoff_manager is not None:
-                try:
-                    self.handoff_manager.on_gnss(gnss)
-                except Exception:
-                    pass
+            self._handoff_on_gnss(gnss)  # [DEMOFIX] display-only
 
             if gnss.is_valid and (self.road_network is None or len(self.road_network.segments) == 0):
                 try:
@@ -348,14 +426,11 @@ class SessionCore:
                 accel=np.array([float(acc[0]), float(acc[1]), float(acc[2])], dtype=np.float64),
                 gyro=np.array([float(gyr[0]), float(gyr[1]), float(gyr[2])], dtype=np.float64),
             )
+            self._last_imu_ts = imu.timestamp_ns  # [DEMOFIX]
             fused = self.engine.on_imu(imu)
             if fused is not None:
                 self.evaluator.on_dr(fused)
-                if self.handoff_manager is not None:
-                    try:
-                        self.handoff_manager.on_fused_position(fused)
-                    except Exception:
-                        pass
+                self._handoff_on_fused(fused)  # [DEMOFIX] display-only
 
         t_batch_end = time.perf_counter()
         total_ms = (t_batch_end - t_batch_start) * 1000.0
@@ -563,8 +638,11 @@ class SessionCore:
         if isinstance(bundle_source, str):
             if not os.path.exists(bundle_source):
                 raise FileNotFoundError(f"Benchmark bundle not found: {bundle_source}")
-            with gzip.open(bundle_source, "rt", encoding="utf-8") as f:
-                bundle = json.load(f)
+            _key = f"{bundle_source}:{os.path.getsize(bundle_source)}"  # [DEMOFIX] parse once, re-setup fast
+            if _key not in self._bundle_cache:
+                with gzip.open(bundle_source, "rt", encoding="utf-8") as f:
+                    self._bundle_cache = {_key: json.load(f)}
+            bundle = self._bundle_cache[_key]
         elif isinstance(bundle_source, bytes):
             bundle = json.loads(gzip.decompress(bundle_source).decode("utf-8"))
         elif isinstance(bundle_source, dict):
@@ -686,7 +764,8 @@ class SessionCore:
                 )
                 for c in preroll_calib_dicts
             ]
-            self.engine.prime_features(preroll_imu, calib_samples=preroll_calib)
+            _rp = bundle.get("preroll_v_raw")  # [DEMOFIX] exporter-computed speeds -> seconds, not minutes
+            self.engine.prime_features(preroll_imu, calib_samples=preroll_calib, raw_preds=_rp)
 
         # 6. Seed GNSS history buffer for T7 online speed calibration
         gnss_history_dicts = bundle.get("gnss_history", [])
@@ -706,11 +785,18 @@ class SessionCore:
         self.engine.recent_gnss_window = list(gnss_history)
         if gnss_history:
             self.engine.moving_gnss_fixes_count = max(len(gnss_history), 180)
-            for gh in gnss_history:
-                self.evaluator.on_gnss(gh)
+            pass  # [DEMOFIX] history feeds the engine only; the evaluator (truth display) starts at the warm-up fix
 
         # Store batches in memory ready for replay
         self.benchmark_batches = bundle.get("batches", [])
+        self.state = "WARMING_UP"  # [DEMOFIX] every setup starts a clean run
+        if self.handoff_manager is not None:
+            self.handoff_manager.reset()
+        self._handoff_pending = False
+        self._handoff_target_enu = None
+        self._last_dr_display_enu = None
+        self._last_imu_ts = None
+        self.benchmark_running = False
         self.expected_metrics = bundle.get("expected", {})
 
         return {
@@ -724,6 +810,42 @@ class SessionCore:
             "gt_dist_m": self.expected_metrics.get("gt_dist_m", 0.0),
         }
 
+    def setup_or_restore_benchmark(self, bundle_path: str) -> Dict[str, Any]:
+        """[DEMOFIX] First call per bundle: full setup, then snapshot engine+evaluator.
+        Later calls (every RUN): restore the snapshot in < 1 s -> each run starts clean."""
+        import copy
+        key = f"{bundle_path}:{os.path.getsize(bundle_path)}"
+        snap = getattr(self, "_bench_snapshot", None)
+        if snap is None or snap["key"] != key:
+            res = self.setup_benchmark_from_bundle(bundle_path)
+            memo = {id(self.predictor): self.predictor}
+            if self.road_network is not None:
+                memo[id(self.road_network)] = self.road_network
+            attrs = {k: getattr(self, k, None) for k in self._BENCH_ATTRS}
+            self._bench_snapshot = {"key": key, "state": copy.deepcopy((self.engine, self.evaluator), memo),
+                                    "attrs": attrs, "res": res}
+            return res
+        memo = {id(self.predictor): self.predictor}
+        if snap["attrs"].get("road_network") is not None:
+            memo[id(snap["attrs"]["road_network"])] = snap["attrs"]["road_network"]
+        self.engine, self.evaluator = copy.deepcopy(snap["state"], memo)
+        for k, v in snap["attrs"].items():
+            setattr(self, k, v)
+        self.state = "WARMING_UP"
+        if self.handoff_manager is not None:
+            self.handoff_manager.reset()
+        self._handoff_pending = False
+        self._handoff_target_enu = None
+        self._last_dr_display_enu = None
+        self._last_imu_ts = None
+        self.benchmark_running = False
+        return snap["res"]
+
+    _BENCH_ATTRS = ("ref_lat", "ref_lon", "ref_alt", "saved_alignment", "road_network", "domain",
+                    "current_trip_name", "current_benchmark_scenario", "benchmark_active", "is_preloaded_trip",
+                    "benchmark_bo_start_ns", "benchmark_bo_end_ns", "norm_mean", "norm_std",
+                    "last_valid_gnss", "benchmark_batches", "expected_metrics")
+
     def get_benchmark_batch_count(self) -> int:
         """Returns the number of loaded benchmark batches."""
         return len(self.benchmark_batches)
@@ -731,6 +853,7 @@ class SessionCore:
     def push_benchmark_batch_index(self, index: int) -> Dict[str, Any]:
         """Replays the benchmark batch at index and returns updated HUD dictionary."""
         if 0 <= index < len(self.benchmark_batches):
+            self.benchmark_running = bool(index < len(self.benchmark_batches) - 1)
             return self.push_batch(self.benchmark_batches[index], source="benchmark")
         return self.get_hud()
 

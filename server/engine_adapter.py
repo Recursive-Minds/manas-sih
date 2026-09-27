@@ -885,6 +885,8 @@ class EngineAdapterStageB:
         self,
         imu_samples: List[IMUSample],
         calib_samples: Optional[List[CalibratedSample]] = None,
+        raw_preds: Optional[List[float]] = None,
+        feature_tail: int = 300,
     ) -> None:
         """
         Pre-rolls the feature extractor and AI speed model over historical IMU samples
@@ -906,6 +908,22 @@ class EngineAdapterStageB:
             c_list.append(c)
             self.recent_imu_calib.append(c)
             self.recent_ai_ts.append(imu.timestamp_ns)
+
+        if raw_preds is not None and len(raw_preds) == N:
+            # [DEMOFIX] speeds precomputed by the exporter: skip N model calls; only the last
+            # feature_tail samples are needed to rebuild the extractor/IIR state (bit-exact in tests)
+            for c in c_list[max(0, N - int(feature_tail)):]:
+                f = self.feature_extractor.push(c)
+                self.feature_buf.append(f)
+                if len(self.feature_buf) > 60:
+                    self.feature_buf.pop(0)
+            for v_raw in raw_preds:
+                v_val = float(v_raw)
+                if self.use_speed_smoother and self.speed_smoother is not None:
+                    v_val = self.speed_smoother.update(v_val, dt_s=0.1)
+                self.recent_ai_speeds.append(v_val)
+            self._last_prime_raw_preds = [float(v) for v in raw_preds]
+            return
 
         if self.model is None and self.predictor is None:
             for c in c_list:
@@ -955,6 +973,7 @@ class EngineAdapterStageB:
                     vf, _, _ = self.model(b_s, b_l)
                     preds.extend(vf.squeeze(-1).float().cpu().numpy().flatten())
 
+        self._last_prime_raw_preds = [float(v) for v in preds]  # [DEMOFIX] exported into bundles
         for v_raw in preds:
             v_val = float(v_raw)
             if self.use_speed_smoother and self.speed_smoother is not None:

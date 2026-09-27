@@ -117,5 +117,7 @@ data class HudUpdate(
     @SerializedName("dr_pos") val drPos: PositionPoint?,
     @SerializedName("gnss_pos") val gnssPos: PositionPoint?,
     @SerializedName("reconciled_pos") val reconciledPos: PositionPoint? = null,
-    @SerializedName("metrics") val metrics: LiveMetrics?
+    @SerializedName("metrics") val metrics: LiveMetrics?,
+    @SerializedName("dr_visible") val drVisible: Boolean? = null,          // [DEMOFIX]
+    @SerializedName("benchmark_running") val benchmarkRunning: Boolean? = null  // [DEMOFIX]
 )

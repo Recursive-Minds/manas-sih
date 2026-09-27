@@ -46,7 +46,7 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
 
     override val isConnected: Boolean get() = _isConnected.get()
     override val isBlackout: Boolean get() = _isBlackout.get()
-    override val isBenchmarkRunning: Boolean get() = benchmarkJob?.isActive == true || isBenchmarkMode.get()
+    override val isBenchmarkRunning: Boolean get() = benchmarkJob?.isActive == true
 
     override var onHudUpdateListener: ((HudUpdate) -> Unit)? = null
     override var onConnectionStateChanged: ((Boolean) -> Unit)? = null
@@ -282,7 +282,7 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
                     throw IllegalStateException("Benchmark bundle $binName not found in assets. Cannot run benchmark without bundle.")
                 }
                 val bundleFile = extractAssetFile(binName)
-                val setupRes = sessionCore?.callAttr("setup_benchmark_from_bundle", bundleFile.absolutePath)
+                val setupRes = sessionCore?.callAttr("setup_or_restore_benchmark", bundleFile.absolutePath)  // [DEMOFIX]
                 Log.i("PHONE", "Benchmark scenario $scenarioId setup result: $setupRes")
 
                 val hudDict = sessionCore?.callAttr("get_hud")
@@ -307,6 +307,11 @@ class LocalChaquopyEngineBridge(private val context: Context) : IEngineBridge {
         benchmarkJob?.cancel()
         benchmarkJob = scope.launch(Dispatchers.IO) {
             try {
+                // [DEMOFIX] every RUN starts from a clean engine (snapshot restore, < 1 s; first time = full setup)
+                val runBundle = extractAssetFile("bench_${scenarioId}.bin")
+                executor.submit(Callable<Unit> {
+                    sessionCore?.callAttr("setup_or_restore_benchmark", runBundle.absolutePath)
+                }).get()
                 var totalBatches = executor.submit(Callable<Int> {
                     sessionCore?.callAttr("get_benchmark_batch_count")?.toInt() ?: 0
                 }).get()

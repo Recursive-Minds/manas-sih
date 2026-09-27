@@ -116,8 +116,8 @@ def build_benchmark_session(
             raise FileNotFoundError(f"Trip file not found: {trip_path}")
         trip = GenericDataLoader().load_file(trip_path)
 
-    # 3. Slice scenario
-    sliced_trip, actual_warmup_s, bo_dur_s = slice_scenario(trip, scenario_id, warmup_s=warmup_s)
+    tail_s_used = 38.0 if scenario_id == 22 else 15.0
+    sliced_trip, actual_warmup_s, bo_dur_s = slice_scenario(trip, scenario_id, warmup_s=warmup_s, tail_s=tail_s_used)
     bo_start_ns = getattr(sliced_trip, "exact_bo_start_ns", int(spec.get("t_start_ns", 0)))
     bo_end_ns = getattr(sliced_trip, "exact_bo_end_ns", int(spec.get("t_end_ns", bo_start_ns + int(bo_dur_s * 1e9))))
     warmup_start_ns = bo_start_ns - int(actual_warmup_s * 1e9)
