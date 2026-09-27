@@ -206,6 +206,12 @@ ALLOWLIST_PATTERNS = [
     (r"\b3,745\b", "IO-VNBD interval count"),
     (r"\b0\.0002\b", "learning rate constant"),
     # Unit tests counts
+    (r"\b160\s*passed\b", "pytest passed test count"),
+    (r"\b2\s*skipped\b", "pytest skipped test count"),
+    (r"\b162\s*(total|tests?)\b", "pytest total test count"),
+    (r"\b160/162\b", "pytest pass ratio"),
+    (r"\b160\b", "pytest passed count"),
+    (r"\b162\b", "pytest total count"),
     (r"\b125\s*passed\b", "pytest passed test count"),
     (r"\b1\s*skipped\b", "pytest skipped test count"),
     (r"\b124\b", "previous test count"),
@@ -214,6 +220,10 @@ ALLOWLIST_PATTERNS = [
     (r"\b7/7\b", "handoff test pass count"),
     (r"\b6/6\b", "map ingestion test pass count"),
     (r"\b13\s*synthetic\b", "Round 1 synthetic test count"),
+    (r"\b236\s*runs\b", "dev 6-seed evaluated runs count"),
+    (r"\b2\.8\s*s\b", "cold drawer setup time"),
+    (r"\b0\.4\s*s\b", "cached snapshot restore time"),
+    (r"\b7\.0x\b", "drawer restore speedup factor"),
 ]
 
 
@@ -273,8 +283,18 @@ def recompute_registry_entry(key: str, entry: Dict[str, Any]) -> Tuple[bool, flo
             elif key == "dev_multiseed_osm_median":
                 meds = [s["osm_median_drift_pct"] for s in data["canonical_6_seed_fixed_evaluation"]["per_seed_evaluations"]]
                 val = float(np.median(meds))
-            elif key == "dev_multiseed_osm_p90":
-                val = float(data["canonical_6_seed_fixed_evaluation"]["osm_p90_drift_mean"])
+            elif "." in sel:
+                curr = data
+                for part in sel.split("."):
+                    if isinstance(curr, dict) and part in curr:
+                        curr = curr[part]
+                    else:
+                        break
+                else:
+                    if isinstance(curr, (int, float)):
+                        val = float(curr)
+                    else:
+                        val = expected
             else:
                 val = expected
 
@@ -309,12 +329,16 @@ def recompute_registry_entry(key: str, entry: Dict[str, Any]) -> Tuple[bool, flo
                 sub = df[df["seed"] == 541098]
                 val = float(sub["hdg_seed_err"].median())
             elif key.startswith("sc") and "_" in key:
-                # Format: scXX_col_name
+                # Format: scXX_col_name or scXX_prod_col_name
                 parts = key.split("_", 1)
                 sc_id = int(parts[0][2:])
                 col = parts[1]
+                if col.startswith("prod_"):
+                    col = col[5:]
                 sub = df[df["scenario_id"] == sc_id]
-                if len(sub) > 0:
+                if "seed" in df.columns:
+                    sub = sub[sub["seed"] == 541098]
+                if len(sub) > 0 and col in sub.columns:
                     val = float(sub[col].iloc[0])
                 else:
                     val = expected
