@@ -21,3 +21,5 @@ android/local.properties
 android/app/src/ondevice/python/
 android/app/src/ondevice/assets/moe_velocity_model.tflite
 android/app/src/ondevice/assets/normalization_params.npz
+recordings/
+*.mp4
