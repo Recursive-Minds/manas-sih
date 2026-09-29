@@ -338,3 +338,26 @@ This log records every command and process executed during the On-Device Phone P
   4. Updated `ppt_pack/images/README.txt` with Scenario #23 physical execution metadata.
   5. Rebuilt `ppt_pack.zip` (1,786,793 bytes / 1.70 MB).
   6. Verified all documentation audits (`check_number_registry.py`, `check_links.py`, `check_latex.py`, `test_doc_numbers.py`): 100% PASS.
+
+---
+
+### Step 8: Judge-Friendly README v2 Integration
+- **Timestamp**: 2026-09-29 19:07:00 +05:30
+- **Base Tag**: `pre-readme-v2`
+- **Branch**: `docs/readme-v2` (branched from `main` at `466fe14`)
+- **Actions Executed**:
+  1. Archived pre-phone README to `docs/archive/README_engineering_record_pre_phone_phase.md` with explicit deprecation header.
+  2. Integrated new judge-friendly `README.md`, `docs/readme/*` (15 images + 1 GIF), and `docs/SIH26168_Recursive_Minds_Idea.pdf`.
+  3. Added Section 10 archived engineering log link.
+  4. Removed MIT badge line from `README.md` (no LICENSE file in repo).
+  5. Implemented `scripts/check_readme_paths.py` validating 20/20 local file paths and 13/13 GitHub heading slugs.
+  6. Verified Quick Parity on canonical scenarios: 5/5 passed (<0.01m), exact 0.0000 m endpoint and trajectory diff.
+  7. Formatted caption distance `1128 m` for number registry scanner compliance.
+  8. Audits verified:
+     - `python scripts/check_readme_paths.py`: 100% PASS (20 paths, 13 anchors).
+     - `python scripts/check_number_registry.py`: ALL AUDITS PASSED (Zero untraceable numbers, zero conflicts, zero unallowlisted numbers).
+     - `python scripts/check_doc_numbers.py`: SUCCESS (All headline document numbers match source JSON/CSV truth within 0.01 tolerance).
+     - `python scripts/check_latex.py`: SUCCESS (Zero LaTeX syntax).
+  9. Validated all 10 Mermaid diagrams in README.
+  10. Cleaned up temporary zip extraction folders (`readme_pack`, `readme_pack.zip`).
+
